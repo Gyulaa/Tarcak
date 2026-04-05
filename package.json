@@ -18,7 +18,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "typecheck:src": "tsc --noEmit -p tsconfig.src.json"
+    "typecheck:src": "tsc --noEmit -p tsconfig.src.json",
+    "security:scan": "node scripts/security-scan.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/jetbrains-mono": "^0.4.1",

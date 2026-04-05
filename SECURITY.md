@@ -15,3 +15,18 @@ Include: affected platform (iOS / Android / version), steps to reproduce, and im
 ## Threat model (short)
 
 See the main [README.md](README.md) security section. This project does not claim protection against malware on a compromised device, kernel-level attackers, or shoulder surfing.
+
+## Automated security scan
+
+The repo runs a **security gate** on push/PR to `main`/`master` and weekly (see [.github/workflows/security.yml](.github/workflows/security.yml)):
+
+1. **`npm audit`** on **production** dependencies (`--omit=dev`), failing the job on **high** or **critical** advisories by default. Dev-only issues are reported as a warning if production is clean.
+2. **Static pattern scan** ([`scripts/security-scan.mjs`](scripts/security-scan.mjs)) over `src/` and root app entry files. It flags common foot-guns: `eval`, dynamic `Function`, Node `child_process` / `execSync` / `spawnSync`, `dangerouslySetInnerHTML`, and `innerHTML` assignment. The app is React Native / local-first; these patterns rarely belong in shipped code.
+
+**Local run:** `npm run security:scan`
+
+**Environment variables:** `SECURITY_AUDIT_ALL=1` treats moderate npm issues as failures. `SECURITY_SKIP_AUDIT=1` skips npm audit (e.g. air-gapped).
+
+**Limits:** This does not prove absence of bugs, malicious dependencies that pass audit, or social engineering. **Malicious “agents”** (compromised maintainer accounts, typosquat packages, prompt-injected tooling) are mitigated partly by audit + review, not eliminated. Prefer pinning versions, reviewing lockfile diffs, and using GitHub **dependency review** on PRs (enabled in the same workflow for PRs).
+
+**Reporting:** Use [GitHub Security Advisories](https://github.com/Gyulaa/Tarcak/security/advisories/new) for sensitive findings, not public issues.

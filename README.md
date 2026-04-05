@@ -24,7 +24,7 @@ The repository [`.github/FUNDING.yml`](.github/FUNDING.yml) points sponsors to t
 
 `app.json` enables the **expo-sqlite** config plugin with **`useSQLCipher: true`**. That only applies after a **native build** (`npx expo prebuild` / EAS / `expo run:*`). **Expo Go does not ship SQLCipher** — the app still runs, but the DB file is **plaintext** there (a console warning explains this). Use a **development build** to validate real encryption.
 
-**CI:** GitHub Actions runs `npm ci` and `npm run typecheck:src` on push/PR to `main` or `master` (see [.github/workflows/ci.yml](.github/workflows/ci.yml)).
+**CI:** GitHub Actions runs `npm ci` and `npm run typecheck:src` on push/PR (see [.github/workflows/ci.yml](.github/workflows/ci.yml)). **Security:** [`security.yml`](.github/workflows/security.yml) runs `npm run security:scan` (npm audit + static pattern gate) and dependency review on PRs; see [SECURITY.md](SECURITY.md).
 
 **Android APK for GitHub Releases:** [docs/ANDROID_GITHUB_RELEASE.md](docs/ANDROID_GITHUB_RELEASE.md) (EAS Build `preview` profile → attach `.apk` to a Release).
 
