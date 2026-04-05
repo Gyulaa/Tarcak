@@ -3,6 +3,8 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { migration0001Initial } from './0001_initial';
 import { migration0002AmountMinorScale } from './0002_amount_minor_scale';
 import { migration0003AssetTypes } from './0003_asset_types';
+import { migration0004Jar } from './0004_jar';
+import { migration0005PocketsArchived } from './0005_pockets_archived';
 import type { Migration } from './types';
 
 /**
@@ -12,6 +14,8 @@ export const ALL_MIGRATIONS: readonly Migration[] = [
   migration0001Initial,
   migration0002AmountMinorScale,
   migration0003AssetTypes,
+  migration0004Jar,
+  migration0005PocketsArchived,
 ].sort(
   (a, b) => a.version - b.version
 );

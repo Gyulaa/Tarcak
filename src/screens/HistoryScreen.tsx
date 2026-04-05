@@ -7,6 +7,7 @@ import * as pocketsRepo from '../db/repositories/pockets';
 import * as txRepo from '../db/repositories/transactions';
 import { font } from '../theme/fonts';
 import { formatMinorForDisplay } from '../utils/formatMinor';
+import { formatOccurredAt } from '../utils/formatOccurredAt';
 
 export default function HistoryScreen({ navigation, route }) {
   const paramPocketId = route.params?.pocketId;
@@ -61,6 +62,7 @@ export default function HistoryScreen({ navigation, route }) {
             style={styles.row}
             onPress={() => navigation.navigate('TransactionEditor', { transactionId: item.id })}
           >
+            <Text style={styles.dateLine}>{formatOccurredAt(item.occurred_at)}</Text>
             <Text style={styles.title}>{item.title}</Text>
             <Text style={styles.meta}>
               {item.kind} · {item.currency} · {formatMinorForDisplay(item.amount_minor, item.currency)}
@@ -84,6 +86,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e8e8e8',
   },
+  dateLine: { fontSize: 12, color: '#888', fontFamily: font.semibold, marginBottom: 6 },
   title: { fontFamily: font.semibold, fontSize: 16, color: '#222' },
   meta: { color: '#666', marginTop: 4, fontSize: 13 },
   chip: {

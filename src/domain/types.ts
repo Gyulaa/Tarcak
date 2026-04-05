@@ -10,6 +10,19 @@ export type Pocket = {
   sort_index: number;
   created_at: number;
   updated_at: number;
+  /** Exactly one pocket per vault; holds pooled funds before distribution. */
+  is_jar: boolean;
+  /** Hidden from pocket lists and transaction pickers (e.g. Jar when pool feature is off). */
+  archived: boolean;
+};
+
+/** One row in `jar_distribution_rules` (basis points, sum must be 10_000 = 100%). */
+export type JarDistributionRule = {
+  id: string;
+  target_pocket_id: string;
+  target_pocket_name: string;
+  percent_bps: number;
+  sort_index: number;
 };
 
 /** User-defined asset / currency code (e.g. HUF, USD, XMR) with a display label. */
@@ -31,6 +44,7 @@ export type LedgerTransaction = {
   /** Integer: 10^-8 of one major unit; income/expense may be negative; transfers are positive. */
   amount_minor: number;
   currency: string;
+  /** Unix ms when the transaction took place (shown in History). */
   occurred_at: number;
   created_at: number;
   updated_at: number;

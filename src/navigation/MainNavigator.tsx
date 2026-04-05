@@ -5,6 +5,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AssetTypesScreen from '../screens/AssetTypesScreen';
 import HistoryScreen from '../screens/HistoryScreen';
 import HomeScreen from '../screens/HomeScreen';
+import JarScreen from '../screens/JarScreen';
+import JarSplitScreen from '../screens/JarSplitScreen';
 import PocketDetailScreen from '../screens/PocketDetailScreen';
 import PocketsScreen from '../screens/PocketsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
@@ -28,6 +30,8 @@ export function MainNavigator({ onLockVault }: { onLockVault: () => Promise<void
           }}
         >
           <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Tarcak' }} />
+          <Stack.Screen name="Jar" component={JarScreen} options={{ title: 'Jar' }} />
+          <Stack.Screen name="JarSplit" component={JarSplitScreen} options={{ title: 'Jar split' }} />
           <Stack.Screen name="Pockets" component={PocketsScreen} options={{ title: 'Pockets' }} />
           <Stack.Screen
             name="PocketDetail"

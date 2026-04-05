@@ -12,11 +12,15 @@ import {
   View,
 } from 'react-native';
 
+import * as settingsRepo from '../db/repositories/settings';
 import { useLedgerStore } from '../stores/ledgerStore';
 import { font } from '../theme/fonts';
 
 export default function PocketsScreen({ navigation }) {
-  const pockets = useLedgerStore((s) => s.pockets);
+  const allPockets = useLedgerStore((s) => s.pockets);
+  const jarPocket = allPockets.find((p) => p.is_jar);
+  const regularPockets = allPockets.filter((p) => !p.is_jar);
+  const listData = jarPocket ? [jarPocket, ...regularPockets] : regularPockets;
   const refresh = useLedgerStore((s) => s.refresh);
   const addPocket = useLedgerStore((s) => s.addPocket);
   const removePocketIfEmpty = useLedgerStore((s) => s.removePocketIfEmpty);
@@ -25,10 +29,14 @@ export default function PocketsScreen({ navigation }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [newName, setNewName] = useState('');
   const [busy, setBusy] = useState(false);
+  const [jarEnabled, setJarEnabled] = useState(true);
 
   useFocusEffect(
     useCallback(() => {
       void refresh();
+      void (async () => {
+        setJarEnabled(await settingsRepo.getJarEnabled());
+      })();
     }, [refresh])
   );
 
@@ -68,23 +76,49 @@ export default function PocketsScreen({ navigation }) {
         <Text style={styles.addBtnText}>+ New pocket</Text>
       </Pressable>
       <FlatList
-        data={pockets}
+        data={listData}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         ListEmptyComponent={<Text style={styles.muted}>No pockets yet.</Text>}
-        renderItem={({ item }) => (
-          <Pressable
-            style={styles.card}
-            onPress={() => navigation.navigate('PocketDetail', { pocketId: item.id })}
-          >
-            <View style={styles.cardMain}>
-              <Text style={styles.cardTitle}>{item.name}</Text>
-            </View>
-            <Pressable onPress={() => tryDelete(item.id, item.name)} hitSlop={10}>
-              <Text style={styles.delete}>Delete</Text>
+        renderItem={({ item }) => {
+          const isJarRow = item.is_jar;
+          const jarUx = isJarRow && jarEnabled;
+          if (jarUx) {
+            return (
+              <Pressable
+                style={styles.jarCard}
+                onPress={() => navigation.navigate('Jar')}
+              >
+                <View style={styles.jarCardIcon}>
+                  <Text style={styles.jarIconGlyph}>J</Text>
+                </View>
+                <View style={styles.jarCardMain}>
+                  <Text style={styles.jarBadge}>Jar</Text>
+                  <Text style={styles.jarCardTitle}>{item.name}</Text>
+                  <Text style={styles.jarCardHint}>Pool · tap to distribute</Text>
+                </View>
+                <Text style={styles.jarChevron}>›</Text>
+              </Pressable>
+            );
+          }
+          return (
+            <Pressable
+              style={styles.card}
+              onPress={() => navigation.navigate('PocketDetail', { pocketId: item.id })}
+            >
+              <View style={styles.cardMain}>
+                <Text style={styles.cardTitle}>{item.name}</Text>
+              </View>
+              {!isJarRow ? (
+                <Pressable onPress={() => tryDelete(item.id, item.name)} hitSlop={10}>
+                  <Text style={styles.delete}>Delete</Text>
+                </Pressable>
+              ) : (
+                <View style={styles.jarNoDelete} />
+              )}
             </Pressable>
-          </Pressable>
-        )}
+          );
+        }}
       />
 
       <Modal visible={modalOpen} transparent animationType="fade">
@@ -143,6 +177,43 @@ const styles = StyleSheet.create({
   },
   cardMain: { flex: 1 },
   cardTitle: { fontSize: 16, fontFamily: font.semibold, color: '#222' },
+  jarCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff7f3',
+    padding: 14,
+    borderRadius: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#ffd4c4',
+    shadowColor: '#ff6f32',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  jarCardIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#ff6f32',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  jarIconGlyph: { color: '#fff', fontSize: 20, fontFamily: font.bold },
+  jarCardMain: { flex: 1 },
+  jarBadge: {
+    fontSize: 11,
+    fontFamily: font.bold,
+    color: '#ff6f32',
+    letterSpacing: 0.8,
+    marginBottom: 2,
+  },
+  jarCardTitle: { fontSize: 17, fontFamily: font.bold, color: '#1a1a1a' },
+  jarCardHint: { fontSize: 13, color: '#9a3412', marginTop: 4 },
+  jarChevron: { fontSize: 26, color: '#ff6f32', fontWeight: '300' },
+  jarNoDelete: { width: 48 },
   delete: { color: '#b00020', fontSize: 14 },
   modalOverlay: {
     flex: 1,

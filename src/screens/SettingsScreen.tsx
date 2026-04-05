@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { useCallback, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
@@ -15,6 +15,7 @@ export default function SettingsScreen() {
   const [assetTypes, setAssetTypes] = useState([]);
   const [defaultCode, setDefaultCode] = useState('HUF');
   const [loaded, setLoaded] = useState(false);
+  const [jarEnabled, setJarEnabled] = useState(true);
 
   useFocusEffect(
     useCallback(() => {
@@ -23,10 +24,20 @@ export default function SettingsScreen() {
         setAssetTypes(types);
         const c = await settingsRepo.getDefaultCurrency();
         setDefaultCode(c);
+        setJarEnabled(await settingsRepo.getJarEnabled());
         setLoaded(true);
       })();
     }, [])
   );
+
+  const onJarToggle = async (value) => {
+    try {
+      await settingsRepo.setJarEnabled(value);
+      setJarEnabled(value);
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : String(e));
+    }
+  };
 
   const save = async () => {
     try {
@@ -70,6 +81,27 @@ export default function SettingsScreen() {
       <Pressable style={styles.secondaryBtn} onPress={() => navigation.navigate('AssetTypes')}>
         <Text style={styles.secondaryBtnText}>Asset types…</Text>
       </Pressable>
+
+      <View style={styles.divider} />
+
+      <Text style={styles.label}>Jar</Text>
+      <View style={styles.switchRow}>
+        <View style={styles.switchTextCol}>
+          <Text style={styles.switchTitle}>Pool & distribute</Text>
+          <Text style={styles.switchHint}>
+            Home shortcut, distribution, and the highlighted Jar row in Pockets. When off, the Jar
+            pocket is archived: hidden from lists and from new transaction pickers until you turn this
+            back on.
+          </Text>
+        </View>
+        <Switch
+          value={jarEnabled}
+          onValueChange={(v) => void onJarToggle(v)}
+          disabled={!loaded}
+          trackColor={{ false: '#ddd', true: '#ffc4a8' }}
+          thumbColor={jarEnabled ? '#ff6f32' : '#f4f4f4'}
+        />
+      </View>
 
       <View style={styles.divider} />
 
@@ -117,6 +149,20 @@ const styles = StyleSheet.create({
   },
   secondaryBtnText: { color: '#ff6f32', fontFamily: font.semibold, fontSize: 16 },
   divider: { height: 1, backgroundColor: '#ddd', marginVertical: 28 },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#e8e8e8',
+    marginBottom: 8,
+  },
+  switchTextCol: { flex: 1 },
+  switchTitle: { fontFamily: font.semibold, fontSize: 16, color: '#222', marginBottom: 6 },
+  switchHint: { fontSize: 13, color: '#666', lineHeight: 19 },
   lockRow: { paddingVertical: 8 },
   lockText: { fontSize: 17, fontFamily: font.semibold, color: '#b00020' },
   lockHint: { color: '#666', marginTop: 6, fontSize: 13 },

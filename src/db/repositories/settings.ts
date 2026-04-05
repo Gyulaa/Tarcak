@@ -1,7 +1,9 @@
 import { openMainDatabase } from '../client';
 import * as assetTypesRepo from './assetTypes';
+import * as pocketsRepo from './pockets';
 
 const KEY_DEFAULT_CURRENCY = 'default_currency';
+const KEY_JAR_ENABLED = 'jar_enabled';
 
 export async function getSetting(key: string): Promise<string | null> {
   const db = await openMainDatabase();
@@ -32,4 +34,19 @@ export async function setDefaultCurrency(code: string): Promise<void> {
     throw new Error(`Add "${c}" as an asset type before setting it as default.`);
   }
   await setSetting(KEY_DEFAULT_CURRENCY, c);
+}
+
+/** When false, Jar pool UI is hidden and the Jar pocket is archived. Default on. */
+export async function getJarEnabled(): Promise<boolean> {
+  const v = await getSetting(KEY_JAR_ENABLED);
+  if (v == null || v.trim() === '') {
+    return true;
+  }
+  const t = v.trim().toLowerCase();
+  return t === '1' || t === 'true' || t === 'yes';
+}
+
+export async function setJarEnabled(enabled: boolean): Promise<void> {
+  await setSetting(KEY_JAR_ENABLED, enabled ? '1' : '0');
+  await pocketsRepo.setJarPocketArchived(!enabled);
 }

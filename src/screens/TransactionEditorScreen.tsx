@@ -17,6 +17,7 @@ import * as settingsRepo from '../db/repositories/settings';
 import * as txRepo from '../db/repositories/transactions';
 import { font } from '../theme/fonts';
 import { formatMinorToAmountString, parseAmountStringToMinor } from '../utils/amountMinor';
+import { formatOccurredAt } from '../utils/formatOccurredAt';
 
 const KINDS = ['income', 'expense', 'transfer'];
 
@@ -235,6 +236,13 @@ export default function TransactionEditorScreen({ navigation, route }) {
       <Text style={styles.label}>Title</Text>
       <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="e.g. Groceries" />
 
+      {transactionId && occurredAt != null ? (
+        <>
+          <Text style={styles.label}>Conducted</Text>
+          <Text style={styles.conductedText}>{formatOccurredAt(occurredAt)}</Text>
+        </>
+      ) : null}
+
       <Text style={styles.label}>Amount</Text>
       <TextInput
         style={styles.input}
@@ -326,6 +334,7 @@ const styles = StyleSheet.create({
   inner: { padding: 16, paddingBottom: 40 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   label: { fontFamily: font.semibold, marginTop: 12, marginBottom: 6, color: '#222' },
+  conductedText: { fontSize: 16, color: '#333' },
   input: {
     borderWidth: 1,
     borderColor: '#ccc',
