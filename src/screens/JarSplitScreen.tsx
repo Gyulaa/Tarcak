@@ -16,7 +16,9 @@ import {
 import * as jarRepo from '../db/repositories/jar';
 import * as pocketsRepo from '../db/repositories/pockets';
 import * as settingsRepo from '../db/repositories/settings';
+import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
+import type { AppColors } from '../theme/palette';
 
 const TOTAL_BPS = 10_000;
 
@@ -44,6 +46,8 @@ function equalBpsForRows(n) {
 }
 
 export default function JarSplitScreen({ navigation }) {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createSplitStyles(colors), [colors]);
   const [rows, setRows] = useState([]);
   const [available, setAvailable] = useState([]);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -236,7 +240,7 @@ export default function JarSplitScreen({ navigation }) {
                   onChangeText={(t) => updatePercent(r.pocketId, t)}
                   keyboardType="decimal-pad"
                   placeholder="0"
-                  placeholderTextColor="#aaa"
+                  placeholderTextColor={colors.placeholder}
                 />
                 <Text style={styles.pctSuffix}>%</Text>
               </View>
@@ -278,111 +282,123 @@ export default function JarSplitScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#f8f9fa' },
-  disabledWrap: { padding: 24, paddingTop: 40 },
-  disabledTitle: { fontSize: 20, fontFamily: font.bold, color: '#111', marginBottom: 10 },
-  disabledBody: { fontSize: 15, color: '#555', lineHeight: 22, marginBottom: 20 },
-  settingsBtn: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#ff6f32',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-  },
-  settingsBtnText: { color: '#fff', fontFamily: font.semibold, fontSize: 16 },
-  inner: { padding: 20, paddingBottom: 40 },
-  lead: { fontSize: 15, color: '#555', lineHeight: 22, marginBottom: 12 },
-  advLink: { marginBottom: 20, paddingVertical: 4 },
-  advLinkText: { color: '#ff6f32', fontFamily: font.semibold, fontSize: 15 },
-  totalCard: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#e8e8e8',
-  },
-  totalTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  totalLabel: { fontSize: 14, color: '#888', fontFamily: font.semibold },
-  totalValue: { fontSize: 22, fontFamily: font.bold, color: '#c62828' },
-  totalOk: { color: '#2e7d32' },
-  totalWarn: { marginTop: 8, fontSize: 13, color: '#c62828' },
-  barTrack: {
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#eee',
-    marginTop: 14,
-    overflow: 'hidden',
-  },
-  barFill: {
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#ff6f32',
-    maxWidth: '100%',
-  },
-  toolbar: { flexDirection: 'row', gap: 10, marginBottom: 16 },
-  toolBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    alignItems: 'center',
-  },
-  toolBtnText: { fontFamily: font.semibold, color: '#333', fontSize: 14 },
-  rowCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#e8e8e8',
-  },
-  rowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  rowName: { flex: 1, fontFamily: font.semibold, fontSize: 16, color: '#222', marginRight: 12 },
-  remove: { color: '#b00020', fontSize: 14 },
-  rowInputWrap: { flexDirection: 'row', alignItems: 'center' },
-  rowInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 18,
-    fontFamily: font.semibold,
-    color: '#111',
-    backgroundColor: '#fafafa',
-  },
-  pctSuffix: { marginLeft: 10, fontSize: 18, fontFamily: font.semibold, color: '#666' },
-  muted: { color: '#666', textAlign: 'center', marginVertical: 16 },
-  saveBtn: {
-    marginTop: 20,
-    backgroundColor: '#ff6f32',
-    paddingVertical: 16,
-    borderRadius: 14,
-    alignItems: 'center',
-  },
-  saveDisabled: { opacity: 0.45 },
-  saveBtnText: { color: '#fff', fontFamily: font.bold, fontSize: 17 },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  modalBox: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    padding: 16,
-    maxHeight: '70%',
-  },
-  modalTitle: { fontSize: 18, fontFamily: font.bold, marginBottom: 12 },
-  pickerList: { maxHeight: 280 },
-  pickerRow: { paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
-  pickerName: { fontSize: 16, color: '#222' },
-  modalClose: { marginTop: 12, alignItems: 'center', padding: 8 },
-  modalCloseText: { color: '#666', fontFamily: font.semibold },
-});
+function createSplitStyles(c: AppColors) {
+  return StyleSheet.create({
+    root: { flex: 1, backgroundColor: c.bg },
+    disabledWrap: { padding: 24, paddingTop: 40 },
+    disabledTitle: { fontSize: 20, fontFamily: font.bold, color: c.text, marginBottom: 10 },
+    disabledBody: { fontSize: 15, color: c.textMuted, lineHeight: 22, marginBottom: 20 },
+    settingsBtn: {
+      alignSelf: 'flex-start',
+      backgroundColor: c.primary,
+      paddingVertical: 12,
+      paddingHorizontal: 20,
+      borderRadius: 10,
+    },
+    settingsBtnText: { color: c.onPrimary, fontFamily: font.semibold, fontSize: 16 },
+    inner: { padding: 20, paddingBottom: 40 },
+    lead: { fontSize: 15, color: c.textMuted, lineHeight: 22, marginBottom: 12 },
+    advLink: { marginBottom: 20, paddingVertical: 4 },
+    advLinkText: { color: c.primary, fontFamily: font.semibold, fontSize: 15 },
+    totalCard: {
+      backgroundColor: c.surface,
+      borderRadius: 14,
+      padding: 16,
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    totalTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    totalLabel: { fontSize: 14, color: c.textMuted, fontFamily: font.semibold },
+    totalValue: { fontSize: 22, fontFamily: font.bold, color: c.danger },
+    totalOk: { color: c.success },
+    totalWarn: { marginTop: 8, fontSize: 13, color: c.danger },
+    barTrack: {
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: c.barTrack,
+      marginTop: 14,
+      overflow: 'hidden',
+    },
+    barFill: {
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: c.primary,
+      maxWidth: '100%',
+    },
+    toolbar: { flexDirection: 'row', gap: 10, marginBottom: 16 },
+    toolBtn: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: 10,
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.borderStrong,
+      alignItems: 'center',
+    },
+    toolBtnText: { fontFamily: font.semibold, color: c.textSecondary, fontSize: 14 },
+    rowCard: {
+      backgroundColor: c.surface,
+      borderRadius: 12,
+      padding: 14,
+      marginBottom: 10,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    rowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+    rowName: { flex: 1, fontFamily: font.semibold, fontSize: 16, color: c.text, marginRight: 12 },
+    remove: { color: c.danger, fontSize: 14 },
+    rowInputWrap: { flexDirection: 'row', alignItems: 'center' },
+    rowInput: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: c.inputBorder,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 18,
+      fontFamily: font.semibold,
+      color: c.inputText,
+      backgroundColor: c.inputBg,
+    },
+    pctSuffix: { marginLeft: 10, fontSize: 18, fontFamily: font.semibold, color: c.textMuted },
+    muted: { color: c.textMuted, textAlign: 'center', marginVertical: 16 },
+    saveBtn: {
+      marginTop: 20,
+      backgroundColor: c.primary,
+      paddingVertical: 16,
+      borderRadius: 14,
+      alignItems: 'center',
+    },
+    saveDisabled: { opacity: 0.45 },
+    saveBtnText: { color: c.onPrimary, fontFamily: font.bold, fontSize: 17 },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: c.modalOverlay,
+      justifyContent: 'center',
+      padding: 24,
+    },
+    modalBox: {
+      backgroundColor: c.surface,
+      borderRadius: 14,
+      padding: 16,
+      maxHeight: '70%',
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    modalTitle: { fontSize: 18, fontFamily: font.bold, marginBottom: 12, color: c.text },
+    pickerList: { maxHeight: 280 },
+    pickerRow: {
+      paddingVertical: 14,
+      paddingHorizontal: 12,
+      marginBottom: 6,
+      borderRadius: 8,
+      backgroundColor: c.pocketPickBg,
+      borderWidth: 1,
+      borderColor: c.pocketPickBorder,
+    },
+    pickerName: { fontSize: 16, color: c.pocketPickText },
+    modalClose: { marginTop: 12, alignItems: 'center', padding: 8 },
+    modalCloseText: { color: c.textMuted, fontFamily: font.semibold },
+  });
+}

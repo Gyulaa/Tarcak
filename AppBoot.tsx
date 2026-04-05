@@ -19,6 +19,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { MainNavigator } from './src/navigation/MainNavigator';
+import { AppThemeProvider, useAppTheme } from './src/theme/ThemeContext';
 import { font } from './src/theme/fonts';
 import {
   createFirstVault,
@@ -32,6 +33,11 @@ import {
   WrongVaultPasswordError,
 } from './src/security';
 import { useLedgerStore } from './src/stores/ledgerStore';
+
+function VaultStatusBar() {
+  const { isDark } = useAppTheme();
+  return <StatusBar style={isDark ? 'light' : 'dark'} />;
+}
 
 type VaultPhaseKey = 'kdf' | 'db';
 
@@ -204,8 +210,10 @@ export default function AppBoot() {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
-          <MainNavigator onLockVault={handleLockFromApp} />
-          <StatusBar style="auto" />
+          <AppThemeProvider>
+            <MainNavigator onLockVault={handleLockFromApp} />
+            <VaultStatusBar />
+          </AppThemeProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>
     );

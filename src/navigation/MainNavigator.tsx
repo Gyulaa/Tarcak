@@ -13,6 +13,7 @@ import PocketDetailScreen from '../screens/PocketDetailScreen';
 import PocketsScreen from '../screens/PocketsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import TransactionEditorScreen from '../screens/TransactionEditorScreen';
+import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import { LockVaultContext } from './LockVaultContext';
 import type { RootStackParamList } from './types';
@@ -22,46 +23,57 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 export function MainNavigator({ onLockVault }: { onLockVault: () => Promise<void> }) {
   return (
     <LockVaultContext.Provider value={onLockVault}>
-      <NavigationContainer>
-        <Stack.Navigator
-          initialRouteName="Home"
-          screenOptions={{
-            headerTintColor: '#ff6f32',
-            headerTitleStyle: { fontFamily: font.semibold },
-            headerBackTitleStyle: { fontFamily: font.regular },
-          }}
-        >
-          <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Tarcak' }} />
-          <Stack.Screen name="Jar" component={JarScreen} options={{ title: 'Jar' }} />
-          <Stack.Screen name="JarSplit" component={JarSplitScreen} options={{ title: 'Jar split' }} />
-          <Stack.Screen name="JarAdvanced" component={JarAdvancedHub} options={{ title: 'Advanced Jar' }} />
-          <Stack.Screen
-            name="JarAdvancedAssetEditor"
-            component={JarAdvancedAssetEditor}
-            options={({ route }) => ({
-              title: route.params?.currency ? `Jar: ${route.params.currency}` : 'Advanced asset',
-            })}
-          />
-          <Stack.Screen name="Pockets" component={PocketsScreen} options={{ title: 'Pockets' }} />
-          <Stack.Screen
-            name="PocketDetail"
-            component={PocketDetailScreen}
-            options={{ title: 'Pocket' }}
-          />
-          <Stack.Screen
-            name="TransactionEditor"
-            component={TransactionEditorScreen}
-            options={{ title: 'Transaction' }}
-          />
-          <Stack.Screen name="History" component={HistoryScreen} options={{ title: 'History' }} />
-          <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
-          <Stack.Screen
-            name="AssetTypes"
-            component={AssetTypesScreen}
-            options={{ title: 'Asset types' }}
-          />
-        </Stack.Navigator>
-      </NavigationContainer>
+      <MainStack />
     </LockVaultContext.Provider>
+  );
+}
+
+function MainStack() {
+  const { colors, isDark, navTheme } = useAppTheme();
+
+  return (
+    <NavigationContainer theme={navTheme}>
+      <Stack.Navigator
+        initialRouteName="Home"
+        screenOptions={{
+          headerStyle: { backgroundColor: colors.surface },
+          headerTintColor: colors.primary,
+          headerTitleStyle: { fontFamily: font.semibold, color: colors.text },
+          headerBackTitleStyle: { fontFamily: font.regular },
+          headerShadowVisible: !isDark,
+          contentStyle: { backgroundColor: colors.bg },
+        }}
+      >
+        <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Tarcak' }} />
+        <Stack.Screen name="Jar" component={JarScreen} options={{ title: 'Jar' }} />
+        <Stack.Screen name="JarSplit" component={JarSplitScreen} options={{ title: 'Jar split' }} />
+        <Stack.Screen name="JarAdvanced" component={JarAdvancedHub} options={{ title: 'Advanced Jar' }} />
+        <Stack.Screen
+          name="JarAdvancedAssetEditor"
+          component={JarAdvancedAssetEditor}
+          options={({ route }) => ({
+            title: route.params?.currency ? `Jar: ${route.params.currency}` : 'Advanced asset',
+          })}
+        />
+        <Stack.Screen name="Pockets" component={PocketsScreen} options={{ title: 'Pockets' }} />
+        <Stack.Screen
+          name="PocketDetail"
+          component={PocketDetailScreen}
+          options={{ title: 'Pocket' }}
+        />
+        <Stack.Screen
+          name="TransactionEditor"
+          component={TransactionEditorScreen}
+          options={{ title: 'Transaction' }}
+        />
+        <Stack.Screen name="History" component={HistoryScreen} options={{ title: 'History' }} />
+        <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
+        <Stack.Screen
+          name="AssetTypes"
+          component={AssetTypesScreen}
+          options={{ title: 'Asset types' }}
+        />
+      </Stack.Navigator>
+    </NavigationContainer>
   );
 }

@@ -16,7 +16,9 @@ import {
 import * as jarAdvancedRepo from '../db/repositories/jarAdvanced';
 import * as jarRepo from '../db/repositories/jar';
 import * as pocketsRepo from '../db/repositories/pockets';
+import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
+import type { AppColors } from '../theme/palette';
 import { formatMinorToAmountString, parseAmountStringToMinor } from '../utils/amountMinor';
 
 const TOTAL_BPS = 10_000;
@@ -76,6 +78,8 @@ function sumBpsForRows(rows) {
 }
 
 export default function JarAdvancedAssetEditor({ navigation, route }) {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createEditorStyles(colors), [colors]);
   const currency = route.params?.currency?.trim().toUpperCase() ?? '';
 
   const [ceilingStr, setCeilingStr] = useState('0');
@@ -334,7 +338,7 @@ export default function JarAdvancedAssetEditor({ navigation, route }) {
           onChangeText={setCeilingStr}
           keyboardType="decimal-pad"
           placeholder="0"
-          placeholderTextColor="#aaa"
+          placeholderTextColor={colors.placeholder}
         />
 
         <Text style={[styles.sectionLabel, styles.mt]}>Default split (at or below ceiling)</Text>
@@ -347,7 +351,7 @@ export default function JarAdvancedAssetEditor({ navigation, route }) {
           </Pressable>
         </View>
         {renderSplitSection(defaultRows, setDefaultRows)}
-        <SegmentTotalBar total={defaultTotal} />
+        <SegmentTotalBar total={defaultTotal} barStyles={styles} />
 
         <View style={styles.mileHeaderRow}>
           <Text style={[styles.sectionLabel, styles.mtMb0]}>Milestones</Text>
@@ -375,7 +379,7 @@ export default function JarAdvancedAssetEditor({ navigation, route }) {
               onChangeText={(t) => updateMilestoneThreshold(idx, t)}
               keyboardType="decimal-pad"
               placeholder="Amount in Jar"
-              placeholderTextColor="#aaa"
+              placeholderTextColor={colors.placeholder}
             />
             <View style={styles.toolbar}>
               <Pressable
@@ -394,7 +398,7 @@ export default function JarAdvancedAssetEditor({ navigation, route }) {
               </Pressable>
             </View>
             {renderMilestoneRows(idx, m.rows)}
-            <SegmentTotalBar total={sumBpsForRows(m.rows)} />
+            <SegmentTotalBar total={sumBpsForRows(m.rows)} barStyles={styles} />
           </View>
         ))}
 
@@ -464,7 +468,7 @@ export default function JarAdvancedAssetEditor({ navigation, route }) {
                 }
                 keyboardType="decimal-pad"
                 placeholder="0"
-                placeholderTextColor="#aaa"
+                placeholderTextColor={colors.placeholder}
               />
               <Text style={styles.pctSuffix}>%</Text>
             </View>
@@ -484,147 +488,160 @@ export default function JarAdvancedAssetEditor({ navigation, route }) {
   }
 }
 
-function SegmentTotalBar({ total }) {
+function SegmentTotalBar({ total, barStyles }) {
   const fillPct = total.sum / 100;
   const barPct = Math.min(100, Math.max(0, fillPct));
+  const s = barStyles;
   return (
-    <View style={styles.totalCard}>
-      <View style={styles.totalTop}>
-        <Text style={styles.totalLabel}>Segment total</Text>
-        <Text style={[styles.totalValue, total.ok && styles.totalOk]}>
+    <View style={s.totalCard}>
+      <View style={s.totalTop}>
+        <Text style={s.totalLabel}>Segment total</Text>
+        <Text style={[s.totalValue, total.ok && s.totalOk]}>
           {total.valid ? `${fillPct.toFixed(2)}%` : '—'}
         </Text>
       </View>
-      <View style={styles.barTrack}>
-        <View style={[styles.barFill, { width: `${barPct}%` }]} />
+      <View style={s.barTrack}>
+        <View style={[s.barFill, { width: `${barPct}%` }]} />
       </View>
       {!total.ok && total.valid ? (
-        <Text style={styles.totalWarn}>Adjust to reach 100.00%</Text>
+        <Text style={s.totalWarn}>Adjust to reach 100.00%</Text>
       ) : null}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#f8f9fa' },
-  inner: { padding: 20, paddingBottom: 40 },
-  centered: { flex: 1, backgroundColor: '#f8f9fa' },
-  muted: { color: '#666', textAlign: 'center', marginVertical: 12 },
-  sectionLabel: { fontFamily: font.semibold, fontSize: 16, color: '#222', marginBottom: 8 },
-  subLabel: { fontSize: 13, color: '#666', marginBottom: 6 },
-  hint: { fontSize: 14, color: '#666', lineHeight: 20, marginBottom: 10 },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 16,
-    backgroundColor: '#fff',
-    color: '#111',
-  },
-  mt: { marginTop: 20 },
-  mtMb0: { marginTop: 20, marginBottom: 0 },
-  mileHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 8,
-  },
-  smallAdd: { paddingVertical: 6, paddingHorizontal: 10 },
-  smallAddText: { color: '#ff6f32', fontFamily: font.semibold, fontSize: 15 },
-  toolbar: { flexDirection: 'row', gap: 10, marginBottom: 12, marginTop: 8 },
-  toolBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    alignItems: 'center',
-  },
-  toolBtnText: { fontFamily: font.semibold, color: '#333', fontSize: 14 },
-  milestoneCard: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#e8e8e8',
-  },
-  mileTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-  mileTitle: { fontFamily: font.bold, fontSize: 16, color: '#222' },
-  rowCard: {
-    backgroundColor: '#fafafa',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#e8e8e8',
-  },
-  rowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  rowName: { flex: 1, fontFamily: font.semibold, fontSize: 15, color: '#222', marginRight: 12 },
-  remove: { color: '#b00020', fontSize: 14 },
-  rowInputWrap: { flexDirection: 'row', alignItems: 'center' },
-  rowInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    fontFamily: font.semibold,
-    color: '#111',
-    backgroundColor: '#fff',
-  },
-  pctSuffix: { marginLeft: 8, fontSize: 16, fontFamily: font.semibold, color: '#666' },
-  totalCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#e8e8e8',
-  },
-  totalTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  totalLabel: { fontSize: 13, color: '#888', fontFamily: font.semibold },
-  totalValue: { fontSize: 18, fontFamily: font.bold, color: '#c62828' },
-  totalOk: { color: '#2e7d32' },
-  totalWarn: { marginTop: 6, fontSize: 12, color: '#c62828' },
-  barTrack: {
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#eee',
-    marginTop: 10,
-    overflow: 'hidden',
-  },
-  barFill: { height: 8, borderRadius: 4, backgroundColor: '#ff6f32', maxWidth: '100%' },
-  saveBtn: {
-    marginTop: 8,
-    backgroundColor: '#ff6f32',
-    paddingVertical: 16,
-    borderRadius: 14,
-    alignItems: 'center',
-  },
-  saveDisabled: { opacity: 0.45 },
-  saveBtnText: { color: '#fff', fontFamily: font.bold, fontSize: 17 },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  modalBox: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    padding: 16,
-    maxHeight: '70%',
-  },
-  modalTitle: { fontSize: 18, fontFamily: font.bold, marginBottom: 12 },
-  pickerList: { maxHeight: 280 },
-  pickerRow: { paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
-  pickerName: { fontSize: 16, color: '#222' },
-  modalClose: { marginTop: 12, alignItems: 'center', padding: 8 },
-  modalCloseText: { color: '#666', fontFamily: font.semibold },
-});
+function createEditorStyles(c: AppColors) {
+  return StyleSheet.create({
+    root: { flex: 1, backgroundColor: c.bg },
+    inner: { padding: 20, paddingBottom: 40 },
+    centered: { flex: 1, backgroundColor: c.bg },
+    muted: { color: c.textMuted, textAlign: 'center', marginVertical: 12 },
+    sectionLabel: { fontFamily: font.semibold, fontSize: 16, color: c.text, marginBottom: 8 },
+    subLabel: { fontSize: 13, color: c.textMuted, marginBottom: 6 },
+    hint: { fontSize: 14, color: c.textMuted, lineHeight: 20, marginBottom: 10 },
+    input: {
+      borderWidth: 1,
+      borderColor: c.inputBorder,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 16,
+      backgroundColor: c.inputBg,
+      color: c.inputText,
+    },
+    mt: { marginTop: 20 },
+    mtMb0: { marginTop: 20, marginBottom: 0 },
+    mileHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: 8,
+    },
+    smallAdd: { paddingVertical: 6, paddingHorizontal: 10 },
+    smallAddText: { color: c.primary, fontFamily: font.semibold, fontSize: 15 },
+    toolbar: { flexDirection: 'row', gap: 10, marginBottom: 12, marginTop: 8 },
+    toolBtn: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: 10,
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.borderStrong,
+      alignItems: 'center',
+    },
+    toolBtnText: { fontFamily: font.semibold, color: c.textSecondary, fontSize: 14 },
+    milestoneCard: {
+      backgroundColor: c.surface,
+      borderRadius: 14,
+      padding: 14,
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    mileTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+    mileTitle: { fontFamily: font.bold, fontSize: 16, color: c.text },
+    rowCard: {
+      backgroundColor: c.surfaceMuted,
+      borderRadius: 12,
+      padding: 12,
+      marginBottom: 8,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    rowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+    rowName: { flex: 1, fontFamily: font.semibold, fontSize: 15, color: c.text, marginRight: 12 },
+    remove: { color: c.danger, fontSize: 14 },
+    rowInputWrap: { flexDirection: 'row', alignItems: 'center' },
+    rowInput: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: c.inputBorder,
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      fontSize: 16,
+      fontFamily: font.semibold,
+      color: c.inputText,
+      backgroundColor: c.inputBg,
+    },
+    pctSuffix: { marginLeft: 8, fontSize: 16, fontFamily: font.semibold, color: c.textMuted },
+    totalCard: {
+      backgroundColor: c.surface,
+      borderRadius: 12,
+      padding: 12,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    totalTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    totalLabel: { fontSize: 13, color: c.textMuted, fontFamily: font.semibold },
+    totalValue: { fontSize: 18, fontFamily: font.bold, color: c.danger },
+    totalOk: { color: c.success },
+    totalWarn: { marginTop: 6, fontSize: 12, color: c.danger },
+    barTrack: {
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: c.barTrack,
+      marginTop: 10,
+      overflow: 'hidden',
+    },
+    barFill: { height: 8, borderRadius: 4, backgroundColor: c.primary, maxWidth: '100%' },
+    saveBtn: {
+      marginTop: 8,
+      backgroundColor: c.primary,
+      paddingVertical: 16,
+      borderRadius: 14,
+      alignItems: 'center',
+    },
+    saveDisabled: { opacity: 0.45 },
+    saveBtnText: { color: c.onPrimary, fontFamily: font.bold, fontSize: 17 },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: c.modalOverlay,
+      justifyContent: 'center',
+      padding: 24,
+    },
+    modalBox: {
+      backgroundColor: c.surface,
+      borderRadius: 14,
+      padding: 16,
+      maxHeight: '70%',
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    modalTitle: { fontSize: 18, fontFamily: font.bold, marginBottom: 12, color: c.text },
+    pickerList: { maxHeight: 280 },
+    pickerRow: {
+      paddingVertical: 14,
+      paddingHorizontal: 12,
+      marginBottom: 6,
+      borderRadius: 8,
+      backgroundColor: c.pocketPickBg,
+      borderWidth: 1,
+      borderColor: c.pocketPickBorder,
+    },
+    pickerName: { fontSize: 16, color: c.pocketPickText },
+    modalClose: { marginTop: 12, alignItems: 'center', padding: 8 },
+    modalCloseText: { color: c.textMuted, fontFamily: font.semibold },
+  });
+}

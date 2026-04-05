@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -13,9 +13,13 @@ import {
 } from 'react-native';
 
 import * as assetTypesRepo from '../db/repositories/assetTypes';
+import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
+import type { AppColors } from '../theme/palette';
 
 export default function AssetTypesScreen() {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [items, setItems] = useState([]);
   const [createOpen, setCreateOpen] = useState(false);
   const [newCode, setNewCode] = useState('');
@@ -132,6 +136,7 @@ export default function AssetTypesScreen() {
             <TextInput
               style={styles.input}
               placeholder="e.g. XMR"
+              placeholderTextColor={colors.placeholder}
               value={newCode}
               onChangeText={(t) => setNewCode(t.toUpperCase())}
               autoCapitalize="characters"
@@ -142,12 +147,13 @@ export default function AssetTypesScreen() {
             <TextInput
               style={styles.input}
               placeholder="e.g. Monero"
+              placeholderTextColor={colors.placeholder}
               value={newName}
               onChangeText={setNewName}
             />
             <View style={styles.modalActions}>
               <Pressable onPress={() => setCreateOpen(false)} style={styles.modalCancel}>
-                <Text>Cancel</Text>
+                <Text style={styles.modalCancelText}>Cancel</Text>
               </Pressable>
               <Pressable
                 onPress={() => void submitCreate()}
@@ -173,6 +179,7 @@ export default function AssetTypesScreen() {
               value={renameValue}
               onChangeText={setRenameValue}
               autoFocus
+              placeholderTextColor={colors.placeholder}
             />
             <View style={styles.modalActions}>
               <Pressable
@@ -182,7 +189,7 @@ export default function AssetTypesScreen() {
                 }}
                 style={styles.modalCancel}
               >
-                <Text>Cancel</Text>
+                <Text style={styles.modalCancelText}>Cancel</Text>
               </Pressable>
               <Pressable
                 onPress={() => void submitRename()}
@@ -199,53 +206,64 @@ export default function AssetTypesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa' },
-  p: { color: '#444', marginHorizontal: 16, marginTop: 12, marginBottom: 8, lineHeight: 22 },
-  list: { padding: 16, paddingTop: 8 },
-  muted: { textAlign: 'center', color: '#666', marginTop: 24 },
-  addBtn: {
-    marginHorizontal: 16,
-    marginBottom: 4,
-    backgroundColor: '#ff6f32',
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  addBtnText: { color: '#fff', fontFamily: font.semibold },
-  card: {
-    backgroundColor: '#fff',
-    padding: 14,
-    borderRadius: 10,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#e8e8e8',
-  },
-  cardMain: { marginBottom: 8 },
-  cardCode: { fontSize: 16, fontFamily: font.bold, color: '#222' },
-  cardName: { fontSize: 14, color: '#555', marginTop: 4 },
-  cardActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 16 },
-  link: { color: '#ff6f32', fontFamily: font.semibold, fontSize: 14 },
-  delete: { color: '#b00020', fontSize: 14 },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  modalBox: { backgroundColor: '#fff', borderRadius: 12, padding: 16 },
-  modalTitle: { fontSize: 18, fontFamily: font.semibold, marginBottom: 12 },
-  fieldLabel: { fontFamily: font.semibold, color: '#333', marginBottom: 4, marginTop: 8 },
-  codeReadonly: { fontSize: 16, fontFamily: font.semibold, color: '#111', marginBottom: 4 },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-  },
-  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 16, gap: 16 },
-  modalCancel: { padding: 8 },
-  modalOk: { backgroundColor: '#ff6f32', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
-  modalOkText: { color: '#fff', fontFamily: font.semibold },
-});
+function createStyles(c: AppColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.bg },
+    p: { color: c.textMuted, marginHorizontal: 16, marginTop: 12, marginBottom: 8, lineHeight: 22 },
+    list: { padding: 16, paddingTop: 8 },
+    muted: { textAlign: 'center', color: c.textMuted, marginTop: 24 },
+    addBtn: {
+      marginHorizontal: 16,
+      marginBottom: 4,
+      backgroundColor: c.primary,
+      paddingVertical: 12,
+      borderRadius: 10,
+      alignItems: 'center',
+    },
+    addBtnText: { color: c.onPrimary, fontFamily: font.semibold },
+    card: {
+      backgroundColor: c.surface,
+      padding: 14,
+      borderRadius: 10,
+      marginBottom: 8,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    cardMain: { marginBottom: 8 },
+    cardCode: { fontSize: 16, fontFamily: font.bold, color: c.text },
+    cardName: { fontSize: 14, color: c.textMuted, marginTop: 4 },
+    cardActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 16 },
+    link: { color: c.primary, fontFamily: font.semibold, fontSize: 14 },
+    delete: { color: c.danger, fontSize: 14 },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: c.modalOverlay,
+      justifyContent: 'center',
+      padding: 24,
+    },
+    modalBox: {
+      backgroundColor: c.surface,
+      borderRadius: 12,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    modalTitle: { fontSize: 18, fontFamily: font.semibold, marginBottom: 12, color: c.text },
+    fieldLabel: { fontFamily: font.semibold, color: c.textSecondary, marginBottom: 4, marginTop: 8 },
+    codeReadonly: { fontSize: 16, fontFamily: font.semibold, color: c.text, marginBottom: 4 },
+    input: {
+      borderWidth: 1,
+      borderColor: c.inputBorder,
+      borderRadius: 8,
+      padding: 12,
+      fontSize: 16,
+      backgroundColor: c.inputBg,
+      color: c.inputText,
+    },
+    modalActions: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 16, gap: 16 },
+    modalCancel: { padding: 8 },
+    modalCancelText: { color: c.textMuted, fontSize: 16 },
+    modalOk: { backgroundColor: c.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
+    modalOkText: { color: c.onPrimary, fontFamily: font.semibold },
+  });
+}

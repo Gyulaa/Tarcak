@@ -1,0 +1,139 @@
+/**
+ * Semantic colors for light and dark (black) UI. Screens should use these tokens, not raw hex.
+ */
+export type AppColors = {
+  bg: string;
+  surface: string;
+  surfaceMuted: string;
+  border: string;
+  borderStrong: string;
+  text: string;
+  textSecondary: string;
+  textMuted: string;
+  primary: string;
+  onPrimary: string;
+  danger: string;
+  success: string;
+  chipBg: string;
+  chipText: string;
+  jarSoftBg: string;
+  jarSoftBorder: string;
+  jarHint: string;
+  jarTitle: string;
+  jarBannerTitle: string;
+  archivedBg: string;
+  archivedBorder: string;
+  archivedTitle: string;
+  archivedSub: string;
+  inputBg: string;
+  inputBorder: string;
+  inputText: string;
+  modalOverlay: string;
+  placeholder: string;
+  shadowJar: string;
+  barTrack: string;
+  switchTrackOff: string;
+  switchTrackOn: string;
+  switchThumbOff: string;
+  switchThumbOn: string;
+  pillBg: string;
+  pillText: string;
+  /** Pocket name rows (transaction editor, add-pocket modals): dark tile + light label */
+  pocketPickBg: string;
+  pocketPickBgSelected: string;
+  pocketPickBorder: string;
+  pocketPickBorderSelected: string;
+  pocketPickText: string;
+  pocketPickTextSelected: string;
+};
+
+export const lightColors: AppColors = {
+  bg: '#f8f9fa',
+  surface: '#ffffff',
+  surfaceMuted: '#fafafa',
+  border: '#e8e8e8',
+  borderStrong: '#d0d0d0',
+  text: '#111111',
+  textSecondary: '#333333',
+  textMuted: '#666666',
+  primary: '#ff6f32',
+  onPrimary: '#ffffff',
+  danger: '#b00020',
+  success: '#2e7d32',
+  chipBg: '#fff0eb',
+  chipText: '#ff6f32',
+  jarSoftBg: '#fff7f3',
+  jarSoftBorder: '#ffd4c4',
+  jarHint: '#9a3412',
+  jarTitle: '#1a1a1a',
+  jarBannerTitle: '#c2410c',
+  archivedBg: '#f4f4f5',
+  archivedBorder: '#d4d4d8',
+  archivedTitle: '#52525b',
+  archivedSub: '#71717a',
+  inputBg: '#fafafa',
+  inputBorder: '#dddddd',
+  inputText: '#111111',
+  modalOverlay: 'rgba(0,0,0,0.4)',
+  placeholder: '#aaaaaa',
+  shadowJar: '#ff6f32',
+  barTrack: '#eeeeee',
+  switchTrackOff: '#dddddd',
+  switchTrackOn: '#ffc4a8',
+  switchThumbOff: '#f4f4f4',
+  switchThumbOn: '#ff6f32',
+  pillBg: '#e8e8e8',
+  pillText: '#333333',
+  pocketPickBg: '#1c1c1e',
+  pocketPickBgSelected: '#2d2d32',
+  pocketPickBorder: '#3a3a3e',
+  pocketPickBorderSelected: '#ff6f32',
+  pocketPickText: '#e8e8ed',
+  pocketPickTextSelected: '#ffb399',
+};
+
+/** Near-black theme */
+export const darkColors: AppColors = {
+  bg: '#0a0a0a',
+  surface: '#141414',
+  surfaceMuted: '#1a1a1a',
+  border: '#2a2a2a',
+  borderStrong: '#3a3a3a',
+  text: '#f0f0f0',
+  textSecondary: '#d0d0d0',
+  textMuted: '#909090',
+  primary: '#ff6f32',
+  onPrimary: '#ffffff',
+  danger: '#ff8a80',
+  success: '#81c784',
+  chipBg: '#2d1810',
+  chipText: '#ffb399',
+  jarSoftBg: '#1f1410',
+  jarSoftBorder: '#4a3020',
+  jarHint: '#d4a088',
+  jarTitle: '#f5f5f5',
+  jarBannerTitle: '#ffb399',
+  archivedBg: '#1c1c1e',
+  archivedBorder: '#3f3f46',
+  archivedTitle: '#a1a1aa',
+  archivedSub: '#71717a',
+  inputBg: '#1c1c1c',
+  inputBorder: '#3a3a3a',
+  inputText: '#f0f0f0',
+  modalOverlay: 'rgba(0,0,0,0.65)',
+  placeholder: '#777777',
+  shadowJar: '#ff6f32',
+  barTrack: '#2a2a2a',
+  switchTrackOff: '#444444',
+  switchTrackOn: '#663820',
+  switchThumbOff: '#888888',
+  switchThumbOn: '#ff6f32',
+  pillBg: '#2a2a2a',
+  pillText: '#cccccc',
+  pocketPickBg: '#101010',
+  pocketPickBgSelected: '#1c1c1e',
+  pocketPickBorder: '#333333',
+  pocketPickBorderSelected: '#ff6f32',
+  pocketPickText: '#ececec',
+  pocketPickTextSelected: '#ffb399',
+};

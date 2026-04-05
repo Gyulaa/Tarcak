@@ -8,6 +8,23 @@
 export const AMOUNT_MINOR_SCALE = 100_000_000;
 const SCALE_BI = BigInt(AMOUNT_MINOR_SCALE);
 
+/**
+ * Groups integer digits with a space every three from the right (e.g. 1000 → "1 000").
+ * `intPart` must be non-negative digits only (no sign).
+ */
+export function formatIntegerPartWithSpaces(intPart: string): string {
+  const digits = intPart.replace(/\D/g, '');
+  if (digits === '') {
+    return '0';
+  }
+  const rev = digits.split('').reverse();
+  const groups: string[] = [];
+  for (let i = 0; i < rev.length; i += 3) {
+    groups.push(rev.slice(i, i + 3).reverse().join(''));
+  }
+  return groups.reverse().join(' ');
+}
+
 /** v1 minor (e.g. cents) → v2 minor (10^-8 major). */
 export const LEGACY_MINOR_TO_CURRENT_MULTIPLIER = 1_000_000;
 
@@ -63,9 +80,10 @@ export function formatMinorToAmountString(minor: number): string {
   }
   const whole = bi / SCALE_BI;
   const frac = bi % SCALE_BI;
+  const wholeStr = formatIntegerPartWithSpaces(whole.toString());
   if (frac === 0n) {
-    return `${neg ? '-' : ''}${whole}`;
+    return `${neg ? '-' : ''}${wholeStr}`;
   }
   const fracStr = frac.toString().padStart(8, '0').replace(/0+$/, '');
-  return `${neg ? '-' : ''}${whole}.${fracStr}`;
+  return `${neg ? '-' : ''}${wholeStr}.${fracStr}`;
 }

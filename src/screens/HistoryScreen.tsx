@@ -1,15 +1,19 @@
 // @ts-nocheck
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import * as pocketsRepo from '../db/repositories/pockets';
 import * as txRepo from '../db/repositories/transactions';
+import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
+import type { AppColors } from '../theme/palette';
 import { formatMinorForDisplay } from '../utils/formatMinor';
 import { formatOccurredAt } from '../utils/formatOccurredAt';
 
 export default function HistoryScreen({ navigation, route }) {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const paramPocketId = route.params?.pocketId;
   const [scopePocketId, setScopePocketId] = useState(paramPocketId);
   const [items, setItems] = useState([]);
@@ -74,27 +78,29 @@ export default function HistoryScreen({ navigation, route }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa' },
-  list: { padding: 16 },
-  muted: { textAlign: 'center', color: '#666', marginTop: 24 },
-  row: {
-    padding: 14,
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#e8e8e8',
-  },
-  dateLine: { fontSize: 12, color: '#888', fontFamily: font.semibold, marginBottom: 6 },
-  title: { fontFamily: font.semibold, fontSize: 16, color: '#222' },
-  meta: { color: '#666', marginTop: 4, fontSize: 13 },
-  chip: {
-    marginHorizontal: 16,
-    marginTop: 10,
-    padding: 10,
-    backgroundColor: '#fff0eb',
-    borderRadius: 8,
-  },
-  chipText: { color: '#ff6f32', textAlign: 'center', fontSize: 13 },
-});
+function createStyles(c: AppColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.bg },
+    list: { padding: 16 },
+    muted: { textAlign: 'center', color: c.textMuted, marginTop: 24 },
+    row: {
+      padding: 14,
+      backgroundColor: c.surface,
+      borderRadius: 10,
+      marginBottom: 8,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    dateLine: { fontSize: 12, color: c.textMuted, fontFamily: font.semibold, marginBottom: 6 },
+    title: { fontFamily: font.semibold, fontSize: 16, color: c.textSecondary },
+    meta: { color: c.textMuted, marginTop: 4, fontSize: 13 },
+    chip: {
+      marginHorizontal: 16,
+      marginTop: 10,
+      padding: 10,
+      backgroundColor: c.chipBg,
+      borderRadius: 8,
+    },
+    chipText: { color: c.chipText, textAlign: 'center', fontSize: 13 },
+  });
+}

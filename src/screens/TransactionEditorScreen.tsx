@@ -15,13 +15,17 @@ import * as assetTypesRepo from '../db/repositories/assetTypes';
 import * as pocketsRepo from '../db/repositories/pockets';
 import * as settingsRepo from '../db/repositories/settings';
 import * as txRepo from '../db/repositories/transactions';
+import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
+import type { AppColors } from '../theme/palette';
 import { formatMinorToAmountString, parseAmountStringToMinor } from '../utils/amountMinor';
 import { formatOccurredAt } from '../utils/formatOccurredAt';
 
 const KINDS = ['income', 'expense', 'transfer'];
 
 export default function TransactionEditorScreen({ navigation, route }) {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createTxStyles(colors), [colors]);
   const { transactionId, presetKind, pocketId, fromPocketId, toPocketId } = route.params || {};
 
   const [loading, setLoading] = useState(!!transactionId);
@@ -207,7 +211,7 @@ export default function TransactionEditorScreen({ navigation, route }) {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <Text>Loading…</Text>
+        <Text style={styles.loadingText}>Loading…</Text>
       </View>
     );
   }
@@ -234,7 +238,13 @@ export default function TransactionEditorScreen({ navigation, route }) {
       </View>
 
       <Text style={styles.label}>Title</Text>
-      <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="e.g. Groceries" />
+      <TextInput
+        style={styles.input}
+        value={title}
+        onChangeText={setTitle}
+        placeholder="e.g. Groceries"
+        placeholderTextColor={colors.placeholder}
+      />
 
       {transactionId && occurredAt != null ? (
         <>
@@ -249,6 +259,7 @@ export default function TransactionEditorScreen({ navigation, route }) {
         value={amountStr}
         onChangeText={setAmountStr}
         keyboardType="numbers-and-punctuation"
+        placeholderTextColor={colors.placeholder}
       />
 
       <Text style={styles.label}>Asset type</Text>
@@ -279,10 +290,14 @@ export default function TransactionEditorScreen({ navigation, route }) {
             {pocketOptions.map((p) => (
               <Pressable
                 key={p.id}
-                style={[styles.pick, targetPocketId === p.id && styles.pickOn]}
+                style={[styles.pickPocket, targetPocketId === p.id && styles.pickPocketOn]}
                 onPress={() => setTargetPocketId(p.id)}
               >
-                <Text style={targetPocketId === p.id ? styles.pickOnText : undefined}>{p.name}</Text>
+                <Text
+                  style={targetPocketId === p.id ? styles.pickPocketNameOn : styles.pickPocketName}
+                >
+                  {p.name}
+                </Text>
               </Pressable>
             ))}
           </View>
@@ -294,10 +309,12 @@ export default function TransactionEditorScreen({ navigation, route }) {
             {pocketOptions.map((p) => (
               <Pressable
                 key={p.id}
-                style={[styles.pick, fromId === p.id && styles.pickOn]}
+                style={[styles.pickPocket, fromId === p.id && styles.pickPocketOn]}
                 onPress={() => setFromId(p.id)}
               >
-                <Text style={fromId === p.id ? styles.pickOnText : undefined}>{p.name}</Text>
+                <Text style={fromId === p.id ? styles.pickPocketNameOn : styles.pickPocketName}>
+                  {p.name}
+                </Text>
               </Pressable>
             ))}
           </View>
@@ -306,10 +323,12 @@ export default function TransactionEditorScreen({ navigation, route }) {
             {pocketOptions.map((p) => (
               <Pressable
                 key={p.id}
-                style={[styles.pick, toId === p.id && styles.pickOn]}
+                style={[styles.pickPocket, toId === p.id && styles.pickPocketOn]}
                 onPress={() => setToId(p.id)}
               >
-                <Text style={toId === p.id ? styles.pickOnText : undefined}>{p.name}</Text>
+                <Text style={toId === p.id ? styles.pickPocketNameOn : styles.pickPocketName}>
+                  {p.name}
+                </Text>
               </Pressable>
             ))}
           </View>
@@ -329,53 +348,74 @@ export default function TransactionEditorScreen({ navigation, route }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa' },
-  inner: { padding: 16, paddingBottom: 40 },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  label: { fontFamily: font.semibold, marginTop: 12, marginBottom: 6, color: '#222' },
-  conductedText: { fontSize: 16, color: '#333' },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 12,
-    backgroundColor: '#fff',
-    fontSize: 16,
-  },
-  kindRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  kindChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#e8e8e8',
-  },
-  kindChipOn: { backgroundColor: '#ff6f32' },
-  kindChipText: { color: '#333' },
-  kindChipTextOn: { color: '#fff', fontFamily: font.semibold },
-  pickList: { gap: 6 },
-  pick: {
-    padding: 12,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  pickOn: { borderColor: '#ff6f32', backgroundColor: '#fff0eb' },
-  pickOnText: { fontFamily: font.semibold, color: '#ff6f32' },
-  pickCode: { fontFamily: font.semibold, color: '#222' },
-  pickSub: { fontSize: 13, color: '#666', marginTop: 2 },
-  muted: { color: '#666', paddingVertical: 8 },
-  manageLink: { marginTop: 8, paddingVertical: 6 },
-  manageLinkText: { color: '#ff6f32', fontFamily: font.semibold },
-  saveBtn: {
-    marginTop: 24,
-    backgroundColor: '#ff6f32',
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  saveBtnText: { color: '#fff', fontFamily: font.bold, fontSize: 16 },
-  delBtn: { marginTop: 16, alignItems: 'center', padding: 12 },
-  delBtnText: { color: '#b00020', fontFamily: font.semibold },
-});
+function createTxStyles(c: AppColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.bg },
+    inner: { padding: 16, paddingBottom: 40 },
+    centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: c.bg },
+    loadingText: { color: c.textMuted, fontSize: 16 },
+    label: { fontFamily: font.semibold, marginTop: 12, marginBottom: 6, color: c.text },
+    conductedText: { fontSize: 16, color: c.textSecondary },
+    input: {
+      borderWidth: 1,
+      borderColor: c.inputBorder,
+      borderRadius: 8,
+      padding: 12,
+      backgroundColor: c.inputBg,
+      fontSize: 16,
+      color: c.inputText,
+    },
+    kindRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    kindChip: {
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 20,
+      backgroundColor: c.pillBg,
+    },
+    kindChipOn: { backgroundColor: c.primary },
+    kindChipText: { color: c.pillText },
+    kindChipTextOn: { color: c.onPrimary, fontFamily: font.semibold },
+    pickList: { gap: 6 },
+    pick: {
+      padding: 12,
+      backgroundColor: c.surface,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: c.borderStrong,
+    },
+    pickOn: { borderColor: c.primary, backgroundColor: c.chipBg },
+    pickOnText: { fontFamily: font.semibold, color: c.primary },
+    pickCode: { fontFamily: font.semibold, color: c.text },
+    pickSub: { fontSize: 13, color: c.textMuted, marginTop: 2 },
+    pickPocket: {
+      padding: 12,
+      backgroundColor: c.pocketPickBg,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: c.pocketPickBorder,
+    },
+    pickPocketOn: {
+      borderColor: c.pocketPickBorderSelected,
+      backgroundColor: c.pocketPickBgSelected,
+    },
+    pickPocketName: { fontSize: 16, color: c.pocketPickText },
+    pickPocketNameOn: {
+      fontSize: 16,
+      fontFamily: font.semibold,
+      color: c.pocketPickTextSelected,
+    },
+    muted: { color: c.textMuted, paddingVertical: 8 },
+    manageLink: { marginTop: 8, paddingVertical: 6 },
+    manageLinkText: { color: c.primary, fontFamily: font.semibold },
+    saveBtn: {
+      marginTop: 24,
+      backgroundColor: c.primary,
+      paddingVertical: 14,
+      borderRadius: 10,
+      alignItems: 'center',
+    },
+    saveBtnText: { color: c.onPrimary, fontFamily: font.bold, fontSize: 16 },
+    delBtn: { marginTop: 16, alignItems: 'center', padding: 12 },
+    delBtnText: { color: c.danger, fontFamily: font.semibold },
+  });
+}

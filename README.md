@@ -12,7 +12,15 @@ Local-first personal finance app: **pockets** (budget segments), **multi-currenc
 | **Entry** | `index.ts` → `App.tsx` (fonts) → `AppBoot.tsx` (vault gate + main UI) |
 | **Architecture** | New Architecture enabled (`newArchEnabled: true` in `app.json`) |
 | **Implemented** | Vault gate, SQLCipher + **migrations `0001`–`0005`**, **repositories** (`pockets`, `transactions`, `settings`, `assetTypes`, `jar`), **Zustand** ledger store, **React Navigation** native stack, screens: **Home** (balances + Jar shortcut when enabled), **Pockets** (Jar row styled distinctly when pool feature on), **Pocket detail**, **transaction editor** (asset type picker, `occurred_at` shown when editing), **History** (pocket filter + **conducted date** per row), **Settings** (default asset type, **Jar on/off**, asset types, lock), **Asset types**, **Jar** (pool balances, distribute, link to split editor), **Jar split** (percentages must total 100%), **encrypted** SQLite |
-| **Still to add** | Polish (themes, rename pocket UI, **editable** transaction date), automated tests beyond CI typecheck, optional FX rates |
+| **Still to add** | Polish (rename pocket UI, **editable** transaction date), automated tests beyond CI typecheck, optional FX rates |
+
+**UI:** Amounts show **spaced thousands** on the integer part (e.g. `1 000`, `54 333 234`) via `formatIntegerPartWithSpaces` in [`src/utils/amountMinor.ts`](src/utils/amountMinor.ts). **Black (dark) theme** is under **Settings → Appearance**; the flag is `dark_theme_enabled` in `user_settings`.
+
+## Support / donations
+
+Replace the placeholder strings in [`src/constants/donations.ts`](src/constants/donations.ts) with your real **Bitcoin** and **Monero** addresses. On the **Home** screen, a small grey line sits **below the Settings** (and other shortcut) buttons; tapping it opens a sheet with copy-to-clipboard buttons.
+
+The repository [`.github/FUNDING.yml`](.github/FUNDING.yml) points sponsors to this README section (you can add `github: username` there for GitHub Sponsors).
 
 `app.json` enables the **expo-sqlite** config plugin with **`useSQLCipher: true`**. That only applies after a **native build** (`npx expo prebuild` / EAS / `expo run:*`). **Expo Go does not ship SQLCipher** — the app still runs, but the DB file is **plaintext** there (a console warning explains this). Use a **development build** to validate real encryption.
 

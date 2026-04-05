@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -14,9 +14,13 @@ import {
 
 import * as settingsRepo from '../db/repositories/settings';
 import { useLedgerStore } from '../stores/ledgerStore';
+import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
+import type { AppColors } from '../theme/palette';
 
 export default function PocketsScreen({ navigation }) {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const allPockets = useLedgerStore((s) => s.pockets);
   const jarPocket = allPockets.find((p) => p.is_jar);
   const regularPockets = allPockets.filter((p) => !p.is_jar);
@@ -128,13 +132,15 @@ export default function PocketsScreen({ navigation }) {
             <TextInput
               style={styles.input}
               placeholder="Name"
+              placeholderTextColor={colors.placeholder}
               value={newName}
               onChangeText={setNewName}
               autoFocus
+              selectionColor={colors.primary}
             />
             <View style={styles.modalActions}>
               <Pressable onPress={() => setModalOpen(false)} style={styles.modalCancel}>
-                <Text>Cancel</Text>
+                <Text style={styles.modalCancelText}>Cancel</Text>
               </Pressable>
               <Pressable
                 onPress={() => void submitNew()}
@@ -151,87 +157,92 @@ export default function PocketsScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa' },
-  list: { padding: 16, paddingTop: 8 },
-  muted: { textAlign: 'center', color: '#666', marginTop: 24 },
-  error: { color: '#b00020', paddingHorizontal: 16, paddingTop: 8 },
-  addBtn: {
-    marginHorizontal: 16,
-    marginTop: 12,
-    backgroundColor: '#ff6f32',
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  addBtnText: { color: '#fff', fontFamily: font.semibold },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    padding: 14,
-    borderRadius: 10,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#e8e8e8',
-  },
-  cardMain: { flex: 1 },
-  cardTitle: { fontSize: 16, fontFamily: font.semibold, color: '#222' },
-  jarCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff7f3',
-    padding: 14,
-    borderRadius: 14,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#ffd4c4',
-    shadowColor: '#ff6f32',
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-  },
-  jarCardIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: '#ff6f32',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  jarIconGlyph: { color: '#fff', fontSize: 20, fontFamily: font.bold },
-  jarCardMain: { flex: 1 },
-  jarBadge: {
-    fontSize: 11,
-    fontFamily: font.bold,
-    color: '#ff6f32',
-    letterSpacing: 0.8,
-    marginBottom: 2,
-  },
-  jarCardTitle: { fontSize: 17, fontFamily: font.bold, color: '#1a1a1a' },
-  jarCardHint: { fontSize: 13, color: '#9a3412', marginTop: 4 },
-  jarChevron: { fontSize: 26, color: '#ff6f32', fontWeight: '300' },
-  jarNoDelete: { width: 48 },
-  delete: { color: '#b00020', fontSize: 14 },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  modalBox: { backgroundColor: '#fff', borderRadius: 12, padding: 16 },
-  modalTitle: { fontSize: 18, fontFamily: font.semibold, marginBottom: 12 },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-  },
-  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 16, gap: 16 },
-  modalCancel: { padding: 8 },
-  modalOk: { backgroundColor: '#ff6f32', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
-  modalOkText: { color: '#fff', fontFamily: font.semibold },
-});
+function createStyles(c: AppColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.bg },
+    list: { padding: 16, paddingTop: 8 },
+    muted: { textAlign: 'center', color: c.textMuted, marginTop: 24 },
+    error: { color: c.danger, paddingHorizontal: 16, paddingTop: 8 },
+    addBtn: {
+      marginHorizontal: 16,
+      marginTop: 12,
+      backgroundColor: c.primary,
+      paddingVertical: 12,
+      borderRadius: 10,
+      alignItems: 'center',
+    },
+    addBtnText: { color: c.onPrimary, fontFamily: font.semibold },
+    card: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: c.surface,
+      padding: 14,
+      borderRadius: 10,
+      marginBottom: 8,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    cardMain: { flex: 1 },
+    cardTitle: { fontSize: 16, fontFamily: font.semibold, color: c.text },
+    jarCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: c.jarSoftBg,
+      padding: 14,
+      borderRadius: 14,
+      marginBottom: 10,
+      borderWidth: 1,
+      borderColor: c.jarSoftBorder,
+      shadowColor: c.shadowJar,
+      shadowOpacity: 0.08,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 2,
+    },
+    jarCardIcon: {
+      width: 44,
+      height: 44,
+      borderRadius: 12,
+      backgroundColor: c.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 12,
+    },
+    jarIconGlyph: { color: c.onPrimary, fontSize: 20, fontFamily: font.bold },
+    jarCardMain: { flex: 1 },
+    jarBadge: {
+      fontSize: 11,
+      fontFamily: font.bold,
+      color: c.primary,
+      letterSpacing: 0.8,
+      marginBottom: 2,
+    },
+    jarCardTitle: { fontSize: 17, fontFamily: font.bold, color: c.jarTitle },
+    jarCardHint: { fontSize: 13, color: c.jarHint, marginTop: 4 },
+    jarChevron: { fontSize: 26, color: c.primary, fontWeight: '300' },
+    jarNoDelete: { width: 48 },
+    delete: { color: c.danger, fontSize: 14 },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: c.modalOverlay,
+      justifyContent: 'center',
+      padding: 24,
+    },
+    modalBox: { backgroundColor: c.surface, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: c.border },
+    modalTitle: { fontSize: 18, fontFamily: font.semibold, marginBottom: 12, color: c.text },
+    input: {
+      borderWidth: 1,
+      borderColor: c.inputBorder,
+      borderRadius: 8,
+      padding: 12,
+      fontSize: 16,
+      backgroundColor: c.inputBg,
+      color: c.inputText,
+    },
+    modalActions: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 16, gap: 16 },
+    modalCancel: { padding: 8 },
+    modalCancelText: { color: c.textMuted, fontSize: 16 },
+    modalOk: { backgroundColor: c.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
+    modalOkText: { color: c.onPrimary, fontFamily: font.semibold },
+  });
+}

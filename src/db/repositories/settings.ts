@@ -5,6 +5,7 @@ import * as pocketsRepo from './pockets';
 const KEY_DEFAULT_CURRENCY = 'default_currency';
 const KEY_JAR_ENABLED = 'jar_enabled';
 const KEY_ADVANCED_JAR = 'advanced_jar_enabled';
+const KEY_DARK_THEME = 'dark_theme_enabled';
 
 export async function getSetting(key: string): Promise<string | null> {
   const db = await openMainDatabase();
@@ -64,4 +65,18 @@ export async function getAdvancedJarEnabled(): Promise<boolean> {
 
 export async function setAdvancedJarEnabled(enabled: boolean): Promise<void> {
   await setSetting(KEY_ADVANCED_JAR, enabled ? '1' : '0');
+}
+
+/** Black / dark UI. Default off (light theme). */
+export async function getDarkThemeEnabled(): Promise<boolean> {
+  const v = await getSetting(KEY_DARK_THEME);
+  if (v == null || v.trim() === '') {
+    return false;
+  }
+  const t = v.trim().toLowerCase();
+  return t === '1' || t === 'true' || t === 'yes';
+}
+
+export async function setDarkThemeEnabled(enabled: boolean): Promise<void> {
+  await setSetting(KEY_DARK_THEME, enabled ? '1' : '0');
 }

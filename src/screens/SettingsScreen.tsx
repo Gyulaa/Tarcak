@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -7,10 +7,14 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import * as assetTypesRepo from '../db/repositories/assetTypes';
 import * as settingsRepo from '../db/repositories/settings';
 import { useLockVault } from '../navigation/LockVaultContext';
+import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
+import type { AppColors } from '../theme/palette';
 
 export default function SettingsScreen() {
   const navigation = useNavigation();
+  const { colors, isDark, setDarkMode } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const lockVault = useLockVault();
   const [assetTypes, setAssetTypes] = useState([]);
   const [defaultCode, setDefaultCode] = useState('HUF');
@@ -45,6 +49,14 @@ export default function SettingsScreen() {
     try {
       await settingsRepo.setAdvancedJarEnabled(value);
       setAdvancedJarEnabled(value);
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const onDarkToggle = async (value) => {
+    try {
+      await setDarkMode(value);
     } catch (e) {
       Alert.alert('Error', e instanceof Error ? e.message : String(e));
     }
@@ -95,6 +107,23 @@ export default function SettingsScreen() {
 
       <View style={styles.divider} />
 
+      <Text style={styles.label}>Appearance</Text>
+      <View style={styles.switchRow}>
+        <View style={styles.switchTextCol}>
+          <Text style={styles.switchTitle}>Black theme</Text>
+          <Text style={styles.switchHint}>Dark background and light text across the app.</Text>
+        </View>
+        <Switch
+          value={isDark}
+          onValueChange={(v) => void onDarkToggle(v)}
+          disabled={!loaded}
+          trackColor={{ false: colors.switchTrackOff, true: colors.switchTrackOn }}
+          thumbColor={isDark ? colors.switchThumbOn : colors.switchThumbOff}
+        />
+      </View>
+
+      <View style={styles.divider} />
+
       <Text style={styles.label}>Jar</Text>
       <View style={styles.switchRow}>
         <View style={styles.switchTextCol}>
@@ -109,8 +138,8 @@ export default function SettingsScreen() {
           value={jarEnabled}
           onValueChange={(v) => void onJarToggle(v)}
           disabled={!loaded}
-          trackColor={{ false: '#ddd', true: '#ffc4a8' }}
-          thumbColor={jarEnabled ? '#ff6f32' : '#f4f4f4'}
+          trackColor={{ false: colors.switchTrackOff, true: colors.switchTrackOn }}
+          thumbColor={jarEnabled ? colors.switchThumbOn : colors.switchThumbOff}
         />
       </View>
 
@@ -126,8 +155,8 @@ export default function SettingsScreen() {
           value={advancedJarEnabled}
           onValueChange={(v) => void onAdvancedJarToggle(v)}
           disabled={!loaded || !jarEnabled}
-          trackColor={{ false: '#ddd', true: '#ffc4a8' }}
-          thumbColor={advancedJarEnabled ? '#ff6f32' : '#f4f4f4'}
+          trackColor={{ false: colors.switchTrackOff, true: colors.switchTrackOn }}
+          thumbColor={advancedJarEnabled ? colors.switchThumbOn : colors.switchThumbOff}
         />
       </View>
 
@@ -149,59 +178,61 @@ export default function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa' },
-  inner: { padding: 16, paddingBottom: 40 },
-  p: { color: '#444', marginBottom: 16, lineHeight: 22 },
-  label: { fontFamily: font.semibold, marginBottom: 6, color: '#222' },
-  pickList: { gap: 6, marginBottom: 16 },
-  pick: {
-    padding: 12,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  pickOn: { borderColor: '#ff6f32', backgroundColor: '#fff0eb' },
-  pickOnText: { fontFamily: font.semibold, color: '#ff6f32' },
-  pickCode: { fontFamily: font.semibold, color: '#222' },
-  pickSub: { fontSize: 13, color: '#666', marginTop: 2 },
-  muted: { color: '#666', paddingVertical: 8 },
-  btn: {
-    backgroundColor: '#ff6f32',
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  btnText: { color: '#fff', fontFamily: font.semibold, fontSize: 16 },
-  secondaryBtn: {
-    marginTop: 12,
-    backgroundColor: '#fff',
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ccc',
-  },
-  secondaryBtnText: { color: '#ff6f32', fontFamily: font.semibold, fontSize: 16 },
-  divider: { height: 1, backgroundColor: '#ddd', marginVertical: 28 },
-  switchRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#e8e8e8',
-    marginBottom: 8,
-  },
-  switchTextCol: { flex: 1 },
-  switchTitle: { fontFamily: font.semibold, fontSize: 16, color: '#222', marginBottom: 6 },
-  switchHint: { fontSize: 13, color: '#666', lineHeight: 19 },
-  switchRowDim: { opacity: 0.55 },
-  secondaryBtnDim: { opacity: 0.45 },
-  lockRow: { paddingVertical: 8 },
-  lockText: { fontSize: 17, fontFamily: font.semibold, color: '#b00020' },
-  lockHint: { color: '#666', marginTop: 6, fontSize: 13 },
-});
+function createStyles(c: AppColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.bg },
+    inner: { padding: 16, paddingBottom: 40 },
+    p: { color: c.textMuted, marginBottom: 16, lineHeight: 22 },
+    label: { fontFamily: font.semibold, marginBottom: 6, color: c.text },
+    pickList: { gap: 6, marginBottom: 16 },
+    pick: {
+      padding: 12,
+      backgroundColor: c.surface,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: c.borderStrong,
+    },
+    pickOn: { borderColor: c.primary, backgroundColor: c.chipBg },
+    pickOnText: { fontFamily: font.semibold, color: c.primary },
+    pickCode: { fontFamily: font.semibold, color: c.text },
+    pickSub: { fontSize: 13, color: c.textMuted, marginTop: 2 },
+    muted: { color: c.textMuted, paddingVertical: 8 },
+    btn: {
+      backgroundColor: c.primary,
+      paddingVertical: 14,
+      borderRadius: 10,
+      alignItems: 'center',
+    },
+    btnText: { color: c.onPrimary, fontFamily: font.semibold, fontSize: 16 },
+    secondaryBtn: {
+      marginTop: 12,
+      backgroundColor: c.surface,
+      paddingVertical: 12,
+      borderRadius: 10,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: c.borderStrong,
+    },
+    secondaryBtnText: { color: c.primary, fontFamily: font.semibold, fontSize: 16 },
+    divider: { height: 1, backgroundColor: c.border, marginVertical: 28 },
+    switchRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 12,
+      backgroundColor: c.surface,
+      borderRadius: 12,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: c.border,
+      marginBottom: 8,
+    },
+    switchTextCol: { flex: 1 },
+    switchTitle: { fontFamily: font.semibold, fontSize: 16, color: c.text, marginBottom: 6 },
+    switchHint: { fontSize: 13, color: c.textMuted, lineHeight: 19 },
+    switchRowDim: { opacity: 0.55 },
+    secondaryBtnDim: { opacity: 0.45 },
+    lockRow: { paddingVertical: 8 },
+    lockText: { fontSize: 17, fontFamily: font.semibold, color: c.danger },
+    lockHint: { color: c.textMuted, marginTop: 6, fontSize: 13 },
+  });
+}

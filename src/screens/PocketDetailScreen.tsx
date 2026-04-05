@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useLayoutEffect, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -13,11 +13,15 @@ import {
 import * as pocketsRepo from '../db/repositories/pockets';
 import * as settingsRepo from '../db/repositories/settings';
 import * as txRepo from '../db/repositories/transactions';
+import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
+import type { AppColors } from '../theme/palette';
 import { formatMinorForDisplay } from '../utils/formatMinor';
 import { formatOccurredAt } from '../utils/formatOccurredAt';
 
 export default function PocketDetailScreen({ navigation, route }) {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { pocketId } = route.params;
   const [pocketName, setPocketName] = useState('');
   const [isJar, setIsJar] = useState(false);
@@ -82,7 +86,7 @@ export default function PocketDetailScreen({ navigation, route }) {
         balances.map((item) => (
           <View key={item.currency} style={styles.row}>
             <Text style={styles.currency}>{item.currency}</Text>
-            <Text>{formatMinorForDisplay(item.balance_minor, item.currency)}</Text>
+            <Text style={styles.balanceAmt}>{formatMinorForDisplay(item.balance_minor, item.currency)}</Text>
           </View>
         ))
       )}
@@ -127,7 +131,7 @@ export default function PocketDetailScreen({ navigation, route }) {
   if (loading && !pocketName) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator />
+        <ActivityIndicator color={colors.primary} />
       </View>
     );
   }
@@ -156,64 +160,67 @@ export default function PocketDetailScreen({ navigation, route }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa' },
-  listPad: { padding: 16, paddingBottom: 32 },
-  centered: { flex: 1, justifyContent: 'center' },
-  archivedBanner: {
-    backgroundColor: '#f4f4f5',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#d4d4d8',
-  },
-  archivedTitle: { fontFamily: font.bold, color: '#52525b', fontSize: 14 },
-  archivedSub: { color: '#71717a', fontSize: 13, marginTop: 6, lineHeight: 18 },
-  jarBanner: {
-    backgroundColor: '#fff7f3',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#ffd4c4',
-  },
-  jarBannerTitle: { fontFamily: font.bold, color: '#c2410c', fontSize: 15 },
-  jarBannerSub: { color: '#9a3412', fontSize: 13, marginTop: 4 },
-  section: { fontSize: 15, fontFamily: font.semibold, marginBottom: 8, color: '#111' },
-  recentTitle: { marginTop: 8 },
-  muted: { color: '#666', marginBottom: 8 },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 12,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    marginBottom: 6,
-    borderWidth: 1,
-    borderColor: '#e8e8e8',
-  },
-  currency: { fontFamily: font.semibold },
-  actions: { marginVertical: 16, gap: 8 },
-  btn: { backgroundColor: '#ff6f32', paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
-  btnText: { color: '#fff', fontFamily: font.semibold },
-  outline: {
-    borderWidth: 1,
-    borderColor: '#ff6f32',
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  outlineText: { color: '#ff6f32', fontFamily: font.semibold },
-  txRow: {
-    padding: 12,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    marginBottom: 6,
-    borderWidth: 1,
-    borderColor: '#e8e8e8',
-  },
-  txDate: { fontSize: 12, color: '#888', fontFamily: font.semibold, marginBottom: 4 },
-  txTitle: { fontFamily: font.semibold, color: '#222' },
-  txMeta: { color: '#666', fontSize: 13, marginTop: 4 },
-});
+function createStyles(c: AppColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.bg },
+    listPad: { padding: 16, paddingBottom: 32 },
+    centered: { flex: 1, justifyContent: 'center', backgroundColor: c.bg },
+    archivedBanner: {
+      backgroundColor: c.archivedBg,
+      borderRadius: 12,
+      padding: 14,
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: c.archivedBorder,
+    },
+    archivedTitle: { fontFamily: font.bold, color: c.archivedTitle, fontSize: 14 },
+    archivedSub: { color: c.archivedSub, fontSize: 13, marginTop: 6, lineHeight: 18 },
+    jarBanner: {
+      backgroundColor: c.jarSoftBg,
+      borderRadius: 12,
+      padding: 14,
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: c.jarSoftBorder,
+    },
+    jarBannerTitle: { fontFamily: font.bold, color: c.jarBannerTitle, fontSize: 15 },
+    jarBannerSub: { color: c.jarHint, fontSize: 13, marginTop: 4 },
+    section: { fontSize: 15, fontFamily: font.semibold, marginBottom: 8, color: c.text },
+    recentTitle: { marginTop: 8 },
+    muted: { color: c.textMuted, marginBottom: 8 },
+    row: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      padding: 12,
+      backgroundColor: c.surface,
+      borderRadius: 8,
+      marginBottom: 6,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    currency: { fontFamily: font.semibold, color: c.text },
+    balanceAmt: { color: c.textSecondary },
+    actions: { marginVertical: 16, gap: 8 },
+    btn: { backgroundColor: c.primary, paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
+    btnText: { color: c.onPrimary, fontFamily: font.semibold },
+    outline: {
+      borderWidth: 1,
+      borderColor: c.primary,
+      paddingVertical: 10,
+      borderRadius: 8,
+      alignItems: 'center',
+    },
+    outlineText: { color: c.primary, fontFamily: font.semibold },
+    txRow: {
+      padding: 12,
+      backgroundColor: c.surface,
+      borderRadius: 8,
+      marginBottom: 6,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    txDate: { fontSize: 12, color: c.textMuted, fontFamily: font.semibold, marginBottom: 4 },
+    txTitle: { fontFamily: font.semibold, color: c.textSecondary },
+    txMeta: { color: c.textMuted, fontSize: 13, marginTop: 4 },
+  });
+}

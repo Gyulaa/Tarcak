@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -17,11 +17,15 @@ import * as jarRepo from '../db/repositories/jar';
 import * as pocketsRepo from '../db/repositories/pockets';
 import * as settingsRepo from '../db/repositories/settings';
 import * as txRepo from '../db/repositories/transactions';
-import { font } from '../theme/fonts';
-import { formatMinorForDisplay } from '../utils/formatMinor';
 import { useLedgerStore } from '../stores/ledgerStore';
+import { useAppTheme } from '../theme/ThemeContext';
+import { font } from '../theme/fonts';
+import type { AppColors } from '../theme/palette';
+import { formatMinorForDisplay } from '../utils/formatMinor';
 
 export default function JarScreen({ navigation }) {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createJarStyles(colors), [colors]);
   const refreshLedger = useLedgerStore((s) => s.refresh);
   const [jarName, setJarName] = useState('Jar');
   const [jarId, setJarId] = useState(null);
@@ -111,13 +115,13 @@ export default function JarScreen({ navigation }) {
       return;
     }
     if (balances.length === 1) {
-      const c = balances[0].currency;
+      const c0 = balances[0].currency;
       Alert.alert(
         'Distribute',
-        `Move the full ${c} balance from the Jar to your pockets using your saved split?`,
+        `Move the full ${c0} balance from the Jar to your pockets using your saved split?`,
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Distribute', onPress: () => void runDistribute(c) },
+          { text: 'Distribute', onPress: () => void runDistribute(c0) },
         ]
       );
       return;
@@ -128,7 +132,7 @@ export default function JarScreen({ navigation }) {
   if (loading && !jarId) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color="#ff6f32" />
+        <ActivityIndicator color={colors.primary} />
       </View>
     );
   }
@@ -260,105 +264,109 @@ export default function JarScreen({ navigation }) {
 
       {busy ? (
         <View style={styles.busy}>
-          <ActivityIndicator color="#ff6f32" />
+          <ActivityIndicator color={colors.primary} />
         </View>
       ) : null}
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: '#f8f9fa' },
-  inner: { padding: 20, paddingBottom: 40 },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8f9fa' },
-  hero: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#f0e6e2',
-    shadowColor: '#ff6f32',
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
-  },
-  heroKicker: { fontSize: 12, fontFamily: font.semibold, color: '#ff6f32', letterSpacing: 0.5 },
-  heroTitle: { fontSize: 26, fontFamily: font.bold, color: '#111', marginTop: 6 },
-  heroSub: { fontSize: 15, color: '#666', marginTop: 10, lineHeight: 22 },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#e8e8e8',
-  },
-  cardLabel: { fontSize: 13, fontFamily: font.semibold, color: '#888', marginBottom: 10 },
-  balanceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-  },
-  balanceCode: { fontFamily: font.bold, fontSize: 16, color: '#222' },
-  balanceAmt: { fontSize: 15, color: '#333' },
-  muted: { color: '#666', fontSize: 15, lineHeight: 22 },
-  splitHint: { fontSize: 14, color: '#555', marginBottom: 16, textAlign: 'center' },
-  primaryBtn: {
-    backgroundColor: '#ff6f32',
-    paddingVertical: 16,
-    borderRadius: 14,
-    alignItems: 'center',
-  },
-  btnDisabled: { opacity: 0.45 },
-  primaryBtnText: { color: '#fff', fontFamily: font.bold, fontSize: 17 },
-  ghostBtn: {
-    marginTop: 12,
-    paddingVertical: 14,
-    borderRadius: 14,
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#ff6f32',
-  },
-  ghostBtnText: { color: '#ff6f32', fontFamily: font.semibold, fontSize: 16 },
-  linkRow: { marginTop: 20, alignItems: 'center', paddingVertical: 8 },
-  linkText: { color: '#ff6f32', fontFamily: font.semibold, fontSize: 15 },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    justifyContent: 'flex-end',
-  },
-  modalSheet: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    paddingBottom: 28,
-  },
-  modalTitle: { fontSize: 18, fontFamily: font.bold, marginBottom: 16, color: '#111' },
-  modalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  modalRowCode: { fontFamily: font.bold, fontSize: 17, color: '#222' },
-  modalRowAmt: { fontSize: 16, color: '#444' },
-  modalCancel: { marginTop: 16, alignItems: 'center', padding: 12 },
-  modalCancelText: { color: '#666', fontFamily: font.semibold },
-  busy: { marginTop: 16, alignItems: 'center' },
-  disabledCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 22,
-    borderWidth: 1,
-    borderColor: '#e8e8e8',
-  },
-  disabledTitle: { fontSize: 20, fontFamily: font.bold, color: '#111', marginBottom: 12 },
-  disabledBody: { fontSize: 15, color: '#555', lineHeight: 22, marginBottom: 20 },
-});
+function createJarStyles(c: AppColors) {
+  return StyleSheet.create({
+    scroll: { flex: 1, backgroundColor: c.bg },
+    inner: { padding: 20, paddingBottom: 40 },
+    centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: c.bg },
+    hero: {
+      backgroundColor: c.surface,
+      borderRadius: 16,
+      padding: 20,
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: c.jarSoftBorder,
+      shadowColor: c.shadowJar,
+      shadowOpacity: 0.06,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 2,
+    },
+    heroKicker: { fontSize: 12, fontFamily: font.semibold, color: c.primary, letterSpacing: 0.5 },
+    heroTitle: { fontSize: 26, fontFamily: font.bold, color: c.text, marginTop: 6 },
+    heroSub: { fontSize: 15, color: c.textMuted, marginTop: 10, lineHeight: 22 },
+    card: {
+      backgroundColor: c.surface,
+      borderRadius: 14,
+      padding: 16,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    cardLabel: { fontSize: 13, fontFamily: font.semibold, color: c.textMuted, marginBottom: 10 },
+    balanceRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: 10,
+      borderTopWidth: 1,
+      borderTopColor: c.border,
+    },
+    balanceCode: { fontFamily: font.bold, fontSize: 16, color: c.textSecondary },
+    balanceAmt: { fontSize: 15, color: c.textSecondary },
+    muted: { color: c.textMuted, fontSize: 15, lineHeight: 22 },
+    splitHint: { fontSize: 14, color: c.textMuted, marginBottom: 16, textAlign: 'center' },
+    primaryBtn: {
+      backgroundColor: c.primary,
+      paddingVertical: 16,
+      borderRadius: 14,
+      alignItems: 'center',
+    },
+    btnDisabled: { opacity: 0.45 },
+    primaryBtnText: { color: c.onPrimary, fontFamily: font.bold, fontSize: 17 },
+    ghostBtn: {
+      marginTop: 12,
+      paddingVertical: 14,
+      borderRadius: 14,
+      alignItems: 'center',
+      borderWidth: 1.5,
+      borderColor: c.primary,
+    },
+    ghostBtnText: { color: c.primary, fontFamily: font.semibold, fontSize: 16 },
+    linkRow: { marginTop: 20, alignItems: 'center', paddingVertical: 8 },
+    linkText: { color: c.primary, fontFamily: font.semibold, fontSize: 15 },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: c.modalOverlay,
+      justifyContent: 'flex-end',
+    },
+    modalSheet: {
+      backgroundColor: c.surface,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      padding: 20,
+      paddingBottom: 28,
+      borderTopWidth: 1,
+      borderColor: c.border,
+    },
+    modalTitle: { fontSize: 18, fontFamily: font.bold, marginBottom: 16, color: c.text },
+    modalRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingVertical: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: c.border,
+    },
+    modalRowCode: { fontFamily: font.bold, fontSize: 17, color: c.text },
+    modalRowAmt: { fontSize: 16, color: c.textSecondary },
+    modalCancel: { marginTop: 16, alignItems: 'center', padding: 12 },
+    modalCancelText: { color: c.textMuted, fontFamily: font.semibold },
+    busy: { marginTop: 16, alignItems: 'center' },
+    disabledCard: {
+      backgroundColor: c.surface,
+      borderRadius: 16,
+      padding: 22,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    disabledTitle: { fontSize: 20, fontFamily: font.bold, color: c.text, marginBottom: 12 },
+    disabledBody: { fontSize: 15, color: c.textMuted, lineHeight: 22, marginBottom: 20 },
+  });
+}
