@@ -198,6 +198,7 @@ export default function AppBoot() {
         <TextInput
           style={styles.input}
           placeholder="Password"
+          placeholderTextColor="#888"
           secureTextEntry
           value={password}
           onChangeText={setPassword}
@@ -252,6 +253,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontFamily: font.semibold,
+    color: '#111',
   },
   hint: {
     fontSize: 13,
@@ -264,6 +266,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
+    /** Android release often inherits theme text color (e.g. white); without this, text can match #fff container. */
+    color: '#111',
+    backgroundColor: '#fff',
   },
   spinner: {
     marginTop: 8,

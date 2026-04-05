@@ -2,6 +2,7 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
+import AssetTypesScreen from '../screens/AssetTypesScreen';
 import HistoryScreen from '../screens/HistoryScreen';
 import HomeScreen from '../screens/HomeScreen';
 import PocketDetailScreen from '../screens/PocketDetailScreen';
@@ -40,6 +41,11 @@ export function MainNavigator({ onLockVault }: { onLockVault: () => Promise<void
           />
           <Stack.Screen name="History" component={HistoryScreen} options={{ title: 'History' }} />
           <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
+          <Stack.Screen
+            name="AssetTypes"
+            component={AssetTypesScreen}
+            options={{ title: 'Asset types' }}
+          />
         </Stack.Navigator>
       </NavigationContainer>
     </LockVaultContext.Provider>

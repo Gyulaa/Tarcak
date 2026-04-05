@@ -12,6 +12,17 @@ export type Pocket = {
   updated_at: number;
 };
 
+/** User-defined asset / currency code (e.g. HUF, USD, XMR) with a display label. */
+export type AssetType = {
+  id: string;
+  /** Uppercase code stored on `transactions.currency`. */
+  code: string;
+  name: string;
+  sort_index: number;
+  created_at: number;
+  updated_at: number;
+};
+
 /** One row in `transactions` — balances are derived from these rows. */
 export type LedgerTransaction = {
   id: string;

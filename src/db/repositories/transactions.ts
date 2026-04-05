@@ -2,6 +2,7 @@ import * as Crypto from 'expo-crypto';
 
 import type { BalanceRow, LedgerTransaction, TransactionKind } from '../../domain/types';
 import { openMainDatabase } from '../client';
+import * as assetTypesRepo from './assetTypes';
 
 type TxRow = {
   id: string;
@@ -95,6 +96,8 @@ export async function insertIncome(params: {
   if (!title) {
     throw new Error('Title is required.');
   }
+  const currency = params.currency.trim().toUpperCase();
+  await assetTypesRepo.requireRegisteredAssetCurrency(currency);
   await db.runAsync(
     `INSERT INTO transactions (
       id, kind, title, amount_minor, currency, occurred_at, created_at, updated_at,
@@ -104,7 +107,7 @@ export async function insertIncome(params: {
       id,
       title,
       params.amount_minor,
-      params.currency.trim().toUpperCase(),
+      currency,
       params.occurred_at,
       now,
       now,
@@ -139,6 +142,8 @@ export async function insertExpense(params: {
   if (!title) {
     throw new Error('Title is required.');
   }
+  const currency = params.currency.trim().toUpperCase();
+  await assetTypesRepo.requireRegisteredAssetCurrency(currency);
   await db.runAsync(
     `INSERT INTO transactions (
       id, kind, title, amount_minor, currency, occurred_at, created_at, updated_at,
@@ -148,7 +153,7 @@ export async function insertExpense(params: {
       id,
       title,
       params.amount_minor,
-      params.currency.trim().toUpperCase(),
+      currency,
       params.occurred_at,
       now,
       now,
@@ -184,6 +189,8 @@ export async function insertTransfer(params: {
   if (!title) {
     throw new Error('Title is required.');
   }
+  const currency = params.currency.trim().toUpperCase();
+  await assetTypesRepo.requireRegisteredAssetCurrency(currency);
   await db.runAsync(
     `INSERT INTO transactions (
       id, kind, title, amount_minor, currency, occurred_at, created_at, updated_at,
@@ -193,7 +200,7 @@ export async function insertTransfer(params: {
       id,
       title,
       params.amount_minor,
-      params.currency.trim().toUpperCase(),
+      currency,
       params.occurred_at,
       now,
       now,
@@ -235,6 +242,7 @@ export async function updateTransaction(
   if (!next.title) {
     throw new Error('Title is required.');
   }
+  await assetTypesRepo.requireRegisteredAssetCurrency(next.currency);
   validateLedgerShape({
     kind: next.kind,
     pocket_id: next.pocket_id,

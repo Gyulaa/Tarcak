@@ -1,5 +1,6 @@
 // @ts-nocheck
-import { useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Pressable,
@@ -10,6 +11,7 @@ import {
   View,
 } from 'react-native';
 
+import * as assetTypesRepo from '../db/repositories/assetTypes';
 import * as pocketsRepo from '../db/repositories/pockets';
 import * as settingsRepo from '../db/repositories/settings';
 import * as txRepo from '../db/repositories/transactions';
@@ -30,48 +32,88 @@ export default function TransactionEditorScreen({ navigation, route }) {
   const [fromId, setFromId] = useState(fromPocketId || '');
   const [toId, setToId] = useState(toPocketId || '');
   const [pockets, setPockets] = useState([]);
+  const [assetTypes, setAssetTypes] = useState([]);
   /** Preserved when editing; ignored on create (we use time of save). */
   const [occurredAt, setOccurredAt] = useState<number | null>(null);
 
+  useFocusEffect(
+    useCallback(() => {
+      void (async () => {
+        const list = await pocketsRepo.listPockets();
+        setPockets(list);
+        const types = await assetTypesRepo.listAssetTypes();
+        setAssetTypes(types);
+      })();
+    }, [])
+  );
+
   useEffect(() => {
+    if (presetKind) {
+      setKind(presetKind);
+    }
+    if (pocketId) {
+      setTargetPocketId(pocketId);
+    }
+    if (fromPocketId) {
+      setFromId(fromPocketId);
+    }
+    if (toPocketId) {
+      setToId(toPocketId);
+    }
+  }, [presetKind, pocketId, fromPocketId, toPocketId]);
+
+  useEffect(() => {
+    if (transactionId) {
+      return;
+    }
     void (async () => {
-      const list = await pocketsRepo.listPockets();
-      setPockets(list);
       const def = await settingsRepo.getDefaultCurrency();
-      if (!transactionId) {
-        setCurrency(def);
+      setCurrency(def);
+    })();
+  }, [transactionId]);
+
+  useEffect(() => {
+    if (!transactionId) {
+      setLoading(false);
+      return;
+    }
+    void (async () => {
+      setLoading(true);
+      const row = await txRepo.getTransaction(transactionId);
+      if (!row) {
+        Alert.alert('Missing', 'Transaction not found.');
+        navigation.goBack();
+        return;
       }
-      if (presetKind) {
-        setKind(presetKind);
-      }
-      if (pocketId) {
-        setTargetPocketId(pocketId);
-      }
-      if (fromPocketId) {
-        setFromId(fromPocketId);
-      }
-      if (toPocketId) {
-        setToId(toPocketId);
-      }
-      if (transactionId) {
-        const row = await txRepo.getTransaction(transactionId);
-        if (!row) {
-          Alert.alert('Missing', 'Transaction not found.');
-          navigation.goBack();
-          return;
-        }
-        setKind(row.kind);
-        setTitle(row.title);
-        setAmountStr(formatMinorToAmountString(row.amount_minor));
-        setCurrency(row.currency);
-        setTargetPocketId(row.pocket_id || '');
-        setFromId(row.from_pocket_id || '');
-        setToId(row.to_pocket_id || '');
-        setOccurredAt(row.occurred_at);
-      }
+      setKind(row.kind);
+      setTitle(row.title);
+      setAmountStr(formatMinorToAmountString(row.amount_minor));
+      setCurrency(row.currency);
+      setTargetPocketId(row.pocket_id || '');
+      setFromId(row.from_pocket_id || '');
+      setToId(row.to_pocket_id || '');
+      setOccurredAt(row.occurred_at);
       setLoading(false);
     })();
-  }, [transactionId, presetKind, pocketId, fromPocketId, toPocketId, navigation]);
+  }, [transactionId, navigation]);
+
+  const pickerAssetTypes = useMemo(() => {
+    const inCatalog = assetTypes.some((a) => a.code === currency);
+    if (inCatalog || !currency) {
+      return assetTypes;
+    }
+    return [
+      {
+        id: '__legacy__',
+        code: currency,
+        name: 'Not in catalog — add in Asset types or pick another',
+        sort_index: -1,
+        created_at: 0,
+        updated_at: 0,
+      },
+      ...assetTypes,
+    ];
+  }, [assetTypes, currency]);
 
   const parseAmount = () => {
     const n = parseAmountStringToMinor(amountStr);
@@ -83,6 +125,11 @@ export default function TransactionEditorScreen({ navigation, route }) {
 
   const save = async () => {
     try {
+      if (!assetTypes.some((a) => a.code === currency)) {
+        throw new Error(
+          'Choose a registered asset type, or add this code under Settings → Asset types.'
+        );
+      }
       const amount_minor = parseAmount();
       const occurred_at = transactionId ? (occurredAt ?? Date.now()) : Date.now();
       if (transactionId) {
@@ -196,14 +243,26 @@ export default function TransactionEditorScreen({ navigation, route }) {
         keyboardType="numbers-and-punctuation"
       />
 
-      <Text style={styles.label}>Currency code</Text>
-      <TextInput
-        style={styles.input}
-        value={currency}
-        onChangeText={(t) => setCurrency(t.toUpperCase())}
-        autoCapitalize="characters"
-        maxLength={8}
-      />
+      <Text style={styles.label}>Asset type</Text>
+      <View style={styles.pickList}>
+        {pickerAssetTypes.length === 0 ? (
+          <Text style={styles.muted}>No asset types yet. Add some under Settings → Asset types.</Text>
+        ) : (
+          pickerAssetTypes.map((a) => (
+            <Pressable
+              key={a.id}
+              style={[styles.pick, currency === a.code && styles.pickOn]}
+              onPress={() => setCurrency(a.code)}
+            >
+              <Text style={currency === a.code ? styles.pickOnText : styles.pickCode}>{a.code}</Text>
+              <Text style={styles.pickSub}>{a.name}</Text>
+            </Pressable>
+          ))
+        )}
+      </View>
+      <Pressable onPress={() => navigation.navigate('AssetTypes')} style={styles.manageLink}>
+        <Text style={styles.manageLinkText}>Manage asset types…</Text>
+      </Pressable>
 
       {kind !== 'transfer' ? (
         <>
@@ -295,6 +354,11 @@ const styles = StyleSheet.create({
   },
   pickOn: { borderColor: '#ff6f32', backgroundColor: '#fff0eb' },
   pickOnText: { fontFamily: font.semibold, color: '#ff6f32' },
+  pickCode: { fontFamily: font.semibold, color: '#222' },
+  pickSub: { fontSize: 13, color: '#666', marginTop: 2 },
+  muted: { color: '#666', paddingVertical: 8 },
+  manageLink: { marginTop: 8, paddingVertical: 6 },
+  manageLinkText: { color: '#ff6f32', fontFamily: font.semibold },
   saveBtn: {
     marginTop: 24,
     backgroundColor: '#ff6f32',

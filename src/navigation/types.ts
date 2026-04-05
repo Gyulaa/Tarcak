@@ -11,4 +11,5 @@ export type RootStackParamList = {
   };
   History: { pocketId?: string } | undefined;
   Settings: undefined;
+  AssetTypes: undefined;
 };

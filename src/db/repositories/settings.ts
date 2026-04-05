@@ -1,4 +1,5 @@
 import { openMainDatabase } from '../client';
+import * as assetTypesRepo from './assetTypes';
 
 const KEY_DEFAULT_CURRENCY = 'default_currency';
 
@@ -25,5 +26,10 @@ export async function getDefaultCurrency(): Promise<string> {
 }
 
 export async function setDefaultCurrency(code: string): Promise<void> {
-  await setSetting(KEY_DEFAULT_CURRENCY, code.trim().toUpperCase());
+  const c = code.trim().toUpperCase();
+  const exists = await assetTypesRepo.currencyExists(c);
+  if (!exists) {
+    throw new Error(`Add "${c}" as an asset type before setting it as default.`);
+  }
+  await setSetting(KEY_DEFAULT_CURRENCY, c);
 }
