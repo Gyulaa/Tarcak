@@ -89,11 +89,8 @@ export default function HomeScreen({ navigation }) {
         <Pressable style={styles.secondaryBtn} onPress={() => navigation.navigate('History', {})}>
           <Text style={styles.secondaryBtnText}>History</Text>
         </Pressable>
-        <Pressable
-          style={styles.secondaryBtn}
-          onPress={() => navigation.navigate('TransactionEditor', { presetKind: 'income' })}
-        >
-          <Text style={styles.secondaryBtnText}>New transaction</Text>
+        <Pressable style={styles.secondaryBtn} onPress={() => navigation.navigate('Statistics')}>
+          <Text style={styles.secondaryBtnText}>Statistics</Text>
         </Pressable>
         <Pressable style={styles.secondaryBtn} onPress={() => navigation.navigate('Settings')}>
           <Text style={styles.secondaryBtnText}>Settings</Text>

@@ -22,6 +22,10 @@ import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
 import { formatMinorForDisplay } from '../utils/formatMinor';
+import { formatOccurredAt } from '../utils/formatOccurredAt';
+
+const JAR_TX_PREVIEW_COUNT = 5;
+const JAR_TX_FETCH_LIMIT = 200;
 
 export default function JarScreen({ navigation }) {
   const { colors } = useAppTheme();
@@ -37,31 +41,41 @@ export default function JarScreen({ navigation }) {
   const [jarFeatureOn, setJarFeatureOn] = useState(true);
   const [advancedJarOn, setAdvancedJarOn] = useState(false);
   const [advancedAssetCount, setAdvancedAssetCount] = useState(0);
+  const [advancedCurrencySet, setAdvancedCurrencySet] = useState(() => new Set());
+  const [jarTransactions, setJarTransactions] = useState([]);
+  const [jarTxShowAll, setJarTxShowAll] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [jar, featureOn, advOn, advSummaries] = await Promise.all([
+      const [jar, featureOn, advOn, advSummaries, advCodes] = await Promise.all([
         pocketsRepo.getJarPocket(),
         settingsRepo.getJarEnabled(),
         settingsRepo.getAdvancedJarEnabled(),
         jarAdvancedRepo.listJarAdvancedSummaries(),
+        jarAdvancedRepo.listJarAdvancedCurrencies(),
       ]);
       setJarFeatureOn(featureOn);
       setAdvancedJarOn(advOn);
       setAdvancedAssetCount(advSummaries.length);
+      setAdvancedCurrencySet(new Set(advCodes));
       if (!jar) {
         setJarId(null);
         setBalances([]);
         setRuleCount(0);
+        setJarTransactions([]);
         return;
       }
       setJarId(jar.id);
       setJarName(jar.name);
-      const b = await txRepo.sumBalancesForPocket(jar.id);
+      const [b, rules, txs] = await Promise.all([
+        txRepo.sumBalancesForPocket(jar.id),
+        jarRepo.listJarDistributionRules(),
+        txRepo.listTransactions({ pocketId: jar.id, limit: JAR_TX_FETCH_LIMIT }),
+      ]);
       setBalances(b.filter((x) => x.balance_minor > 0));
-      const rules = await jarRepo.listJarDistributionRules();
       setRuleCount(rules.length);
+      setJarTransactions(txs);
     } finally {
       setLoading(false);
     }
@@ -89,8 +103,12 @@ export default function JarScreen({ navigation }) {
     }
   };
 
-  const canDistribute =
-    ruleCount > 0 || (advancedJarOn && advancedAssetCount > 0);
+  const balancesForDistribute = useMemo(() => {
+    if (!advancedJarOn) return balances;
+    return balances.filter((b) => advancedCurrencySet.has(b.currency));
+  }, [balances, advancedJarOn, advancedCurrencySet]);
+
+  const canDistribute = advancedJarOn ? balancesForDistribute.length > 0 : ruleCount > 0;
 
   const onDistributePress = () => {
     if (!jarId) return;
@@ -98,14 +116,13 @@ export default function JarScreen({ navigation }) {
       Alert.alert(
         'Set up split first',
         advancedJarOn
-          ? 'Add a basic Jar split (Edit split) or configure at least one asset under Advanced Jar in Settings.'
+          ? 'Add Advanced Jar rules for each asset you hold in the Jar (open Advanced Jar). Percentages must total 100% per asset.'
           : 'Add target pockets and make sure percentages total 100%.',
         [
           { text: 'OK' },
-          { text: 'Edit split', onPress: () => navigation.navigate('JarSplit') },
           ...(advancedJarOn
             ? [{ text: 'Advanced Jar', onPress: () => navigation.navigate('JarAdvanced') }]
-            : []),
+            : [{ text: 'Edit split', onPress: () => navigation.navigate('JarSplit') }]),
         ]
       );
       return;
@@ -114,11 +131,23 @@ export default function JarScreen({ navigation }) {
       Alert.alert('Jar is empty', 'Record income into the Jar first.');
       return;
     }
-    if (balances.length === 1) {
-      const c0 = balances[0].currency;
+    if (balancesForDistribute.length === 0) {
+      Alert.alert(
+        'Nothing to distribute yet',
+        advancedJarOn
+          ? 'Configure Advanced Jar for at least one asset that has a balance in the Jar.'
+          : 'Set up your split first.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    if (balancesForDistribute.length === 1) {
+      const c0 = balancesForDistribute[0].currency;
       Alert.alert(
         'Distribute',
-        `Move the full ${c0} balance from the Jar to your pockets using your saved split?`,
+        advancedJarOn
+          ? `Move the full ${c0} balance from the Jar using your Advanced Jar rules?`
+          : `Move the full ${c0} balance from the Jar to your pockets using your saved split?`,
         [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Distribute', onPress: () => void runDistribute(c0) },
@@ -196,13 +225,20 @@ export default function JarScreen({ navigation }) {
       </View>
 
       <Text style={styles.splitHint}>
-        {ruleCount === 0 && !(advancedJarOn && advancedAssetCount > 0)
-          ? 'No split configured yet.'
-          : ruleCount === 0 && advancedJarOn && advancedAssetCount > 0
-            ? `Advanced Jar: ${advancedAssetCount} asset${advancedAssetCount === 1 ? '' : 's'} — others use basic split once you add it.`
-            : advancedJarOn && advancedAssetCount > 0
-              ? `${ruleCount} pocket${ruleCount === 1 ? '' : 's'} in basic split; ${advancedAssetCount} asset${advancedAssetCount === 1 ? '' : 's'} with advanced rules.`
-              : `${ruleCount} pocket${ruleCount === 1 ? '' : 's'} in your split.`}
+        {advancedJarOn
+          ? advancedAssetCount === 0
+            ? 'Advanced Jar: add at least one asset and define its split.'
+            : balances.length === 0
+              ? `Advanced Jar: ${advancedAssetCount} asset${advancedAssetCount === 1 ? '' : 's'} configured.`
+              : balances.every((b) => advancedCurrencySet.has(b.currency))
+                ? `Advanced Jar: all Jar balances have rules (${advancedAssetCount} asset${advancedAssetCount === 1 ? '' : 's'}).`
+                : `Advanced Jar: add rules for every asset in the Jar (missing: ${balances
+                    .filter((b) => !advancedCurrencySet.has(b.currency))
+                    .map((b) => b.currency)
+                    .join(', ')}).`
+          : ruleCount === 0
+            ? 'No basic split configured yet.'
+            : `${ruleCount} pocket${ruleCount === 1 ? '' : 's'} in your split.`}
       </Text>
 
       <Pressable
@@ -213,35 +249,75 @@ export default function JarScreen({ navigation }) {
         <Text style={styles.primaryBtnText}>Distribute</Text>
       </Pressable>
 
-      <Pressable style={styles.ghostBtn} onPress={() => navigation.navigate('JarSplit')} disabled={busy}>
-        <Text style={styles.ghostBtnText}>Edit basic split</Text>
-      </Pressable>
-
       {advancedJarOn ? (
         <Pressable style={styles.ghostBtn} onPress={() => navigation.navigate('JarAdvanced')} disabled={busy}>
           <Text style={styles.ghostBtnText}>Advanced Jar</Text>
         </Pressable>
-      ) : null}
+      ) : (
+        <Pressable style={styles.ghostBtn} onPress={() => navigation.navigate('JarSplit')} disabled={busy}>
+          <Text style={styles.ghostBtnText}>Edit basic split</Text>
+        </Pressable>
+      )}
 
       <Pressable
-        style={styles.linkRow}
+        style={[styles.primaryBtn, styles.recordIncomeBtn]}
         onPress={() => navigation.navigate('TransactionEditor', { presetKind: 'income', pocketId: jarId })}
       >
-        <Text style={styles.linkText}>Record income to Jar →</Text>
+        <Text style={styles.primaryBtnText}>Record income to Jar</Text>
       </Pressable>
+
+      <View style={styles.sectionDivider} />
+      <Text style={styles.sectionTitle}>Transactions</Text>
+      {jarTransactions.length === 0 ? (
+        <Text style={styles.txEmpty}>No activity in the Jar yet.</Text>
+      ) : (
+        <>
+          {(jarTxShowAll ? jarTransactions : jarTransactions.slice(0, JAR_TX_PREVIEW_COUNT)).map(
+            (item) => (
+              <Pressable
+                key={item.id}
+                style={styles.txRow}
+                onPress={() => navigation.navigate('TransactionEditor', { transactionId: item.id })}
+              >
+                <Text style={styles.txDate}>{formatOccurredAt(item.occurred_at)}</Text>
+                <Text style={styles.txTitle} numberOfLines={1}>
+                  {item.title}
+                </Text>
+                <Text style={styles.txMeta}>
+                  {item.kind} · {item.currency} ·{' '}
+                  {formatMinorForDisplay(item.amount_minor, item.currency)}
+                </Text>
+              </Pressable>
+            )
+          )}
+          {jarTransactions.length > JAR_TX_PREVIEW_COUNT ? (
+            <Pressable
+              style={styles.showMoreRow}
+              onPress={() => setJarTxShowAll((v) => !v)}
+              hitSlop={6}
+            >
+              <Text style={styles.showMoreText}>
+                {jarTxShowAll ? 'Show less' : 'Show more'}
+              </Text>
+            </Pressable>
+          ) : null}
+        </>
+      )}
 
       <Modal visible={pickCurrencyOpen} transparent animationType="fade">
         <Pressable style={styles.modalOverlay} onPress={() => setPickCurrencyOpen(false)}>
           <Pressable style={styles.modalSheet} onPress={(e) => e.stopPropagation()}>
             <Text style={styles.modalTitle}>Distribute which asset?</Text>
-            {balances.map((item) => (
+            {balancesForDistribute.map((item) => (
               <Pressable
                 key={item.currency}
                 style={styles.modalRow}
                 onPress={() => {
                   Alert.alert(
                     'Distribute',
-                    `Move the full ${item.currency} balance from the Jar using your saved split?`,
+                    advancedJarOn
+                      ? `Move the full ${item.currency} balance from the Jar using your Advanced Jar rules?`
+                      : `Move the full ${item.currency} balance from the Jar using your saved split?`,
                     [
                       { text: 'Cancel', style: 'cancel' },
                       { text: 'Distribute', onPress: () => void runDistribute(item.currency) },
@@ -330,8 +406,33 @@ function createJarStyles(c: AppColors) {
       borderColor: c.primary,
     },
     ghostBtnText: { color: c.primary, fontFamily: font.semibold, fontSize: 16 },
-    linkRow: { marginTop: 20, alignItems: 'center', paddingVertical: 8 },
-    linkText: { color: c.primary, fontFamily: font.semibold, fontSize: 15 },
+    recordIncomeBtn: { marginTop: 12 },
+    sectionDivider: {
+      height: 1,
+      backgroundColor: c.border,
+      marginTop: 28,
+      marginBottom: 16,
+    },
+    sectionTitle: {
+      fontSize: 13,
+      fontFamily: font.semibold,
+      color: c.textMuted,
+      marginBottom: 12,
+    },
+    txEmpty: { fontSize: 15, color: c.textMuted, lineHeight: 22 },
+    txRow: {
+      padding: 14,
+      backgroundColor: c.surface,
+      borderRadius: 12,
+      marginBottom: 8,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    txDate: { fontSize: 12, color: c.textMuted, fontFamily: font.semibold, marginBottom: 6 },
+    txTitle: { fontFamily: font.semibold, fontSize: 16, color: c.textSecondary },
+    txMeta: { color: c.textMuted, marginTop: 4, fontSize: 13 },
+    showMoreRow: { alignItems: 'center', paddingVertical: 10, marginTop: 4 },
+    showMoreText: { color: c.primary, fontFamily: font.semibold, fontSize: 15 },
     modalOverlay: {
       flex: 1,
       backgroundColor: c.modalOverlay,

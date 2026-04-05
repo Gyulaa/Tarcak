@@ -4,6 +4,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 're
 
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
+import { ModalSelectField } from '../components/ModalSelectField';
 import * as assetTypesRepo from '../db/repositories/assetTypes';
 import * as settingsRepo from '../db/repositories/settings';
 import { useLockVault } from '../navigation/LockVaultContext';
@@ -62,10 +63,20 @@ export default function SettingsScreen() {
     }
   };
 
-  const save = async () => {
+  const defaultAssetDisplay = useMemo(() => {
+    const row = assetTypes.find((a) => a.code === defaultCode);
+    return row ? `${row.code} — ${row.name}` : '';
+  }, [assetTypes, defaultCode]);
+
+  const defaultAssetOptions = useMemo(
+    () => assetTypes.map((a) => ({ value: a.code, title: a.code, subtitle: a.name })),
+    [assetTypes]
+  );
+
+  const onPickDefaultAsset = async (code) => {
     try {
-      await settingsRepo.setDefaultCurrency(defaultCode);
-      Alert.alert('Saved', `New transactions will default to ${defaultCode}.`);
+      await settingsRepo.setDefaultCurrency(code);
+      setDefaultCode(code);
     } catch (e) {
       Alert.alert('Error', e instanceof Error ? e.message : String(e));
     }
@@ -74,32 +85,28 @@ export default function SettingsScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.inner}>
       <Text style={styles.p}>
-        Default asset type is selected when you open a new transaction. Create types under Asset
-        types, then pick one here.
+        Default asset type is applied when you open a new transaction. Create types under Asset
+        types, then choose one below.
       </Text>
-      <Text style={styles.label}>Default asset type</Text>
-      <View style={styles.pickList}>
-        {loaded && assetTypes.length === 0 ? (
+      {loaded && assetTypes.length === 0 ? (
+        <>
+          <Text style={styles.label}>Default asset type</Text>
           <Text style={styles.muted}>
             No asset types yet. Open Asset types below and add at least one (e.g. HUF).
           </Text>
-        ) : (
-          assetTypes.map((a) => (
-            <Pressable
-              key={a.id}
-              style={[styles.pick, defaultCode === a.code && styles.pickOn]}
-              onPress={() => setDefaultCode(a.code)}
-              disabled={!loaded}
-            >
-              <Text style={defaultCode === a.code ? styles.pickOnText : styles.pickCode}>{a.code}</Text>
-              <Text style={styles.pickSub}>{a.name}</Text>
-            </Pressable>
-          ))
-        )}
-      </View>
-      <Pressable style={styles.btn} onPress={() => void save()} disabled={!loaded || assetTypes.length === 0}>
-        <Text style={styles.btnText}>Save default</Text>
-      </Pressable>
+        </>
+      ) : (
+        <ModalSelectField
+          label="Default asset type"
+          displayValue={defaultAssetDisplay}
+          placeholder="Select default asset"
+          modalTitle="Default asset type"
+          options={defaultAssetOptions}
+          onSelect={(code) => void onPickDefaultAsset(code)}
+          disabled={!loaded || assetTypes.length === 0}
+          emptyMessage="No asset types yet. Open Asset types below first."
+        />
+      )}
 
       <Pressable style={styles.secondaryBtn} onPress={() => navigation.navigate('AssetTypes')}>
         <Text style={styles.secondaryBtnText}>Asset types…</Text>
@@ -147,8 +154,9 @@ export default function SettingsScreen() {
         <View style={styles.switchTextCol}>
           <Text style={styles.switchTitle}>Advanced Jar</Text>
           <Text style={styles.switchHint}>
-            Per-asset default ceiling and milestone splits (linear blend between steps). Assets without
-            their own rules still use the basic split from Jar → Edit split. Off by default.
+            Per-asset default ceiling and milestone splits (linear blend between steps). When on,
+            Jar distribution uses only these rules—add every asset you keep in the Jar under Advanced
+            Jar. Off by default.
           </Text>
         </View>
         <Switch
@@ -184,26 +192,7 @@ function createStyles(c: AppColors) {
     inner: { padding: 16, paddingBottom: 40 },
     p: { color: c.textMuted, marginBottom: 16, lineHeight: 22 },
     label: { fontFamily: font.semibold, marginBottom: 6, color: c.text },
-    pickList: { gap: 6, marginBottom: 16 },
-    pick: {
-      padding: 12,
-      backgroundColor: c.surface,
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: c.borderStrong,
-    },
-    pickOn: { borderColor: c.primary, backgroundColor: c.chipBg },
-    pickOnText: { fontFamily: font.semibold, color: c.primary },
-    pickCode: { fontFamily: font.semibold, color: c.text },
-    pickSub: { fontSize: 13, color: c.textMuted, marginTop: 2 },
     muted: { color: c.textMuted, paddingVertical: 8 },
-    btn: {
-      backgroundColor: c.primary,
-      paddingVertical: 14,
-      borderRadius: 10,
-      alignItems: 'center',
-    },
-    btnText: { color: c.onPrimary, fontFamily: font.semibold, fontSize: 16 },
     secondaryBtn: {
       marginTop: 12,
       backgroundColor: c.surface,

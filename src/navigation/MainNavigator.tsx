@@ -12,6 +12,7 @@ import JarSplitScreen from '../screens/JarSplitScreen';
 import PocketDetailScreen from '../screens/PocketDetailScreen';
 import PocketsScreen from '../screens/PocketsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import StatisticsScreen from '../screens/StatisticsScreen';
 import TransactionEditorScreen from '../screens/TransactionEditorScreen';
 import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
@@ -67,6 +68,7 @@ function MainStack() {
           options={{ title: 'Transaction' }}
         />
         <Stack.Screen name="History" component={HistoryScreen} options={{ title: 'History' }} />
+        <Stack.Screen name="Statistics" component={StatisticsScreen} options={{ title: 'Statistics' }} />
         <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
         <Stack.Screen
           name="AssetTypes"

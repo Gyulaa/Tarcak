@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 
+import { ModalSelectField } from '../components/ModalSelectField';
 import * as assetTypesRepo from '../db/repositories/assetTypes';
 import * as pocketsRepo from '../db/repositories/pockets';
 import * as settingsRepo from '../db/repositories/settings';
@@ -208,6 +209,41 @@ export default function TransactionEditorScreen({ navigation, route }) {
     ]);
   };
 
+  const assetSelectOptions = useMemo(
+    () =>
+      pickerAssetTypes.map((a) => ({
+        value: a.code,
+        title: a.code,
+        subtitle: a.name,
+      })),
+    [pickerAssetTypes]
+  );
+
+  const pocketSelectOptions = useMemo(
+    () => pockets.map((p) => ({ value: p.id, title: p.name })),
+    [pockets]
+  );
+
+  const selectedAssetLabel = useMemo(() => {
+    const a = pickerAssetTypes.find((x) => x.code === currency);
+    return a ? `${a.code} — ${a.name}` : '';
+  }, [pickerAssetTypes, currency]);
+
+  const targetPocketLabel = useMemo(() => {
+    const p = pockets.find((x) => x.id === targetPocketId);
+    return p?.name ?? '';
+  }, [pockets, targetPocketId]);
+
+  const fromPocketLabel = useMemo(() => {
+    const p = pockets.find((x) => x.id === fromId);
+    return p?.name ?? '';
+  }, [pockets, fromId]);
+
+  const toPocketLabel = useMemo(() => {
+    const p = pockets.find((x) => x.id === toId);
+    return p?.name ?? '';
+  }, [pockets, toId]);
+
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -215,8 +251,6 @@ export default function TransactionEditorScreen({ navigation, route }) {
       </View>
     );
   }
-
-  const pocketOptions = pockets;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.inner}>
@@ -259,79 +293,63 @@ export default function TransactionEditorScreen({ navigation, route }) {
         value={amountStr}
         onChangeText={setAmountStr}
         keyboardType="numbers-and-punctuation"
+        placeholder="0.00"
         placeholderTextColor={colors.placeholder}
       />
 
-      <Text style={styles.label}>Asset type</Text>
-      <View style={styles.pickList}>
-        {pickerAssetTypes.length === 0 ? (
+      {pickerAssetTypes.length === 0 ? (
+        <>
+          <Text style={styles.label}>Asset type</Text>
           <Text style={styles.muted}>No asset types yet. Add some under Settings → Asset types.</Text>
-        ) : (
-          pickerAssetTypes.map((a) => (
-            <Pressable
-              key={a.id}
-              style={[styles.pick, currency === a.code && styles.pickOn]}
-              onPress={() => setCurrency(a.code)}
-            >
-              <Text style={currency === a.code ? styles.pickOnText : styles.pickCode}>{a.code}</Text>
-              <Text style={styles.pickSub}>{a.name}</Text>
-            </Pressable>
-          ))
-        )}
-      </View>
+        </>
+      ) : (
+        <ModalSelectField
+          label="Asset type"
+          displayValue={selectedAssetLabel}
+          placeholder="Select asset type"
+          modalTitle="Asset type"
+          options={assetSelectOptions}
+          onSelect={setCurrency}
+          emptyMessage="No asset types yet. Add some under Settings → Asset types."
+        />
+      )}
       <Pressable onPress={() => navigation.navigate('AssetTypes')} style={styles.manageLink}>
         <Text style={styles.manageLinkText}>Manage asset types…</Text>
       </Pressable>
 
       {kind !== 'transfer' ? (
-        <>
-          <Text style={styles.label}>Pocket</Text>
-          <View style={styles.pickList}>
-            {pocketOptions.map((p) => (
-              <Pressable
-                key={p.id}
-                style={[styles.pickPocket, targetPocketId === p.id && styles.pickPocketOn]}
-                onPress={() => setTargetPocketId(p.id)}
-              >
-                <Text
-                  style={targetPocketId === p.id ? styles.pickPocketNameOn : styles.pickPocketName}
-                >
-                  {p.name}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </>
+        <ModalSelectField
+          label="Pocket"
+          displayValue={targetPocketLabel}
+          placeholder="Select pocket"
+          modalTitle="Pocket"
+          options={pocketSelectOptions}
+          onSelect={setTargetPocketId}
+          variant="pocket"
+          emptyMessage="No pockets yet. Create one under Pockets."
+        />
       ) : (
         <>
-          <Text style={styles.label}>From pocket</Text>
-          <View style={styles.pickList}>
-            {pocketOptions.map((p) => (
-              <Pressable
-                key={p.id}
-                style={[styles.pickPocket, fromId === p.id && styles.pickPocketOn]}
-                onPress={() => setFromId(p.id)}
-              >
-                <Text style={fromId === p.id ? styles.pickPocketNameOn : styles.pickPocketName}>
-                  {p.name}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-          <Text style={styles.label}>To pocket</Text>
-          <View style={styles.pickList}>
-            {pocketOptions.map((p) => (
-              <Pressable
-                key={p.id}
-                style={[styles.pickPocket, toId === p.id && styles.pickPocketOn]}
-                onPress={() => setToId(p.id)}
-              >
-                <Text style={toId === p.id ? styles.pickPocketNameOn : styles.pickPocketName}>
-                  {p.name}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
+          <ModalSelectField
+            label="From pocket"
+            displayValue={fromPocketLabel}
+            placeholder="Select pocket"
+            modalTitle="From pocket"
+            options={pocketSelectOptions}
+            onSelect={setFromId}
+            variant="pocket"
+            emptyMessage="No pockets yet. Create one under Pockets."
+          />
+          <ModalSelectField
+            label="To pocket"
+            displayValue={toPocketLabel}
+            placeholder="Select pocket"
+            modalTitle="To pocket"
+            options={pocketSelectOptions}
+            onSelect={setToId}
+            variant="pocket"
+            emptyMessage="No pockets yet. Create one under Pockets."
+          />
         </>
       )}
 
@@ -375,35 +393,6 @@ function createTxStyles(c: AppColors) {
     kindChipOn: { backgroundColor: c.primary },
     kindChipText: { color: c.pillText },
     kindChipTextOn: { color: c.onPrimary, fontFamily: font.semibold },
-    pickList: { gap: 6 },
-    pick: {
-      padding: 12,
-      backgroundColor: c.surface,
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: c.borderStrong,
-    },
-    pickOn: { borderColor: c.primary, backgroundColor: c.chipBg },
-    pickOnText: { fontFamily: font.semibold, color: c.primary },
-    pickCode: { fontFamily: font.semibold, color: c.text },
-    pickSub: { fontSize: 13, color: c.textMuted, marginTop: 2 },
-    pickPocket: {
-      padding: 12,
-      backgroundColor: c.pocketPickBg,
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: c.pocketPickBorder,
-    },
-    pickPocketOn: {
-      borderColor: c.pocketPickBorderSelected,
-      backgroundColor: c.pocketPickBgSelected,
-    },
-    pickPocketName: { fontSize: 16, color: c.pocketPickText },
-    pickPocketNameOn: {
-      fontSize: 16,
-      fontFamily: font.semibold,
-      color: c.pocketPickTextSelected,
-    },
     muted: { color: c.textMuted, paddingVertical: 8 },
     manageLink: { marginTop: 8, paddingVertical: 6 },
     manageLinkText: { color: c.primary, fontFamily: font.semibold },

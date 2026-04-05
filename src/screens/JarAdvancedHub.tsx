@@ -64,7 +64,7 @@ export default function JarAdvancedHub({ navigation }) {
   const onDelete = (currency) => {
     Alert.alert(
       'Remove advanced config?',
-      `Delete milestone rules for ${currency}? The basic Jar split is unchanged.`,
+      `Delete Advanced Jar rules for ${currency}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -121,8 +121,8 @@ export default function JarAdvancedHub({ navigation }) {
       <ScrollView contentContainerStyle={styles.inner}>
         <Text style={styles.lead}>
           Each listed asset uses its own default split while the Jar balance stays at or below the
-          ceiling, then blends toward milestone splits as the balance grows. Assets not listed here
-          use the basic Jar split from Edit split.
+          ceiling, then blends toward milestone splits as the balance grows. Distribution from the
+          Jar only runs for assets you configure here.
         </Text>
 
         <Pressable

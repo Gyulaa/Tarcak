@@ -139,31 +139,24 @@ export async function distributeJarCurrency(params: {
 
   let ordered: { target_pocket_id: string; percent_bps: number }[] = [];
 
-  if (advancedOn && advCfg) {
-    try {
-      const bpsMap = jarAdvancedRepo.resolveAdvancedEffectiveBps(totalMinor, advCfg);
-      let sum = 0;
-      for (const v of bpsMap.values()) {
-        sum += v;
-      }
-      if (sum !== JAR_ADV_TOTAL_BPS) {
-        throw new Error('Internal split error.');
-      }
-      ordered = [...bpsMap.entries()]
-        .filter(([, bps]) => bps > 0)
-        .sort((a, b) => a[0].localeCompare(b[0]))
-        .map(([target_pocket_id, percent_bps]) => ({ target_pocket_id, percent_bps }));
-    } catch (e) {
-      if (basicRules.length === 0) {
-        throw e instanceof Error
-          ? e
-          : new Error('Advanced split failed and no basic fallback is configured.');
-      }
-      ordered = basicRules.map((r) => ({
-        target_pocket_id: r.target_pocket_id,
-        percent_bps: r.percent_bps,
-      }));
+  if (advancedOn) {
+    if (!advCfg) {
+      throw new Error(
+        `No Advanced Jar rules for ${currency}. Open Advanced Jar from the Jar screen and add this asset, or turn off Advanced Jar in Settings to use the basic split.`
+      );
     }
+    const bpsMap = jarAdvancedRepo.resolveAdvancedEffectiveBps(totalMinor, advCfg);
+    let sum = 0;
+    for (const v of bpsMap.values()) {
+      sum += v;
+    }
+    if (sum !== JAR_ADV_TOTAL_BPS) {
+      throw new Error('Internal split error.');
+    }
+    ordered = [...bpsMap.entries()]
+      .filter(([, bps]) => bps > 0)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([target_pocket_id, percent_bps]) => ({ target_pocket_id, percent_bps }));
   } else {
     if (basicRules.length === 0) {
       throw new Error('Set up your split first (Edit split).');

@@ -10,6 +10,7 @@ export type RootStackParamList = {
     toPocketId?: string;
   };
   History: { pocketId?: string } | undefined;
+  Statistics: undefined;
   Settings: undefined;
   AssetTypes: undefined;
   Jar: undefined;
