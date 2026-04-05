@@ -5,6 +5,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AssetTypesScreen from '../screens/AssetTypesScreen';
 import HistoryScreen from '../screens/HistoryScreen';
 import HomeScreen from '../screens/HomeScreen';
+import JarAdvancedAssetEditor from '../screens/JarAdvancedAssetEditor';
+import JarAdvancedHub from '../screens/JarAdvancedHub';
 import JarScreen from '../screens/JarScreen';
 import JarSplitScreen from '../screens/JarSplitScreen';
 import PocketDetailScreen from '../screens/PocketDetailScreen';
@@ -32,6 +34,14 @@ export function MainNavigator({ onLockVault }: { onLockVault: () => Promise<void
           <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Tarcak' }} />
           <Stack.Screen name="Jar" component={JarScreen} options={{ title: 'Jar' }} />
           <Stack.Screen name="JarSplit" component={JarSplitScreen} options={{ title: 'Jar split' }} />
+          <Stack.Screen name="JarAdvanced" component={JarAdvancedHub} options={{ title: 'Advanced Jar' }} />
+          <Stack.Screen
+            name="JarAdvancedAssetEditor"
+            component={JarAdvancedAssetEditor}
+            options={({ route }) => ({
+              title: route.params?.currency ? `Jar: ${route.params.currency}` : 'Advanced asset',
+            })}
+          />
           <Stack.Screen name="Pockets" component={PocketsScreen} options={{ title: 'Pockets' }} />
           <Stack.Screen
             name="PocketDetail"

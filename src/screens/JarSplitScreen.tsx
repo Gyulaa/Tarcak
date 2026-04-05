@@ -49,6 +49,7 @@ export default function JarSplitScreen({ navigation }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [jarFeatureOn, setJarFeatureOn] = useState(true);
+  const [advancedJarOn, setAdvancedJarOn] = useState(false);
 
   const load = useCallback(async () => {
     const regular = await pocketsRepo.listRegularPockets();
@@ -70,8 +71,12 @@ export default function JarSplitScreen({ navigation }) {
   useFocusEffect(
     useCallback(() => {
       void (async () => {
-        const on = await settingsRepo.getJarEnabled();
+        const [on, adv] = await Promise.all([
+          settingsRepo.getJarEnabled(),
+          settingsRepo.getAdvancedJarEnabled(),
+        ]);
         setJarFeatureOn(on);
+        setAdvancedJarOn(adv);
         if (on) {
           void load();
         }
@@ -178,9 +183,14 @@ export default function JarSplitScreen({ navigation }) {
     <View style={styles.root}>
       <ScrollView contentContainerStyle={styles.inner}>
         <Text style={styles.lead}>
-          When you tap Distribute, each asset in the Jar is split across these pockets. Percentages must
-          add up to exactly 100%.
+          When you tap Distribute, each asset in the Jar is split across these pockets unless Advanced
+          Jar overrides that asset. Percentages must add up to exactly 100%.
         </Text>
+        {advancedJarOn ? (
+          <Pressable style={styles.advLink} onPress={() => navigation.navigate('JarAdvanced')}>
+            <Text style={styles.advLinkText}>Open Advanced Jar (per-asset ceilings & milestones)</Text>
+          </Pressable>
+        ) : null}
 
         <View style={styles.totalCard}>
           <View style={styles.totalTop}>
@@ -282,7 +292,9 @@ const styles = StyleSheet.create({
   },
   settingsBtnText: { color: '#fff', fontFamily: font.semibold, fontSize: 16 },
   inner: { padding: 20, paddingBottom: 40 },
-  lead: { fontSize: 15, color: '#555', lineHeight: 22, marginBottom: 20 },
+  lead: { fontSize: 15, color: '#555', lineHeight: 22, marginBottom: 12 },
+  advLink: { marginBottom: 20, paddingVertical: 4 },
+  advLinkText: { color: '#ff6f32', fontFamily: font.semibold, fontSize: 15 },
   totalCard: {
     backgroundColor: '#fff',
     borderRadius: 14,

@@ -14,4 +14,6 @@ export type RootStackParamList = {
   AssetTypes: undefined;
   Jar: undefined;
   JarSplit: undefined;
+  JarAdvanced: undefined;
+  JarAdvancedAssetEditor: { currency: string };
 };

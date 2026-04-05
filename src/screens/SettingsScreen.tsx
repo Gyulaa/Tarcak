@@ -16,6 +16,7 @@ export default function SettingsScreen() {
   const [defaultCode, setDefaultCode] = useState('HUF');
   const [loaded, setLoaded] = useState(false);
   const [jarEnabled, setJarEnabled] = useState(true);
+  const [advancedJarEnabled, setAdvancedJarEnabled] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -25,6 +26,7 @@ export default function SettingsScreen() {
         const c = await settingsRepo.getDefaultCurrency();
         setDefaultCode(c);
         setJarEnabled(await settingsRepo.getJarEnabled());
+        setAdvancedJarEnabled(await settingsRepo.getAdvancedJarEnabled());
         setLoaded(true);
       })();
     }, [])
@@ -34,6 +36,15 @@ export default function SettingsScreen() {
     try {
       await settingsRepo.setJarEnabled(value);
       setJarEnabled(value);
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const onAdvancedJarToggle = async (value) => {
+    try {
+      await settingsRepo.setAdvancedJarEnabled(value);
+      setAdvancedJarEnabled(value);
     } catch (e) {
       Alert.alert('Error', e instanceof Error ? e.message : String(e));
     }
@@ -103,6 +114,31 @@ export default function SettingsScreen() {
         />
       </View>
 
+      <View style={[styles.switchRow, !jarEnabled && styles.switchRowDim]}>
+        <View style={styles.switchTextCol}>
+          <Text style={styles.switchTitle}>Advanced Jar</Text>
+          <Text style={styles.switchHint}>
+            Per-asset default ceiling and milestone splits (linear blend between steps). Assets without
+            their own rules still use the basic split from Jar → Edit split. Off by default.
+          </Text>
+        </View>
+        <Switch
+          value={advancedJarEnabled}
+          onValueChange={(v) => void onAdvancedJarToggle(v)}
+          disabled={!loaded || !jarEnabled}
+          trackColor={{ false: '#ddd', true: '#ffc4a8' }}
+          thumbColor={advancedJarEnabled ? '#ff6f32' : '#f4f4f4'}
+        />
+      </View>
+
+      <Pressable
+        style={[styles.secondaryBtn, (!jarEnabled || !advancedJarEnabled) && styles.secondaryBtnDim]}
+        onPress={() => navigation.navigate('JarAdvanced')}
+        disabled={!loaded || !jarEnabled || !advancedJarEnabled}
+      >
+        <Text style={styles.secondaryBtnText}>Configure Advanced Jar…</Text>
+      </Pressable>
+
       <View style={styles.divider} />
 
       <Pressable style={styles.lockRow} onPress={() => void lockVault()}>
@@ -163,6 +199,8 @@ const styles = StyleSheet.create({
   switchTextCol: { flex: 1 },
   switchTitle: { fontFamily: font.semibold, fontSize: 16, color: '#222', marginBottom: 6 },
   switchHint: { fontSize: 13, color: '#666', lineHeight: 19 },
+  switchRowDim: { opacity: 0.55 },
+  secondaryBtnDim: { opacity: 0.45 },
   lockRow: { paddingVertical: 8 },
   lockText: { fontSize: 17, fontFamily: font.semibold, color: '#b00020' },
   lockHint: { color: '#666', marginTop: 6, fontSize: 13 },

@@ -4,6 +4,7 @@ import * as pocketsRepo from './pockets';
 
 const KEY_DEFAULT_CURRENCY = 'default_currency';
 const KEY_JAR_ENABLED = 'jar_enabled';
+const KEY_ADVANCED_JAR = 'advanced_jar_enabled';
 
 export async function getSetting(key: string): Promise<string | null> {
   const db = await openMainDatabase();
@@ -49,4 +50,18 @@ export async function getJarEnabled(): Promise<boolean> {
 export async function setJarEnabled(enabled: boolean): Promise<void> {
   await setSetting(KEY_JAR_ENABLED, enabled ? '1' : '0');
   await pocketsRepo.setJarPocketArchived(!enabled);
+}
+
+/** Per-asset milestone-based Jar distribution. Default off. */
+export async function getAdvancedJarEnabled(): Promise<boolean> {
+  const v = await getSetting(KEY_ADVANCED_JAR);
+  if (v == null || v.trim() === '') {
+    return false;
+  }
+  const t = v.trim().toLowerCase();
+  return t === '1' || t === 'true' || t === 'yes';
+}
+
+export async function setAdvancedJarEnabled(enabled: boolean): Promise<void> {
+  await setSetting(KEY_ADVANCED_JAR, enabled ? '1' : '0');
 }

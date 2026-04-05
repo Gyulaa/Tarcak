@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 
+import * as jarAdvancedRepo from '../db/repositories/jarAdvanced';
 import * as jarRepo from '../db/repositories/jar';
 import * as pocketsRepo from '../db/repositories/pockets';
 import * as settingsRepo from '../db/repositories/settings';
@@ -30,15 +31,21 @@ export default function JarScreen({ navigation }) {
   const [busy, setBusy] = useState(false);
   const [pickCurrencyOpen, setPickCurrencyOpen] = useState(false);
   const [jarFeatureOn, setJarFeatureOn] = useState(true);
+  const [advancedJarOn, setAdvancedJarOn] = useState(false);
+  const [advancedAssetCount, setAdvancedAssetCount] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [jar, featureOn] = await Promise.all([
+      const [jar, featureOn, advOn, advSummaries] = await Promise.all([
         pocketsRepo.getJarPocket(),
         settingsRepo.getJarEnabled(),
+        settingsRepo.getAdvancedJarEnabled(),
+        jarAdvancedRepo.listJarAdvancedSummaries(),
       ]);
       setJarFeatureOn(featureOn);
+      setAdvancedJarOn(advOn);
+      setAdvancedAssetCount(advSummaries.length);
       if (!jar) {
         setJarId(null);
         setBalances([]);
@@ -78,13 +85,25 @@ export default function JarScreen({ navigation }) {
     }
   };
 
+  const canDistribute =
+    ruleCount > 0 || (advancedJarOn && advancedAssetCount > 0);
+
   const onDistributePress = () => {
     if (!jarId) return;
-    if (ruleCount === 0) {
-      Alert.alert('Set up split first', 'Add target pockets and make sure percentages total 100%.', [
-        { text: 'OK' },
-        { text: 'Edit split', onPress: () => navigation.navigate('JarSplit') },
-      ]);
+    if (!canDistribute) {
+      Alert.alert(
+        'Set up split first',
+        advancedJarOn
+          ? 'Add a basic Jar split (Edit split) or configure at least one asset under Advanced Jar in Settings.'
+          : 'Add target pockets and make sure percentages total 100%.',
+        [
+          { text: 'OK' },
+          { text: 'Edit split', onPress: () => navigation.navigate('JarSplit') },
+          ...(advancedJarOn
+            ? [{ text: 'Advanced Jar', onPress: () => navigation.navigate('JarAdvanced') }]
+            : []),
+        ]
+      );
       return;
     }
     if (balances.length === 0) {
@@ -173,22 +192,32 @@ export default function JarScreen({ navigation }) {
       </View>
 
       <Text style={styles.splitHint}>
-        {ruleCount === 0
+        {ruleCount === 0 && !(advancedJarOn && advancedAssetCount > 0)
           ? 'No split configured yet.'
-          : `${ruleCount} pocket${ruleCount === 1 ? '' : 's'} in your split.`}
+          : ruleCount === 0 && advancedJarOn && advancedAssetCount > 0
+            ? `Advanced Jar: ${advancedAssetCount} asset${advancedAssetCount === 1 ? '' : 's'} — others use basic split once you add it.`
+            : advancedJarOn && advancedAssetCount > 0
+              ? `${ruleCount} pocket${ruleCount === 1 ? '' : 's'} in basic split; ${advancedAssetCount} asset${advancedAssetCount === 1 ? '' : 's'} with advanced rules.`
+              : `${ruleCount} pocket${ruleCount === 1 ? '' : 's'} in your split.`}
       </Text>
 
       <Pressable
-        style={[styles.primaryBtn, (busy || balances.length === 0) && styles.btnDisabled]}
+        style={[styles.primaryBtn, (busy || balances.length === 0 || !canDistribute) && styles.btnDisabled]}
         onPress={onDistributePress}
-        disabled={busy}
+        disabled={busy || !canDistribute}
       >
         <Text style={styles.primaryBtnText}>Distribute</Text>
       </Pressable>
 
       <Pressable style={styles.ghostBtn} onPress={() => navigation.navigate('JarSplit')} disabled={busy}>
-        <Text style={styles.ghostBtnText}>Edit split</Text>
+        <Text style={styles.ghostBtnText}>Edit basic split</Text>
       </Pressable>
+
+      {advancedJarOn ? (
+        <Pressable style={styles.ghostBtn} onPress={() => navigation.navigate('JarAdvanced')} disabled={busy}>
+          <Text style={styles.ghostBtnText}>Advanced Jar</Text>
+        </Pressable>
+      ) : null}
 
       <Pressable
         style={styles.linkRow}

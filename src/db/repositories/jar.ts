@@ -1,8 +1,11 @@
 import * as Crypto from 'expo-crypto';
 
 import type { JarDistributionRule } from '../../domain/types';
+import { JAR_ADV_TOTAL_BPS } from '../../domain/jarAdvancedMath';
 import { openMainDatabase } from '../client';
+import * as jarAdvancedRepo from './jarAdvanced';
 import * as pocketsRepo from './pockets';
+import * as settingsRepo from './settings';
 import * as txRepo from './transactions';
 
 const TOTAL_BPS = 10_000;
@@ -123,11 +126,6 @@ export async function distributeJarCurrency(params: {
     throw new Error('Jar is archived. Turn on Pool & distribute in Settings to use it.');
   }
   const currency = params.currency.trim().toUpperCase();
-  const rules = await listJarDistributionRules();
-  if (rules.length === 0) {
-    throw new Error('Set up your split first (Edit split).');
-  }
-  const bpsList = rules.map((r) => r.percent_bps);
   const balances = await txRepo.sumBalancesForPocket(jar.id);
   const row = balances.find((b) => b.currency === currency);
   const totalMinor = row?.balance_minor ?? 0;
@@ -135,11 +133,53 @@ export async function distributeJarCurrency(params: {
     throw new Error('No balance to distribute for this asset in the Jar.');
   }
 
+  const basicRules = await listJarDistributionRules();
+  const advancedOn = await settingsRepo.getAdvancedJarEnabled();
+  const advCfg = advancedOn ? await jarAdvancedRepo.getJarAdvancedDistributeConfig(currency) : null;
+
+  let ordered: { target_pocket_id: string; percent_bps: number }[] = [];
+
+  if (advancedOn && advCfg) {
+    try {
+      const bpsMap = jarAdvancedRepo.resolveAdvancedEffectiveBps(totalMinor, advCfg);
+      let sum = 0;
+      for (const v of bpsMap.values()) {
+        sum += v;
+      }
+      if (sum !== JAR_ADV_TOTAL_BPS) {
+        throw new Error('Internal split error.');
+      }
+      ordered = [...bpsMap.entries()]
+        .filter(([, bps]) => bps > 0)
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([target_pocket_id, percent_bps]) => ({ target_pocket_id, percent_bps }));
+    } catch (e) {
+      if (basicRules.length === 0) {
+        throw e instanceof Error
+          ? e
+          : new Error('Advanced split failed and no basic fallback is configured.');
+      }
+      ordered = basicRules.map((r) => ({
+        target_pocket_id: r.target_pocket_id,
+        percent_bps: r.percent_bps,
+      }));
+    }
+  } else {
+    if (basicRules.length === 0) {
+      throw new Error('Set up your split first (Edit split).');
+    }
+    ordered = basicRules.map((r) => ({
+      target_pocket_id: r.target_pocket_id,
+      percent_bps: r.percent_bps,
+    }));
+  }
+
+  const bpsList = ordered.map((x) => x.percent_bps);
   const parts = splitAmountByBps(totalMinor, bpsList);
   const title = (params.title ?? 'Jar distribution').trim() || 'Jar distribution';
   const occurred_at = Date.now();
   let count = 0;
-  for (let i = 0; i < rules.length; i++) {
+  for (let i = 0; i < ordered.length; i++) {
     const amt = parts[i];
     if (amt <= 0) {
       continue;
@@ -150,7 +190,7 @@ export async function distributeJarCurrency(params: {
       currency,
       occurred_at,
       from_pocket_id: jar.id,
-      to_pocket_id: rules[i].target_pocket_id,
+      to_pocket_id: ordered[i].target_pocket_id,
     });
     count += 1;
   }
