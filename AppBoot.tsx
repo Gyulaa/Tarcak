@@ -2,13 +2,13 @@
 // Temporary: React 19 + React Native 0.81 JSX typings disagree under `tsc` (View/Text as JSX).
 // Metro / Expo bundling is unaffected. Security code is fully checked via `npm run typecheck:src`.
 
+import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   AppState,
-  Button,
   Pressable,
   StyleSheet,
   Text,
@@ -25,7 +25,6 @@ import {
   eraseAllLocalTarcakData,
   hasVault,
   isSessionUnlocked,
-  isSqlCipherAvailableInThisBuild,
   lockVaultSession,
   openMainDatabase,
   registerLockOnBackground,
@@ -33,6 +32,34 @@ import {
   WrongVaultPasswordError,
 } from './src/security';
 import { useLedgerStore } from './src/stores/ledgerStore';
+
+type VaultPhaseKey = 'kdf' | 'db';
+
+const UNLOCK_PHASE_STEPS: { key: VaultPhaseKey; title: string; body: string }[] = [
+  {
+    key: 'kdf',
+    title: 'Verify your password',
+    body: 'This step is intentionally slow so your data stays protected if someone copies the app files.',
+  },
+  {
+    key: 'db',
+    title: 'Open your vault',
+    body: 'Loading your encrypted ledger on this device…',
+  },
+];
+
+const CREATE_PHASE_STEPS: { key: VaultPhaseKey; title: string; body: string }[] = [
+  {
+    key: 'kdf',
+    title: 'Create your protected vault',
+    body: 'Stretching your password can take 10–30 seconds on some phones — please keep the app open.',
+  },
+  {
+    key: 'db',
+    title: 'Prepare encrypted storage',
+    body: 'Setting up the local database…',
+  },
+];
 
 /**
  * Vault gate, then main ledger UI (navigation + screens).
@@ -42,9 +69,10 @@ export default function AppBoot() {
   const [unlocked, setUnlocked] = useState(false);
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
-  /** Shown while PBKDF2 / SecureStore / DB init run (can be tens of seconds on device). */
-  const [vaultPhase, setVaultPhase] = useState<string | null>(null);
+  /** Which long-running substep is active during create/unlock (`null` when idle or erase-only busy). */
+  const [vaultPhaseKey, setVaultPhaseKey] = useState<VaultPhaseKey | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [passwordVisible, setPasswordVisible] = useState(false);
 
   const refreshVaultFlag = useCallback(async () => {
     setVaultPresent(await hasVault());
@@ -73,9 +101,9 @@ export default function AppBoot() {
     setMessage(null);
     setBusy(true);
     try {
-      setVaultPhase('Stretching password (PBKDF2)…');
+      setVaultPhaseKey('kdf');
       await createFirstVault(password);
-      setVaultPhase('Opening encrypted database…');
+      setVaultPhaseKey('db');
       setPassword('');
       await refreshVaultFlag();
       await openMainDatabase();
@@ -84,7 +112,7 @@ export default function AppBoot() {
     } catch (e) {
       setMessage(e instanceof Error ? e.message : String(e));
     } finally {
-      setVaultPhase(null);
+      setVaultPhaseKey(null);
       setBusy(false);
     }
   };
@@ -93,9 +121,9 @@ export default function AppBoot() {
     setMessage(null);
     setBusy(true);
     try {
-      setVaultPhase('Deriving key (PBKDF2)…');
+      setVaultPhaseKey('kdf');
       await unlockWithPassword(password);
-      setVaultPhase('Opening database…');
+      setVaultPhaseKey('db');
       setPassword('');
       await openMainDatabase();
       setUnlocked(true);
@@ -107,7 +135,7 @@ export default function AppBoot() {
         setMessage(e instanceof Error ? e.message : String(e));
       }
     } finally {
-      setVaultPhase(null);
+      setVaultPhaseKey(null);
       setBusy(false);
     }
   };
@@ -172,8 +200,6 @@ export default function AppBoot() {
     );
   }
 
-  const sqlCipher = isSqlCipherAvailableInThisBuild();
-
   if (unlocked) {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
@@ -189,34 +215,60 @@ export default function AppBoot() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <View style={styles.container}>
         <Text style={styles.title}>Tarcak — unlock</Text>
-        <Text style={styles.hint}>
-          {sqlCipher
-            ? 'SQLCipher: active in this build (encrypted DB file).'
-            : 'SQLCipher: not available (e.g. Expo Go). DB file is plaintext; use a dev build.'}
-        </Text>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          placeholderTextColor="#888"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-          autoCapitalize="none"
-          autoCorrect={false}
-          editable={!busy}
-        />
+        <View style={styles.inputOuter}>
+          <TextInput
+            style={styles.input}
+            placeholder="Password"
+            placeholderTextColor="#888"
+            secureTextEntry={!passwordVisible}
+            value={password}
+            onChangeText={setPassword}
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!busy}
+          />
+          <Pressable
+            style={styles.eyeBtn}
+            onPress={() => setPasswordVisible((v) => !v)}
+            disabled={busy}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel={passwordVisible ? 'Hide password' : 'Show password'}
+          >
+            <Ionicons
+              name={passwordVisible ? 'eye-off-outline' : 'eye-outline'}
+              size={22}
+              color={busy ? '#bbb' : '#666'}
+            />
+          </Pressable>
+        </View>
 
         {!vaultPresent ? (
-          <Button
-            title="Create vault"
-            color="#ff6f32"
+          <Pressable
+            style={({ pressed }) => [
+              styles.primaryBtn,
+              busy && styles.primaryBtnBusy,
+              pressed && !busy && styles.primaryBtnPressed,
+            ]}
             onPress={() => void onCreateVault()}
             disabled={busy}
-          />
+          >
+            <Text style={styles.primaryBtnText}>Create vault</Text>
+          </Pressable>
         ) : (
           <>
-            <Button title="Unlock" color="#ff6f32" onPress={() => void onUnlock()} disabled={busy} />
+            <Pressable
+              style={({ pressed }) => [
+                styles.primaryBtn,
+                busy && styles.primaryBtnBusy,
+                pressed && !busy && styles.primaryBtnPressed,
+              ]}
+              onPress={() => void onUnlock()}
+              disabled={busy}
+            >
+              <Text style={styles.primaryBtnText}>Unlock</Text>
+            </Pressable>
             <Pressable
               onPress={confirmEraseAllData}
               disabled={busy}
@@ -227,8 +279,45 @@ export default function AppBoot() {
           </>
         )}
 
-        {busy ? <ActivityIndicator style={styles.spinner} /> : null}
-        {vaultPhase ? <Text style={styles.phase}>{vaultPhase}</Text> : null}
+        {busy && vaultPhaseKey ? (
+          <View style={styles.phaseCard}>
+            <Text style={styles.phaseCardTitle}>Please wait</Text>
+            {(vaultPresent ? UNLOCK_PHASE_STEPS : CREATE_PHASE_STEPS).map((step, i) => {
+              const steps = vaultPresent ? UNLOCK_PHASE_STEPS : CREATE_PHASE_STEPS;
+              const activeIdx = steps.findIndex((s) => s.key === vaultPhaseKey);
+              const done = i < activeIdx;
+              const current = i === activeIdx;
+              return (
+                <View key={step.key} style={styles.phaseRow}>
+                  <View
+                    style={[
+                      styles.phaseDot,
+                      done && styles.phaseDotDone,
+                      current && styles.phaseDotCurrent,
+                    ]}
+                  >
+                    {done ? (
+                      <Text style={styles.phaseCheck}>✓</Text>
+                    ) : (
+                      <Text style={[styles.phaseNum, current && styles.phaseNumCurrent]}>{i + 1}</Text>
+                    )}
+                  </View>
+                  <View style={styles.phaseTextCol}>
+                    <Text style={[styles.phaseStepTitle, current && styles.phaseStepTitleCurrent]}>
+                      {step.title}
+                    </Text>
+                    <Text style={styles.phaseStepBody}>{step.body}</Text>
+                    {current ? (
+                      <ActivityIndicator style={styles.phaseSpinner} color="#ff6f32" />
+                    ) : null}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        ) : busy ? (
+          <ActivityIndicator style={styles.spinner} color="#ff6f32" />
+        ) : null}
         {message ? <Text style={styles.message}>{message}</Text> : null}
 
         <StatusBar style="auto" />
@@ -254,34 +343,123 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontFamily: font.semibold,
     color: '#111',
-  },
-  hint: {
-    fontSize: 13,
-    color: '#444',
     marginBottom: 8,
   },
-  input: {
+  inputOuter: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: '#ccc',
     borderRadius: 8,
-    padding: 12,
+    backgroundColor: '#fff',
+    paddingRight: 4,
+  },
+  input: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
     fontSize: 16,
     /** Android release often inherits theme text color (e.g. white); without this, text can match #fff container. */
     color: '#111',
-    backgroundColor: '#fff',
+    backgroundColor: 'transparent',
+  },
+  eyeBtn: {
+    padding: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  primaryBtn: {
+    backgroundColor: '#ff6f32',
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  primaryBtnPressed: {
+    opacity: 0.88,
+  },
+  /** While working: dim the bar slightly but keep label white (avoids RN Button grey disabled text). */
+  primaryBtnBusy: {
+    opacity: 0.55,
+  },
+  primaryBtnText: {
+    color: '#fff',
+    fontFamily: font.semibold,
+    fontSize: 17,
   },
   spinner: {
-    marginTop: 8,
+    marginTop: 16,
   },
-  phase: {
-    marginTop: 12,
-    color: '#333',
+  phaseCard: {
+    marginTop: 16,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: '#f8f9fa',
+    borderWidth: 1,
+    borderColor: '#e8e8e8',
+  },
+  phaseCardTitle: {
+    fontFamily: font.bold,
+    fontSize: 16,
+    color: '#111',
+    marginBottom: 14,
+  },
+  phaseRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  phaseDot: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#e0e0e0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    marginTop: 2,
+  },
+  phaseDotDone: {
+    backgroundColor: '#2e7d32',
+  },
+  phaseDotCurrent: {
+    backgroundColor: '#fff0eb',
+    borderWidth: 2,
+    borderColor: '#ff6f32',
+  },
+  phaseCheck: {
+    color: '#fff',
     fontSize: 14,
-    lineHeight: 20,
-    textAlign: 'center',
+    fontFamily: font.bold,
+  },
+  phaseNum: {
+    fontSize: 13,
+    fontFamily: font.semibold,
+    color: '#666',
+  },
+  phaseNumCurrent: {
+    color: '#ff6f32',
+  },
+  phaseTextCol: { flex: 1 },
+  phaseStepTitle: {
+    fontSize: 15,
+    fontFamily: font.semibold,
+    color: '#555',
+  },
+  phaseStepTitleCurrent: {
+    color: '#111',
+  },
+  phaseStepBody: {
+    fontSize: 13,
+    color: '#666',
+    lineHeight: 19,
+    marginTop: 4,
+  },
+  phaseSpinner: {
+    marginTop: 10,
+    alignSelf: 'flex-start',
   },
   message: {
-    marginTop: 8,
+    marginTop: 12,
     color: '#333',
   },
   forgotWrap: {

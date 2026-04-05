@@ -11,8 +11,8 @@ Local-first personal finance app: **pockets** (budget segments), **multi-currenc
 | **Runtime** | Expo SDK `~54`, React Native `0.81`, React `19`, TypeScript `strict` |
 | **Entry** | `index.ts` → `App.tsx` (fonts) → `AppBoot.tsx` (vault gate + main UI) |
 | **Architecture** | New Architecture enabled (`newArchEnabled: true` in `app.json`) |
-| **Implemented** | Vault gate, SQLCipher + migrations, **repositories** (`src/db/repositories/*`), **Zustand** ledger store, **React Navigation** native stack, screens: Home (balances), Pockets, Pocket detail, transaction editor (income/expense/transfer + edit/delete), History (optional pocket filter), Settings (default currency + lock) |
-| **Still to add** | Polish (themes, rename pocket UI, date picker), automated tests beyond CI typecheck, optional FX rates |
+| **Implemented** | Vault gate, SQLCipher + **migrations `0001`–`0005`**, **repositories** (`pockets`, `transactions`, `settings`, `assetTypes`, `jar`), **Zustand** ledger store, **React Navigation** native stack, screens: **Home** (balances + Jar shortcut when enabled), **Pockets** (Jar row styled distinctly when pool feature on), **Pocket detail**, **transaction editor** (asset type picker, `occurred_at` shown when editing), **History** (pocket filter + **conducted date** per row), **Settings** (default asset type, **Jar on/off**, asset types, lock), **Asset types**, **Jar** (pool balances, distribute, link to split editor), **Jar split** (percentages must total 100%), **encrypted** SQLite |
+| **Still to add** | Polish (themes, rename pocket UI, **editable** transaction date), automated tests beyond CI typecheck, optional FX rates |
 
 `app.json` enables the **expo-sqlite** config plugin with **`useSQLCipher: true`**. That only applies after a **native build** (`npx expo prebuild` / EAS / `expo run:*`). **Expo Go does not ship SQLCipher** — the app still runs, but the DB file is **plaintext** there (a console warning explains this). Use a **development build** to validate real encryption.
 
@@ -93,14 +93,17 @@ Biometrics can be added later as a **convenience** that gates access to the pass
 
 A **pocket** is a user-defined bucket (e.g. “Daily”, “Savings”, “Crypto”). It does not have a single currency: the same pocket can hold **multiple currencies** as separate balances.
 
-### Currency
+### Asset type (currency code)
 
-Represent `currency` as a string code:
-
-- Fiat: ISO 4217 (`HUF`, `USD`, …).
-- Crypto: conventional symbols (`BTC`, `ETH`, …) until you add metadata tables later.
+Each transaction stores a **`currency` string** that must match a row in the **`asset_types`** catalog (code + display name). Users **define** codes (e.g. `HUF`, `USD`, `XMR`) under **Settings → Asset types**, then **pick** them when recording a transaction (no free-text codes on the form). **`default_currency`** in `user_settings` must refer to an existing catalog code.
 
 Amounts are stored as **signed integers**: **one major currency unit = 10⁸ minor units** (8 decimal places), so values like `0.00000001` are exact. **Income / expense** may use negative amounts; **transfers** must be positive (enforced in SQLite and app validation). The UI accepts decimal strings; see `src/utils/amountMinor.ts`. **Never** use floating point for money in logic — only for display derived from integers.
+
+### Jar (pool & distribute)
+
+The vault has **one system pocket** with **`is_jar = 1`** (created by migration `0004`, default name “Jar”). It behaves like any other pocket in the ledger (income, expense, transfers). **Distribution:** the user configures **target pockets and percentages** (basis points summing to **10 000** = 100%) on **Jar split**, then **Distribute** moves the **full** balance of a chosen asset from the Jar into those pockets via **transfer** rows (integer split; remainder on the last target).
+
+**Settings → Pool & distribute** toggles the feature. When **off**, the setting `jar_enabled` is false and the Jar pocket is **`archived = 1`**: it disappears from **Pockets**, **Home** shortcuts, and **new-transaction pocket pickers**, but **balances and history** still count in aggregates. Turning the feature **on** clears archive on the Jar row. `getPocket(id)` still returns archived pockets (e.g. opening the Jar from a disabled-state screen).
 
 ### Ledger transactions (single source of truth)
 
@@ -114,7 +117,7 @@ Every user-visible record is a **transaction** row. Balances are **derived** by 
 | `expense` | Money out | One **debit** pocket |
 | `transfer` | Move value between pockets | **Debit** pocket → **credit** pocket (same currency for v1; see below) |
 
-Each record has a **title** (short label), **amount** (non-zero integer in minor units at 10⁻⁸ major), **currency**, and **timestamp** (`occurred_at`). Support **edit** by updating the row (and optionally `updated_at`). **History** is filtered queries ordered by `occurred_at` descending.
+Each record has a **title** (short label), **amount** (non-zero integer in minor units at 10⁻⁸ major), **currency** (must exist in `asset_types`), and **when it happened** (`occurred_at`, Unix ms). New saves set `occurred_at` to the current time; the editor shows the stored value when **editing**. **History** and pocket **recent lists** display this date; the list is ordered by `occurred_at` descending.
 
 **v1 rule:** **Transfers are same-currency.** Cross-currency moves are either two transactions (sell/buy) or a future `exchange` type when you add rates — avoid ambiguous bookkeeping early.
 
@@ -147,6 +150,30 @@ SQLite tables (column types illustrative; adjust to your SQLCipher driver).
 | `sort_index` | INTEGER NOT NULL | UI ordering |
 | `created_at` | INTEGER NOT NULL | Unix ms |
 | `updated_at` | INTEGER NOT NULL | Unix ms |
+| `is_jar` | INTEGER NOT NULL | `1` for the single system Jar (migration `0004`) |
+| `archived` | INTEGER NOT NULL | `1` = hidden from `listPockets()` and pickers (Jar when pool feature off; migration `0005`) |
+
+Partial unique index: at most one row with `is_jar = 1`.
+
+### `asset_types`
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `id` | TEXT PK | UUID |
+| `code` | TEXT NOT NULL UNIQUE | Uppercase code stored on `transactions.currency` |
+| `name` | TEXT NOT NULL | Display label |
+| `sort_index` | INTEGER NOT NULL | UI ordering |
+| `created_at` / `updated_at` | INTEGER NOT NULL | Unix ms |
+
+### `jar_distribution_rules`
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `id` | TEXT PK | UUID |
+| `target_pocket_id` | TEXT NOT NULL FK | Regular pocket (not the Jar); `ON DELETE CASCADE` |
+| `percent_bps` | INTEGER NOT NULL | Share in basis points (1–10000); all active rules must sum to **10000** |
+| `sort_index` | INTEGER NOT NULL | Order for split calculation |
+| `created_at` / `updated_at` | INTEGER NOT NULL | Unix ms |
 
 ### `transactions`
 
@@ -156,8 +183,8 @@ SQLite tables (column types illustrative; adjust to your SQLCipher driver).
 | `kind` | TEXT NOT NULL | `income` \| `expense` \| `transfer` |
 | `title` | TEXT NOT NULL | User label |
 | `amount_minor` | INTEGER NOT NULL | Non-zero minor units (**10⁻⁸** of one major unit); signed allowed for `income` / `expense`; **transfers** must be > 0 (see migration `0002_amount_minor_scale`) |
-| `currency` | TEXT NOT NULL | `HUF`, `USD`, `BTC`, … |
-| `occurred_at` | INTEGER NOT NULL | When the event happened (Unix ms) |
+| `currency` | TEXT NOT NULL | Must match `asset_types.code` (enforced in repositories) |
+| `occurred_at` | INTEGER NOT NULL | When the user says the event happened (Unix ms); shown in History |
 | `created_at` | INTEGER NOT NULL | Record creation |
 | `updated_at` | INTEGER NOT NULL | Last edit |
 
@@ -182,7 +209,7 @@ Pocket linkage (nullable by kind):
 | `key` | TEXT PK | e.g. `default_currency` |
 | `value` | TEXT NOT NULL | JSON or plain string |
 
-Seed keys as you need them (e.g. `default_currency` = `HUF`). Price APIs and last-fetched rates can live here or in dedicated tables later.
+Known keys include **`default_currency`** (code string) and **`jar_enabled`** (`1` / `0`). When `jar_enabled` is turned off in the app, the Jar pocket is archived in the same write. Price APIs and last-fetched rates can live here or in dedicated tables later.
 
 ---
 
@@ -201,14 +228,13 @@ For each pocket `p` and currency `c`:
 
 ---
 
-## Repository API (suggested)
+## Repository API (implemented surface)
 
-Rough surface the UI will call:
-
-- **Pockets:** `listPockets()`, `createPocket()`, `renamePocket()`, `reorderPockets()`, `deletePocket()` (define behavior if balance ≠ 0 — block, force transfer, or archive).
-- **Transactions:** `createIncome()`, `createExpense()`, `createTransfer()`, `updateTransaction()`, `deleteTransaction()` (or soft-delete if you prefer audit).
-- **History:** `listTransactions({ pocketId?: string, limit, cursor })` ordered by `occurred_at` DESC.
-- **Aggregates:** `sumBalancesByCurrency()`, `sumBalancesForPocket(pocketId)`.
+- **Pockets:** `listPockets()` (non-archived only), `listRegularPockets()`, `getPocket()`, `getJarPocket()`, `createPocket()`, `renamePocket()`, `deletePocketIfUnused()`, `setJarPocketArchived()`.
+- **Transactions:** `insertIncome` / `insertExpense` / `insertTransfer`, `updateTransaction`, `deleteTransaction`, `getTransaction`, `listTransactions({ pocketId?, limit, offset })` ordered by `occurred_at` DESC, `sumBalancesAll`, `sumBalancesForPocket`.
+- **Settings:** `getSetting` / `setSetting`, `getDefaultCurrency` / `setDefaultCurrency`, `getJarEnabled` / `setJarEnabled` (also archives/unarchives the Jar).
+- **Asset types:** `listAssetTypes`, `createAssetType`, `updateAssetTypeName`, `deleteAssetType`, `currencyExists`, `requireRegisteredAssetCurrency`.
+- **Jar:** `listJarDistributionRules`, `replaceJarDistributionRules`, `distributeJarCurrency`, `splitAmountByBps` (pure helper).
 
 ---
 
@@ -233,14 +259,20 @@ src/
     sqlcipher.ts         # build PRAGMA key SQL from raw DEK
     client.ts            # PRAGMA key, foreign_keys=ON, runPendingMigrations, open/close
     migrations/
-      types.ts           # Migration type
-      runner.ts          # ensure meta table, apply pending versions (no txn around DDL)
-      0001_initial.ts    # pockets, transactions, user_settings + seed default_currency
+      types.ts
+      runner.ts
+      0001_initial.ts
+      0002_amount_minor_scale.ts
+      0003_asset_types.ts
+      0004_jar.ts
+      0005_pockets_archived.ts
       index.ts           # re-exports
     repositories/
       pockets.ts
       transactions.ts
       settings.ts
+      assetTypes.ts
+      jar.ts
   domain/
     types.ts
   stores/
@@ -256,9 +288,14 @@ src/
     TransactionEditorScreen.tsx
     HistoryScreen.tsx
     SettingsScreen.tsx
+    AssetTypesScreen.tsx
+    JarScreen.tsx
+    JarSplitScreen.tsx
   utils/
+    amountMinor.ts
     formatMinor.ts
-AppBoot.tsx              # vault gate + SafeAreaProvider + MainNavigator when unlocked
+    formatOccurredAt.ts
+AppBoot.tsx              # vault gate (password `TextInput` uses explicit colors on Android release builds) + SafeAreaProvider + MainNavigator when unlocked
 ```
 
 Keep **SQL strings and migrations** out of React components.
@@ -273,10 +310,14 @@ Keep **SQL strings and migrations** out of React components.
 | Transfers between pockets | `kind = transfer` + from/to FKs |
 | Income / expense + title | `kind` + `title` |
 | Edit + history | `updateTransaction`, `listTransactions` |
+| Conducted date in UI | `occurred_at` + `formatOccurredAt` in History / pocket detail / editor |
 | Filter history by pocket | `listTransactions({ pocketId })` |
+| Asset type catalog | `asset_types` + `assetTypes` repository + Settings / editor pickers |
+| Jar pool & split distribute | `is_jar` pocket, `jar_distribution_rules`, `jar` repository, Jar / Jar split screens |
+| Jar off → archive pocket | `user_settings.jar_enabled` + `pockets.archived` + `setJarEnabled` |
 | Encrypted storage | `db/client.ts` + SQLCipher (or equivalent) |
 | Password unlock | `security/*` + lock on background |
-| Default currency + API prices | `user_settings` + new tables or JSON blobs later |
+| Default asset + API prices | `user_settings.default_currency` + optional FX tables later |
 
 ---
 
