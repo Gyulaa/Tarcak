@@ -6,6 +6,7 @@ const KEY_DEFAULT_CURRENCY = 'default_currency';
 const KEY_JAR_ENABLED = 'jar_enabled';
 const KEY_ADVANCED_JAR = 'advanced_jar_enabled';
 const KEY_DARK_THEME = 'dark_theme_enabled';
+const KEY_COLOR_THEME = 'color_theme_id';
 const KEY_SHOW_ARCHIVED_POCKETS = 'show_archived_pockets';
 
 export async function getSetting(key: string): Promise<string | null> {
@@ -80,6 +81,15 @@ export async function getDarkThemeEnabled(): Promise<boolean> {
 
 export async function setDarkThemeEnabled(enabled: boolean): Promise<void> {
   await setSetting(KEY_DARK_THEME, enabled ? '1' : '0');
+}
+
+/** Accent palette id (`terracotta` | `ocean` | `forest` | `slate` | `red` | `yellow`). Invalid/missing → caller normalizes. */
+export async function getColorThemeId(): Promise<string | null> {
+  return getSetting(KEY_COLOR_THEME);
+}
+
+export async function setColorThemeId(id: string): Promise<void> {
+  await setSetting(KEY_COLOR_THEME, id.trim().toLowerCase());
 }
 
 /** When true, user-archived regular pockets appear in Pockets and transaction pickers. Default off. */

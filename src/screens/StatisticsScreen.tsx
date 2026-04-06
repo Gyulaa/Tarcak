@@ -46,8 +46,9 @@ const RANGE_PRESETS = [
 ];
 
 const MAX_LINE_POINTS = 72;
-const SLICE_COLORS = [
-  '#9a3f1f',
+
+/** Pie slice colors after the first (theme primary). Kept stable for legend consistency. */
+const PIE_SLICE_COLORS_TAIL = [
   '#2e7d32',
   '#1565c0',
   '#6a1b9a',
@@ -55,7 +56,7 @@ const SLICE_COLORS = [
   '#ef6c00',
   '#c62828',
   '#37474f',
-];
+] as const;
 
 function rangeFromPreset(
   preset: string,
@@ -108,6 +109,11 @@ export default function StatisticsScreen({ route, navigation }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { width: winW } = useWindowDimensions();
+
+  const pieSliceColors = useMemo(
+    () => [colors.primary, ...PIE_SLICE_COLORS_TAIL],
+    [colors.primary]
+  );
 
   const [assetTypes, setAssetTypes] = useState([]);
   const [currency, setCurrency] = useState('HUF');
@@ -301,10 +307,10 @@ export default function StatisticsScreen({ route, navigation }) {
     if (positiveSlices.length === 0) return [];
     return positiveSlices.map((s, i) => ({
       value: s.balance_minor,
-      color: SLICE_COLORS[i % SLICE_COLORS.length],
+      color: pieSliceColors[i % pieSliceColors.length],
       text: s.name,
     }));
-  }, [positiveSlices]);
+  }, [positiveSlices, pieSliceColors]);
 
   const pieTotalPositive = useMemo(
     () => positiveSlices.reduce((a, s) => a + s.balance_minor, 0),
@@ -489,7 +495,10 @@ export default function StatisticsScreen({ route, navigation }) {
             {positiveSlices.map((s, i) => (
               <View key={s.pocketId} style={styles.legendRow}>
                 <View
-                  style={[styles.legendSwatch, { backgroundColor: SLICE_COLORS[i % SLICE_COLORS.length] }]}
+                  style={[
+                    styles.legendSwatch,
+                    { backgroundColor: pieSliceColors[i % pieSliceColors.length] },
+                  ]}
                 />
                 <Text style={styles.legendName} numberOfLines={1}>
                   {s.name}

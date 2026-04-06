@@ -4,13 +4,20 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 
 import * as settingsRepo from '../db/repositories/settings';
 import type { AppColors } from './palette';
-import { darkColors, lightColors } from './palette';
+import {
+  COLOR_THEMES,
+  DEFAULT_COLOR_THEME_ID,
+  normalizeColorThemeId,
+  type ColorThemeId,
+} from './colorThemes';
 
 export type AppThemeContextValue = {
   colors: AppColors;
   isDark: boolean;
+  colorThemeId: ColorThemeId;
   navTheme: Theme;
   setDarkMode: (enabled: boolean) => Promise<void>;
+  setColorTheme: (id: ColorThemeId) => Promise<void>;
 };
 
 const AppThemeContext = createContext<AppThemeContextValue | null>(null);
@@ -33,16 +40,38 @@ function buildNavTheme(colors: AppColors, isDark: boolean): Theme {
 
 export function AppThemeProvider({ children }: { children: ReactNode }) {
   const [isDark, setIsDark] = useState(false);
+  const [colorThemeId, setColorThemeIdState] = useState<ColorThemeId>(DEFAULT_COLOR_THEME_ID);
 
   useEffect(() => {
-    void settingsRepo.getDarkThemeEnabled().then(setIsDark);
+    let cancelled = false;
+    void (async () => {
+      const [dark, rawTheme] = await Promise.all([
+        settingsRepo.getDarkThemeEnabled(),
+        settingsRepo.getColorThemeId(),
+      ]);
+      if (cancelled) return;
+      setIsDark(dark);
+      setColorThemeIdState(normalizeColorThemeId(rawTheme));
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const colors = isDark ? darkColors : lightColors;
+  const colors = useMemo(() => {
+    const pack = COLOR_THEMES[colorThemeId] ?? COLOR_THEMES[DEFAULT_COLOR_THEME_ID];
+    return isDark ? pack.dark : pack.light;
+  }, [colorThemeId, isDark]);
 
   const setDarkMode = useCallback(async (enabled: boolean) => {
     setIsDark(enabled);
     await settingsRepo.setDarkThemeEnabled(enabled);
+  }, []);
+
+  const setColorTheme = useCallback(async (id: ColorThemeId) => {
+    const next = normalizeColorThemeId(id);
+    setColorThemeIdState(next);
+    await settingsRepo.setColorThemeId(next);
   }, []);
 
   const navTheme = useMemo(() => buildNavTheme(colors, isDark), [colors, isDark]);
@@ -51,10 +80,12 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
     () => ({
       colors,
       isDark,
+      colorThemeId,
       navTheme,
       setDarkMode,
+      setColorTheme,
     }),
-    [colors, isDark, navTheme, setDarkMode]
+    [colors, isDark, colorThemeId, navTheme, setDarkMode, setColorTheme]
   );
 
   return <AppThemeContext.Provider value={value}>{children}</AppThemeContext.Provider>;

@@ -20,6 +20,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { MainNavigator } from './src/navigation/MainNavigator';
 import { AppThemeProvider, useAppTheme } from './src/theme/ThemeContext';
+import { COLOR_THEMES, DEFAULT_COLOR_THEME_ID } from './src/theme/colorThemes';
 import { font } from './src/theme/fonts';
 import {
   createFirstVault,
@@ -316,7 +317,7 @@ export default function AppBoot() {
                     </Text>
                     <Text style={styles.phaseStepBody}>{step.body}</Text>
                     {current ? (
-                      <ActivityIndicator style={styles.phaseSpinner} color="#9a3f1f" />
+                      <ActivityIndicator style={styles.phaseSpinner} color={vaultLight.primary} />
                     ) : null}
                   </View>
                 </View>
@@ -324,7 +325,7 @@ export default function AppBoot() {
             })}
           </View>
         ) : busy ? (
-          <ActivityIndicator style={styles.spinner} color="#9a3f1f" />
+          <ActivityIndicator style={styles.spinner} color={vaultLight.primary} />
         ) : null}
         {message ? <Text style={styles.message}>{message}</Text> : null}
 
@@ -333,6 +334,8 @@ export default function AppBoot() {
     </GestureHandlerRootView>
   );
 }
+
+const vaultLight = COLOR_THEMES[DEFAULT_COLOR_THEME_ID].light;
 
 const styles = StyleSheet.create({
   container: {
@@ -377,7 +380,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   primaryBtn: {
-    backgroundColor: '#9a3f1f',
+    backgroundColor: vaultLight.primary,
     paddingVertical: 14,
     borderRadius: 10,
     alignItems: 'center',
@@ -430,9 +433,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#2e7d32',
   },
   phaseDotCurrent: {
-    backgroundColor: '#faf2ef',
+    backgroundColor: vaultLight.chipBg,
     borderWidth: 2,
-    borderColor: '#9a3f1f',
+    borderColor: vaultLight.primary,
   },
   phaseCheck: {
     color: '#fff',
@@ -445,7 +448,7 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   phaseNumCurrent: {
-    color: '#9a3f1f',
+    color: vaultLight.primary,
   },
   phaseTextCol: { flex: 1 },
   phaseStepTitle: {

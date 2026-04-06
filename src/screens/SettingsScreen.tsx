@@ -9,13 +9,14 @@ import { ScreenWithFooter } from '../components/ScreenWithFooter';
 import * as assetTypesRepo from '../db/repositories/assetTypes';
 import * as settingsRepo from '../db/repositories/settings';
 import { useLockVault } from '../navigation/LockVaultContext';
+import { COLOR_THEME_META, COLOR_THEME_ORDER, normalizeColorThemeId } from '../theme/colorThemes';
 import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
 
 export default function SettingsScreen() {
   const navigation = useNavigation();
-  const { colors, isDark, setDarkMode } = useAppTheme();
+  const { colors, isDark, colorThemeId, setDarkMode, setColorTheme } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const lockVault = useLockVault();
   const [assetTypes, setAssetTypes] = useState([]);
@@ -75,6 +76,26 @@ export default function SettingsScreen() {
     }
   };
 
+  const onColorThemeSelect = async (id: string) => {
+    try {
+      await setColorTheme(normalizeColorThemeId(id));
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const colorThemeOptions = useMemo(
+    () =>
+      COLOR_THEME_ORDER.map((id) => ({
+        value: id,
+        title: COLOR_THEME_META[id].title,
+        subtitle: COLOR_THEME_META[id].subtitle,
+      })),
+    []
+  );
+
+  const colorThemeDisplay = COLOR_THEME_META[colorThemeId].title;
+
   const defaultAssetDisplay = useMemo(() => {
     const row = assetTypes.find((a) => a.code === defaultCode);
     return row ? `${row.code} — ${row.name}` : '';
@@ -128,7 +149,16 @@ export default function SettingsScreen() {
       <View style={styles.divider} />
 
       <Text style={styles.label}>Appearance</Text>
-      <View style={styles.switchRow}>
+      <ModalSelectField
+        label="Color palette"
+        displayValue={colorThemeDisplay}
+        placeholder="Select palette"
+        modalTitle="Accent color"
+        options={colorThemeOptions}
+        onSelect={(v) => void onColorThemeSelect(v)}
+        disabled={!loaded}
+      />
+      <View style={[styles.switchRow, { marginTop: 12 }]}>
         <View style={styles.switchTextCol}>
           <Text style={styles.switchTitle}>Black theme</Text>
           <Text style={styles.switchHint}>Dark background and light text across the app.</Text>
