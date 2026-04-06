@@ -13,6 +13,8 @@ import {
   View,
 } from 'react-native';
 
+import { ContourOnPrimaryText } from '../components/ContourOnPrimaryText';
+import { ScreenWithFooter } from '../components/ScreenWithFooter';
 import * as assetTypesRepo from '../db/repositories/assetTypes';
 import * as jarAdvancedRepo from '../db/repositories/jarAdvanced';
 import * as settingsRepo from '../db/repositories/settings';
@@ -85,38 +87,45 @@ export default function JarAdvancedHub({ navigation }) {
 
   if (!jarOn) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.muted}>Turn on Pool & distribute in Settings to use Advanced Jar.</Text>
-        <Pressable style={styles.primaryBtn} onPress={() => navigation.navigate('Settings')}>
-          <Text style={styles.primaryBtnText}>Open Settings</Text>
-        </Pressable>
-      </View>
+      <ScreenWithFooter>
+        <View style={styles.centered}>
+          <Text style={styles.muted}>Turn on Pool & distribute in Settings to use Advanced Jar.</Text>
+          <Pressable style={styles.primaryBtn} onPress={() => navigation.navigate('Settings')}>
+            <ContourOnPrimaryText style={styles.primaryBtnText}>Open Settings</ContourOnPrimaryText>
+          </Pressable>
+        </View>
+      </ScreenWithFooter>
     );
   }
 
   if (!advancedOn) {
     return (
+      <ScreenWithFooter>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.inner}>
         <Text style={styles.lead}>
           Advanced Jar is off. Enable it under Settings → Jar to configure per-asset ceilings and
           milestone splits.
         </Text>
         <Pressable style={styles.primaryBtn} onPress={() => navigation.navigate('Settings')}>
-          <Text style={styles.primaryBtnText}>Open Settings</Text>
+          <ContourOnPrimaryText style={styles.primaryBtnText}>Open Settings</ContourOnPrimaryText>
         </Pressable>
       </ScrollView>
+      </ScreenWithFooter>
     );
   }
 
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator color={colors.primary} />
-      </View>
+      <ScreenWithFooter>
+        <View style={styles.centered}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      </ScreenWithFooter>
     );
   }
 
   return (
+    <ScreenWithFooter>
     <View style={styles.root}>
       <ScrollView contentContainerStyle={styles.inner}>
         <Text style={styles.lead}>
@@ -130,7 +139,7 @@ export default function JarAdvancedHub({ navigation }) {
           onPress={() => setPickerOpen(true)}
           disabled={addableCodes.length === 0}
         >
-          <Text style={styles.addBtnText}>+ Add asset</Text>
+          <ContourOnPrimaryText style={styles.addBtnText}>+ Add asset</ContourOnPrimaryText>
         </Pressable>
 
         {addableCodes.length === 0 && assetTypes.length > 0 ? (
@@ -191,6 +200,7 @@ export default function JarAdvancedHub({ navigation }) {
         </Pressable>
       </Modal>
     </View>
+    </ScreenWithFooter>
   );
 }
 
@@ -217,7 +227,7 @@ function createHubStyles(c: AppColors) {
       borderRadius: 12,
       alignSelf: 'center',
     },
-    primaryBtnText: { color: c.onPrimary, fontFamily: font.semibold, fontSize: 16 },
+    primaryBtnText: { fontFamily: font.semibold, fontSize: 16 },
     addBtn: {
       backgroundColor: c.primary,
       paddingVertical: 14,
@@ -226,7 +236,7 @@ function createHubStyles(c: AppColors) {
       marginBottom: 8,
     },
     addBtnDisabled: { opacity: 0.45 },
-    addBtnText: { color: c.onPrimary, fontFamily: font.bold, fontSize: 16 },
+    addBtnText: { fontFamily: font.bold, fontSize: 16 },
     row: {
       flexDirection: 'row',
       alignItems: 'center',

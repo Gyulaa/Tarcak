@@ -12,6 +12,8 @@ import {
   View,
 } from 'react-native';
 
+import { ContourOnPrimaryText } from '../components/ContourOnPrimaryText';
+import { ScreenWithFooter } from '../components/ScreenWithFooter';
 import * as jarAdvancedRepo from '../db/repositories/jarAdvanced';
 import * as jarRepo from '../db/repositories/jar';
 import * as pocketsRepo from '../db/repositories/pockets';
@@ -160,22 +162,27 @@ export default function JarScreen({ navigation }) {
 
   if (loading && !jarId) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator color={colors.primary} />
-      </View>
+      <ScreenWithFooter>
+        <View style={styles.centered}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      </ScreenWithFooter>
     );
   }
 
   if (!jarId) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.muted}>Jar pocket is not available.</Text>
-      </View>
+      <ScreenWithFooter>
+        <View style={styles.centered}>
+          <Text style={styles.muted}>Jar pocket is not available.</Text>
+        </View>
+      </ScreenWithFooter>
     );
   }
 
   if (!jarFeatureOn) {
     return (
+      <ScreenWithFooter>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.inner}>
         <View style={styles.disabledCard}>
           <Text style={styles.disabledTitle}>Jar features are off</Text>
@@ -185,7 +192,7 @@ export default function JarScreen({ navigation }) {
             it, or open it here to view balances and history.
           </Text>
           <Pressable style={styles.primaryBtn} onPress={() => navigation.navigate('Settings')}>
-            <Text style={styles.primaryBtnText}>Open Settings</Text>
+            <ContourOnPrimaryText style={styles.primaryBtnText}>Open Settings</ContourOnPrimaryText>
           </Pressable>
           <Pressable
             style={styles.ghostBtn}
@@ -195,10 +202,12 @@ export default function JarScreen({ navigation }) {
           </Pressable>
         </View>
       </ScrollView>
+      </ScreenWithFooter>
     );
   }
 
   return (
+    <ScreenWithFooter>
     <ScrollView style={styles.scroll} contentContainerStyle={styles.inner}>
       <View style={styles.hero}>
         <Text style={styles.heroKicker}>Hold & allocate</Text>
@@ -246,7 +255,7 @@ export default function JarScreen({ navigation }) {
         onPress={onDistributePress}
         disabled={busy || !canDistribute}
       >
-        <Text style={styles.primaryBtnText}>Distribute</Text>
+        <ContourOnPrimaryText style={styles.primaryBtnText}>Distribute</ContourOnPrimaryText>
       </Pressable>
 
       {advancedJarOn ? (
@@ -263,7 +272,7 @@ export default function JarScreen({ navigation }) {
         style={[styles.primaryBtn, styles.recordIncomeBtn]}
         onPress={() => navigation.navigate('TransactionEditor', { presetKind: 'income', pocketId: jarId })}
       >
-        <Text style={styles.primaryBtnText}>Record income to Jar</Text>
+        <ContourOnPrimaryText style={styles.primaryBtnText}>Record income to Jar</ContourOnPrimaryText>
       </Pressable>
 
       <View style={styles.sectionDivider} />
@@ -344,6 +353,7 @@ export default function JarScreen({ navigation }) {
         </View>
       ) : null}
     </ScrollView>
+    </ScreenWithFooter>
   );
 }
 
@@ -396,7 +406,7 @@ function createJarStyles(c: AppColors) {
       alignItems: 'center',
     },
     btnDisabled: { opacity: 0.45 },
-    primaryBtnText: { color: c.onPrimary, fontFamily: font.bold, fontSize: 17 },
+    primaryBtnText: { fontFamily: font.bold, fontSize: 17 },
     ghostBtn: {
       marginTop: 12,
       paddingVertical: 14,

@@ -26,6 +26,8 @@ type Props = {
   emptyMessage?: string;
   /** Tighter label + field for toolbar / multi-column rows (e.g. History filters). */
   compact?: boolean;
+  /** Soft warm tint on compact labels, chevron, field border, and sheet top edge (e.g. History filters). */
+  accent?: boolean;
 };
 
 export function ModalSelectField({
@@ -39,9 +41,13 @@ export function ModalSelectField({
   variant = 'default',
   emptyMessage = 'Nothing to choose yet.',
   compact = false,
+  accent = false,
 }: Props) {
   const { colors } = useAppTheme();
-  const styles = useMemo(() => createStyles(colors, variant, compact), [colors, variant, compact]);
+  const styles = useMemo(
+    () => createStyles(colors, variant, compact, accent),
+    [colors, variant, compact, accent]
+  );
   const [open, setOpen] = useState(false);
   const trimmed = displayValue.trim();
   const showPlaceholder = !trimmed;
@@ -99,9 +105,17 @@ export function ModalSelectField({
   );
 }
 
-function createStyles(c: AppColors, variant: 'default' | 'pocket', compact: boolean) {
-  const fieldBg = variant === 'pocket' ? c.pocketPickBg : c.inputBg;
-  const fieldBorder = variant === 'pocket' ? c.pocketPickBorder : c.inputBorder;
+function createStyles(
+  c: AppColors,
+  variant: 'default' | 'pocket',
+  compact: boolean,
+  accent: boolean
+) {
+  /** Compact filter rows use one grey for all three fields; full-size pocket pickers keep tile styling. */
+  const fieldBg = variant === 'pocket' && !compact ? c.pocketPickBg : c.inputBg;
+  const fieldBorderDefault =
+    variant === 'pocket' && !compact ? c.pocketPickBorder : c.inputBorder;
+  const fieldBorder = accent && compact ? c.jarSoftBorder : fieldBorderDefault;
   const rowBg = variant === 'pocket' ? c.pocketPickBg : c.surface;
   const rowBorder = variant === 'pocket' ? c.pocketPickBorder : c.border;
 
@@ -111,7 +125,7 @@ function createStyles(c: AppColors, variant: 'default' | 'pocket', compact: bool
       marginTop: compact ? 2 : 12,
       marginBottom: compact ? 4 : 6,
       fontSize: compact ? 11 : undefined,
-      color: compact ? c.textMuted : c.text,
+      color: compact ? (accent ? c.primary : c.textMuted) : c.text,
     },
     field: {
       flexDirection: 'row',
@@ -127,7 +141,11 @@ function createStyles(c: AppColors, variant: 'default' | 'pocket', compact: bool
     fieldDisabled: { opacity: 0.5 },
     fieldText: { flex: 1, fontSize: compact ? 13 : 16, color: c.inputText },
     fieldPlaceholder: { color: c.placeholder },
-    chevron: { fontSize: compact ? 18 : 22, color: c.textMuted, fontWeight: '300' },
+    chevron: {
+      fontSize: compact ? 18 : 22,
+      color: accent && compact ? c.primary : c.textMuted,
+      fontWeight: '300',
+    },
     overlay: {
       flex: 1,
       backgroundColor: c.modalOverlay,
@@ -141,10 +159,15 @@ function createStyles(c: AppColors, variant: 'default' | 'pocket', compact: bool
       paddingHorizontal: 20,
       paddingBottom: 28,
       maxHeight: '72%',
-      borderTopWidth: 1,
-      borderColor: c.border,
+      borderTopWidth: accent ? 2 : 1,
+      borderColor: accent ? c.jarSoftBorder : c.border,
     },
-    sheetTitle: { fontSize: 18, fontFamily: font.bold, marginBottom: 12, color: c.text },
+    sheetTitle: {
+      fontSize: 18,
+      fontFamily: font.bold,
+      marginBottom: 12,
+      color: c.text,
+    },
     scroll: { maxHeight: 360 },
     empty: { color: c.textMuted, paddingVertical: 16, fontSize: 15 },
     row: {

@@ -12,7 +12,9 @@ import {
 } from 'react-native';
 import { LineChart, PieChart } from 'react-native-gifted-charts';
 
+import { ContourOnPrimaryText } from '../components/ContourOnPrimaryText';
 import { ModalSelectField } from '../components/ModalSelectField';
+import { ScreenWithFooter } from '../components/ScreenWithFooter';
 import * as assetTypesRepo from '../db/repositories/assetTypes';
 import * as pocketsRepo from '../db/repositories/pockets';
 import * as settingsRepo from '../db/repositories/settings';
@@ -45,7 +47,7 @@ const RANGE_PRESETS = [
 
 const MAX_LINE_POINTS = 72;
 const SLICE_COLORS = [
-  '#ff6f32',
+  '#9a3f1f',
   '#2e7d32',
   '#1565c0',
   '#6a1b9a',
@@ -102,7 +104,7 @@ function axisDateLabel(ts: number): string {
   }
 }
 
-export default function StatisticsScreen() {
+export default function StatisticsScreen({ route, navigation }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { width: winW } = useWindowDimensions();
@@ -134,12 +136,23 @@ export default function StatisticsScreen() {
           getEarliestOccurredAt(),
         ]);
         setAssetTypes(types);
-        setCurrency((c) => (types.some((t) => t.code === c) ? c : def));
+        const raw = route.params?.initialCurrency;
+        const paramCode =
+          typeof raw === 'string' && raw.trim() ? raw.trim().toUpperCase() : '';
+        const fromNav =
+          paramCode && types.some((t) => t.code === paramCode) ? paramCode : null;
+        setCurrency((prev) => {
+          if (fromNav) return fromNav;
+          return types.some((t) => t.code === prev) ? prev : def;
+        });
+        if (paramCode) {
+          navigation.setParams({ initialCurrency: undefined });
+        }
         setJarPocket(jar);
         setPockets(plist);
         setEarliest(early);
       })();
-    }, [])
+    }, [navigation, route.params?.initialCurrency])
   );
 
   const statisticsScope = useMemo(() => {
@@ -304,6 +317,7 @@ export default function StatisticsScreen() {
     pieTotalPositive > 0;
 
   return (
+    <ScreenWithFooter>
     <ScrollView style={styles.scroll} contentContainerStyle={styles.inner}>
       <Text style={styles.lead}>
         Balances over time and pocket mix for one asset at a time. Totals follow your ledger;
@@ -322,9 +336,11 @@ export default function StatisticsScreen() {
             style={[styles.chip, rangePreset === r.id && styles.chipOn]}
             onPress={() => setRangePreset(r.id)}
           >
-            <Text style={[styles.chipText, rangePreset === r.id && styles.chipTextOn]}>
-              {r.label}
-            </Text>
+            {rangePreset === r.id ? (
+              <ContourOnPrimaryText style={styles.chipTextOn}>{r.label}</ContourOnPrimaryText>
+            ) : (
+              <Text style={styles.chipText}>{r.label}</Text>
+            )}
           </Pressable>
         ))}
       </ScrollView>
@@ -499,6 +515,7 @@ export default function StatisticsScreen() {
         </View>
       ) : null}
     </ScrollView>
+    </ScreenWithFooter>
   );
 }
 
@@ -519,7 +536,7 @@ function createStyles(c: AppColors) {
     },
     chipOn: { backgroundColor: c.primary, borderColor: c.primary },
     chipText: { fontFamily: font.semibold, fontSize: 14, color: c.textSecondary },
-    chipTextOn: { color: c.onPrimary },
+    chipTextOn: { fontFamily: font.semibold, fontSize: 14 },
     muted: { fontSize: 14, color: c.textMuted, lineHeight: 20 },
     card: {
       marginTop: 20,

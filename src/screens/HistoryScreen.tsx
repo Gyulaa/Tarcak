@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'reac
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ModalSelectField } from '../components/ModalSelectField';
+import { ScreenWithFooter } from '../components/ScreenWithFooter';
 import * as pocketsRepo from '../db/repositories/pockets';
 import * as settingsRepo from '../db/repositories/settings';
 import * as txRepo from '../db/repositories/transactions';
@@ -30,6 +31,15 @@ function applyHistoryFilters(items, { kind, currency, pocketId }) {
     if (pocketId && !txInvolvesPocket(tx, pocketId)) return false;
     return true;
   });
+}
+
+function pocketLineForHistory(tx, names) {
+  const n = (id) => (id ? names.get(id) ?? '…' : '…');
+  if (tx.kind === 'transfer' && tx.from_pocket_id && tx.to_pocket_id) {
+    return `${n(tx.from_pocket_id)} → ${n(tx.to_pocket_id)}`;
+  }
+  if (tx.pocket_id) return n(tx.pocket_id);
+  return null;
 }
 
 export default function HistoryScreen({ navigation, route }) {
@@ -167,6 +177,7 @@ export default function HistoryScreen({ navigation, route }) {
   };
 
   return (
+    <ScreenWithFooter>
     <View style={styles.container}>
       {scopePocketId ? (
         <Pressable style={styles.chip} onPress={() => setScopePocketId(undefined)}>
@@ -188,6 +199,7 @@ export default function HistoryScreen({ navigation, route }) {
           <View style={styles.filterCell}>
             <ModalSelectField
               compact
+              accent
               label="Type"
               displayValue={kindDisplay}
               placeholder="All types"
@@ -199,6 +211,7 @@ export default function HistoryScreen({ navigation, route }) {
           <View style={styles.filterCell}>
             <ModalSelectField
               compact
+              accent
               label="Asset"
               displayValue={currencyDisplay}
               placeholder="All assets"
@@ -211,6 +224,7 @@ export default function HistoryScreen({ navigation, route }) {
           <View style={styles.filterCell}>
             <ModalSelectField
               compact
+              accent
               label="Pocket"
               displayValue={pocketDisplay}
               placeholder="All pockets"
@@ -233,20 +247,25 @@ export default function HistoryScreen({ navigation, route }) {
             {items.length === 0 ? 'No transactions yet.' : 'No transactions match these filters.'}
           </Text>
         }
-        renderItem={({ item }) => (
-          <Pressable
-            style={styles.row}
-            onPress={() => navigation.navigate('TransactionEditor', { transactionId: item.id })}
-          >
-            <Text style={styles.dateLine}>{formatOccurredAt(item.occurred_at)}</Text>
-            <Text style={styles.title}>{item.title}</Text>
-            <Text style={styles.meta}>
-              {item.kind} · {item.currency} · {formatMinorForDisplay(item.amount_minor, item.currency)}
-            </Text>
-          </Pressable>
-        )}
+        renderItem={({ item }) => {
+          const pocketLine = pocketLineForHistory(item, pocketNames);
+          return (
+            <Pressable
+              style={styles.row}
+              onPress={() => navigation.navigate('TransactionEditor', { transactionId: item.id })}
+            >
+              <Text style={styles.dateLine}>{formatOccurredAt(item.occurred_at)}</Text>
+              <Text style={styles.title}>{item.title}</Text>
+              {pocketLine ? <Text style={styles.pocketLine}>{pocketLine}</Text> : null}
+              <Text style={styles.meta}>
+                {item.kind} · {item.currency} · {formatMinorForDisplay(item.amount_minor, item.currency)}
+              </Text>
+            </Pressable>
+          );
+        }}
       />
     </View>
+    </ScreenWithFooter>
   );
 }
 
@@ -265,6 +284,11 @@ function createStyles(c: AppColors) {
     },
     dateLine: { fontSize: 12, color: c.textMuted, fontFamily: font.semibold, marginBottom: 6 },
     title: { fontFamily: font.semibold, fontSize: 16, color: c.textSecondary },
+    pocketLine: {
+      fontSize: 13,
+      color: c.textMuted,
+      marginTop: 4,
+    },
     meta: { color: c.textMuted, marginTop: 4, fontSize: 13 },
     chip: {
       marginHorizontal: 16,
@@ -276,10 +300,11 @@ function createStyles(c: AppColors) {
     chipText: { color: c.chipText, textAlign: 'center', fontSize: 13 },
     filterSection: {
       paddingHorizontal: 16,
-      paddingTop: 6,
-      paddingBottom: 4,
+      paddingTop: 8,
+      paddingBottom: 8,
+      backgroundColor: c.chipBg,
       borderBottomWidth: 1,
-      borderBottomColor: c.border,
+      borderBottomColor: c.jarSoftBorder,
     },
     filterHeaderRow: {
       flexDirection: 'row',
@@ -290,7 +315,7 @@ function createStyles(c: AppColors) {
     filterSectionTitle: {
       fontSize: 13,
       fontFamily: font.semibold,
-      color: c.textMuted,
+      color: c.primary,
     },
     clearText: {
       fontSize: 13,

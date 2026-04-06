@@ -5,6 +5,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 're
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
 import { ModalSelectField } from '../components/ModalSelectField';
+import { ScreenWithFooter } from '../components/ScreenWithFooter';
 import * as assetTypesRepo from '../db/repositories/assetTypes';
 import * as settingsRepo from '../db/repositories/settings';
 import { useLockVault } from '../navigation/LockVaultContext';
@@ -94,6 +95,7 @@ export default function SettingsScreen() {
   };
 
   return (
+    <ScreenWithFooter>
     <ScrollView style={styles.container} contentContainerStyle={styles.inner}>
       <Text style={styles.p}>
         Default asset type is applied when you open a new transaction. Create types under Asset
@@ -214,6 +216,7 @@ export default function SettingsScreen() {
         <Text style={styles.lockHint}>Closes the database and clears keys from memory.</Text>
       </Pressable>
     </ScrollView>
+    </ScreenWithFooter>
   );
 }
 

@@ -3,7 +3,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useLayoutEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { DonationFooter } from '../components/DonationFooter';
+import { ContourOnPrimaryText } from '../components/ContourOnPrimaryText';
+import { ScreenWithFooter } from '../components/ScreenWithFooter';
 import * as settingsRepo from '../db/repositories/settings';
 import { useLockVault } from '../navigation/LockVaultContext';
 import { useLedgerStore } from '../stores/ledgerStore';
@@ -64,7 +65,8 @@ export default function HomeScreen({ navigation }) {
   );
 
   return (
-    <View style={styles.container}>
+    <ScreenWithFooter>
+      <View style={styles.container}>
       <FlatList
         style={styles.list}
         data={homeBalances}
@@ -75,16 +77,23 @@ export default function HomeScreen({ navigation }) {
         }
         contentContainerStyle={styles.listContent}
         renderItem={({ item }) => (
-          <View style={styles.row}>
+          <Pressable
+            style={styles.row}
+            onPress={() =>
+              navigation.navigate('Statistics', { initialCurrency: item.currency })
+            }
+          >
             <Text style={styles.currency}>{item.currency}</Text>
             <Text style={styles.amount}>{formatMinorForDisplay(item.balance_minor, item.currency)}</Text>
-          </View>
+          </Pressable>
         )}
       />
 
       <View style={styles.actions}>
         <Pressable style={styles.primaryBtn} onPress={() => navigation.navigate('Pockets')}>
-          <Text style={styles.primaryBtnText}>Pockets ({pocketListCount})</Text>
+          <ContourOnPrimaryText style={styles.primaryBtnText}>
+            Pockets ({pocketListCount})
+          </ContourOnPrimaryText>
         </Pressable>
         <Pressable style={styles.secondaryBtn} onPress={() => navigation.navigate('History', {})}>
           <Text style={styles.secondaryBtnText}>History</Text>
@@ -96,9 +105,8 @@ export default function HomeScreen({ navigation }) {
           <Text style={styles.secondaryBtnText}>Settings</Text>
         </Pressable>
       </View>
-
-      <DonationFooter />
-    </View>
+      </View>
+    </ScreenWithFooter>
   );
 }
 
@@ -150,7 +158,7 @@ function createStyles(c: AppColors) {
       borderRadius: 10,
       alignItems: 'center',
     },
-    primaryBtnText: { color: c.onPrimary, fontFamily: font.semibold, fontSize: 16 },
+    primaryBtnText: { fontFamily: font.semibold, fontSize: 16 },
     secondaryBtn: {
       backgroundColor: c.surface,
       paddingVertical: 12,

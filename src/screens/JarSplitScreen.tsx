@@ -13,6 +13,8 @@ import {
   View,
 } from 'react-native';
 
+import { ContourOnPrimaryText } from '../components/ContourOnPrimaryText';
+import { ScreenWithFooter } from '../components/ScreenWithFooter';
 import * as jarRepo from '../db/repositories/jar';
 import * as pocketsRepo from '../db/repositories/pockets';
 import * as settingsRepo from '../db/repositories/settings';
@@ -169,6 +171,7 @@ export default function JarSplitScreen({ navigation }) {
 
   if (!jarFeatureOn) {
     return (
+      <ScreenWithFooter>
       <View style={styles.root}>
         <View style={styles.disabledWrap}>
           <Text style={styles.disabledTitle}>Jar split is unavailable</Text>
@@ -176,14 +179,16 @@ export default function JarSplitScreen({ navigation }) {
             Turn on "Pool & distribute" under Settings → Jar to edit distribution percentages.
           </Text>
           <Pressable style={styles.settingsBtn} onPress={() => navigation.navigate('Settings')}>
-            <Text style={styles.settingsBtnText}>Open Settings</Text>
+            <ContourOnPrimaryText style={styles.settingsBtnText}>Open Settings</ContourOnPrimaryText>
           </Pressable>
         </View>
       </View>
+      </ScreenWithFooter>
     );
   }
 
   return (
+    <ScreenWithFooter>
     <View style={styles.root}>
       <ScrollView contentContainerStyle={styles.inner}>
         <Text style={styles.lead}>
@@ -253,7 +258,7 @@ export default function JarSplitScreen({ navigation }) {
           onPress={() => void save()}
           disabled={!totalBps.ok || busy || rows.length === 0}
         >
-          <Text style={styles.saveBtnText}>Save split</Text>
+          <ContourOnPrimaryText style={styles.saveBtnText}>Save split</ContourOnPrimaryText>
         </Pressable>
       </ScrollView>
 
@@ -279,6 +284,7 @@ export default function JarSplitScreen({ navigation }) {
         </Pressable>
       </Modal>
     </View>
+    </ScreenWithFooter>
   );
 }
 
@@ -295,7 +301,7 @@ function createSplitStyles(c: AppColors) {
       paddingHorizontal: 20,
       borderRadius: 10,
     },
-    settingsBtnText: { color: c.onPrimary, fontFamily: font.semibold, fontSize: 16 },
+    settingsBtnText: { fontFamily: font.semibold, fontSize: 16 },
     inner: { padding: 20, paddingBottom: 40 },
     lead: { fontSize: 15, color: c.textMuted, lineHeight: 22, marginBottom: 12 },
     advLink: { marginBottom: 20, paddingVertical: 4 },
@@ -371,7 +377,7 @@ function createSplitStyles(c: AppColors) {
       alignItems: 'center',
     },
     saveDisabled: { opacity: 0.45 },
-    saveBtnText: { color: c.onPrimary, fontFamily: font.bold, fontSize: 17 },
+    saveBtnText: { fontFamily: font.bold, fontSize: 17 },
     modalOverlay: {
       flex: 1,
       backgroundColor: c.modalOverlay,

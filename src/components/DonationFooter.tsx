@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 
+import { ContourOnPrimaryText } from './ContourOnPrimaryText';
 import { DONATION_BTC_ADDRESS, DONATION_XMR_ADDRESS } from '../constants/donations';
 import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
@@ -56,7 +57,7 @@ export function DonationFooter() {
                 style={[styles.copyBtn, { backgroundColor: colors.primary }]}
                 onPress={() => void copy('Bitcoin', DONATION_BTC_ADDRESS)}
               >
-                <Text style={[styles.copyBtnText, { color: colors.onPrimary }]}>Copy BTC address</Text>
+                <ContourOnPrimaryText style={styles.copyBtnText}>Copy BTC address</ContourOnPrimaryText>
               </Pressable>
 
               <Text style={[styles.coinLabel, styles.coinLabelSp, { color: colors.textSecondary }]}>
@@ -69,7 +70,7 @@ export function DonationFooter() {
                 style={[styles.copyBtn, { backgroundColor: colors.primary }]}
                 onPress={() => void copy('Monero', DONATION_XMR_ADDRESS)}
               >
-                <Text style={[styles.copyBtnText, { color: colors.onPrimary }]}>Copy XMR address</Text>
+                <ContourOnPrimaryText style={styles.copyBtnText}>Copy XMR address</ContourOnPrimaryText>
               </Pressable>
             </ScrollView>
 

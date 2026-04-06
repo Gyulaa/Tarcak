@@ -13,6 +13,8 @@ import {
   View,
 } from 'react-native';
 
+import { ContourOnPrimaryText } from '../components/ContourOnPrimaryText';
+import { ScreenWithFooter } from '../components/ScreenWithFooter';
 import * as jarAdvancedRepo from '../db/repositories/jarAdvanced';
 import * as jarRepo from '../db/repositories/jar';
 import * as pocketsRepo from '../db/repositories/pockets';
@@ -313,17 +315,24 @@ export default function JarAdvancedAssetEditor({ navigation, route }) {
 
   if (!currency) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.muted}>Missing asset.</Text>
-      </View>
+      <ScreenWithFooter>
+        <View style={styles.centered}>
+          <Text style={styles.muted}>Missing asset.</Text>
+        </View>
+      </ScreenWithFooter>
     );
   }
 
   if (!loaded) {
-    return <View style={styles.centered} />;
+    return (
+      <ScreenWithFooter>
+        <View style={styles.centered} />
+      </ScreenWithFooter>
+    );
   }
 
   return (
+    <ScreenWithFooter>
     <View style={styles.root}>
       <ScrollView contentContainerStyle={styles.inner}>
         <Text style={styles.sectionLabel}>Default ceiling</Text>
@@ -410,7 +419,7 @@ export default function JarAdvancedAssetEditor({ navigation, route }) {
           onPress={() => void save()}
           disabled={!defaultTotal.ok || !milestonesAllValid || busy}
         >
-          <Text style={styles.saveBtnText}>Save</Text>
+          <ContourOnPrimaryText style={styles.saveBtnText}>Save</ContourOnPrimaryText>
         </Pressable>
       </ScrollView>
 
@@ -436,6 +445,7 @@ export default function JarAdvancedAssetEditor({ navigation, route }) {
         </Pressable>
       </Modal>
     </View>
+    </ScreenWithFooter>
   );
 
   function renderSplitSection(rows, setRows) {
@@ -614,7 +624,7 @@ function createEditorStyles(c: AppColors) {
       alignItems: 'center',
     },
     saveDisabled: { opacity: 0.45 },
-    saveBtnText: { color: c.onPrimary, fontFamily: font.bold, fontSize: 17 },
+    saveBtnText: { fontFamily: font.bold, fontSize: 17 },
     modalOverlay: {
       flex: 1,
       backgroundColor: c.modalOverlay,

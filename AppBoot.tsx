@@ -316,7 +316,7 @@ export default function AppBoot() {
                     </Text>
                     <Text style={styles.phaseStepBody}>{step.body}</Text>
                     {current ? (
-                      <ActivityIndicator style={styles.phaseSpinner} color="#ff6f32" />
+                      <ActivityIndicator style={styles.phaseSpinner} color="#9a3f1f" />
                     ) : null}
                   </View>
                 </View>
@@ -324,7 +324,7 @@ export default function AppBoot() {
             })}
           </View>
         ) : busy ? (
-          <ActivityIndicator style={styles.spinner} color="#ff6f32" />
+          <ActivityIndicator style={styles.spinner} color="#9a3f1f" />
         ) : null}
         {message ? <Text style={styles.message}>{message}</Text> : null}
 
@@ -377,7 +377,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   primaryBtn: {
-    backgroundColor: '#ff6f32',
+    backgroundColor: '#9a3f1f',
     paddingVertical: 14,
     borderRadius: 10,
     alignItems: 'center',
@@ -430,9 +430,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#2e7d32',
   },
   phaseDotCurrent: {
-    backgroundColor: '#fff0eb',
+    backgroundColor: '#faf2ef',
     borderWidth: 2,
-    borderColor: '#ff6f32',
+    borderColor: '#9a3f1f',
   },
   phaseCheck: {
     color: '#fff',
@@ -445,7 +445,7 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   phaseNumCurrent: {
-    color: '#ff6f32',
+    color: '#9a3f1f',
   },
   phaseTextCol: { flex: 1 },
   phaseStepTitle: {

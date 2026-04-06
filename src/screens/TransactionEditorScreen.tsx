@@ -12,6 +12,8 @@ import {
 } from 'react-native';
 
 import { ModalSelectField } from '../components/ModalSelectField';
+import { ContourOnPrimaryText } from '../components/ContourOnPrimaryText';
+import { ScreenWithFooter } from '../components/ScreenWithFooter';
 import * as assetTypesRepo from '../db/repositories/assetTypes';
 import * as pocketsRepo from '../db/repositories/pockets';
 import * as settingsRepo from '../db/repositories/settings';
@@ -247,13 +249,16 @@ export default function TransactionEditorScreen({ navigation, route }) {
 
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.loadingText}>Loading…</Text>
-      </View>
+      <ScreenWithFooter>
+        <View style={styles.centered}>
+          <Text style={styles.loadingText}>Loading…</Text>
+        </View>
+      </ScreenWithFooter>
     );
   }
 
   return (
+    <ScreenWithFooter>
     <ScrollView style={styles.container} contentContainerStyle={styles.inner}>
       {!transactionId ? (
         <Text style={styles.label}>Kind</Text>
@@ -267,7 +272,11 @@ export default function TransactionEditorScreen({ navigation, route }) {
             style={[styles.kindChip, kind === k && styles.kindChipOn]}
             onPress={() => setKind(k)}
           >
-            <Text style={[styles.kindChipText, kind === k && styles.kindChipTextOn]}>{k}</Text>
+            {kind === k ? (
+              <ContourOnPrimaryText style={styles.kindChipTextOn}>{k}</ContourOnPrimaryText>
+            ) : (
+              <Text style={styles.kindChipText}>{k}</Text>
+            )}
           </Pressable>
         ))}
       </View>
@@ -355,7 +364,9 @@ export default function TransactionEditorScreen({ navigation, route }) {
       )}
 
       <Pressable style={styles.saveBtn} onPress={() => void save()}>
-        <Text style={styles.saveBtnText}>{transactionId ? 'Save changes' : 'Save'}</Text>
+        <ContourOnPrimaryText style={styles.saveBtnText}>
+          {transactionId ? 'Save changes' : 'Save'}
+        </ContourOnPrimaryText>
       </Pressable>
 
       {transactionId ? (
@@ -364,6 +375,7 @@ export default function TransactionEditorScreen({ navigation, route }) {
         </Pressable>
       ) : null}
     </ScrollView>
+    </ScreenWithFooter>
   );
 }
 
@@ -393,7 +405,7 @@ function createTxStyles(c: AppColors) {
     },
     kindChipOn: { backgroundColor: c.primary },
     kindChipText: { color: c.pillText },
-    kindChipTextOn: { color: c.onPrimary, fontFamily: font.semibold },
+    kindChipTextOn: { fontFamily: font.semibold },
     muted: { color: c.textMuted, paddingVertical: 8 },
     manageLink: { marginTop: 8, paddingVertical: 6 },
     manageLinkText: { color: c.primary, fontFamily: font.semibold },
@@ -404,7 +416,7 @@ function createTxStyles(c: AppColors) {
       borderRadius: 10,
       alignItems: 'center',
     },
-    saveBtnText: { color: c.onPrimary, fontFamily: font.bold, fontSize: 16 },
+    saveBtnText: { fontFamily: font.bold, fontSize: 16 },
     delBtn: { marginTop: 16, alignItems: 'center', padding: 12 },
     delBtnText: { color: c.danger, fontFamily: font.semibold },
   });

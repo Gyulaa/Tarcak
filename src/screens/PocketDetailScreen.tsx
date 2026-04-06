@@ -3,7 +3,9 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useLayoutEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { ContourOnPrimaryText } from '../components/ContourOnPrimaryText';
 import { PocketEditMenu, PocketEditPencilButton } from '../components/PocketEditMenu';
+import { ScreenWithFooter } from '../components/ScreenWithFooter';
 import * as pocketsRepo from '../db/repositories/pockets';
 import * as settingsRepo from '../db/repositories/settings';
 import * as txRepo from '../db/repositories/transactions';
@@ -132,7 +134,17 @@ export default function PocketDetailScreen({ navigation, route }) {
                 navigation.navigate('TransactionEditor', { presetKind: 'income', pocketId })
               }
             >
-              <Text style={styles.btnText}>Income</Text>
+              <View style={styles.btnRow}>
+                <View style={styles.btnQuarter}>
+                  <ContourOnPrimaryText style={styles.btnMark}>+</ContourOnPrimaryText>
+                </View>
+                <View style={styles.btnHalf}>
+                  <ContourOnPrimaryText style={styles.btnLabelPrimary}>Income</ContourOnPrimaryText>
+                </View>
+                <View style={styles.btnQuarter}>
+                  <ContourOnPrimaryText style={styles.btnMark}>+</ContourOnPrimaryText>
+                </View>
+              </View>
             </Pressable>
             <Pressable
               style={styles.btn}
@@ -140,7 +152,17 @@ export default function PocketDetailScreen({ navigation, route }) {
                 navigation.navigate('TransactionEditor', { presetKind: 'expense', pocketId })
               }
             >
-              <Text style={styles.btnText}>Expense</Text>
+              <View style={styles.btnRow}>
+                <View style={styles.btnQuarter}>
+                  <ContourOnPrimaryText style={styles.btnMark}>-</ContourOnPrimaryText>
+                </View>
+                <View style={styles.btnHalf}>
+                  <ContourOnPrimaryText style={styles.btnLabelPrimary}>Expense</ContourOnPrimaryText>
+                </View>
+                <View style={styles.btnQuarter}>
+                  <ContourOnPrimaryText style={styles.btnMark}>-</ContourOnPrimaryText>
+                </View>
+              </View>
             </Pressable>
             <Pressable
               style={styles.btn}
@@ -148,7 +170,17 @@ export default function PocketDetailScreen({ navigation, route }) {
                 navigation.navigate('TransactionEditor', { presetKind: 'transfer', fromPocketId: pocketId })
               }
             >
-              <Text style={styles.btnText}>Transfer</Text>
+              <View style={styles.btnRow}>
+                <View style={styles.btnQuarter}>
+                  <ContourOnPrimaryText style={styles.btnMark}>{'<'}</ContourOnPrimaryText>
+                </View>
+                <View style={styles.btnHalf}>
+                  <ContourOnPrimaryText style={styles.btnLabelPrimary}>Transfer</ContourOnPrimaryText>
+                </View>
+                <View style={styles.btnQuarter}>
+                  <ContourOnPrimaryText style={styles.btnMark}>{'>'}</ContourOnPrimaryText>
+                </View>
+              </View>
             </Pressable>
           </>
         ) : null}
@@ -166,13 +198,16 @@ export default function PocketDetailScreen({ navigation, route }) {
 
   if (loading && !pocketName) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator color={colors.primary} />
-      </View>
+      <ScreenWithFooter>
+        <View style={styles.centered}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      </ScreenWithFooter>
     );
   }
 
   return (
+    <ScreenWithFooter>
     <View style={styles.container}>
       <FlatList
         style={styles.listFlex}
@@ -211,6 +246,7 @@ export default function PocketDetailScreen({ navigation, route }) {
         }}
       />
     </View>
+    </ScreenWithFooter>
   );
 }
 
@@ -259,7 +295,16 @@ function createStyles(c: AppColors) {
     balanceAmt: { fontSize: 22, fontFamily: font.bold, color: c.text },
     actions: { marginVertical: 16, gap: 8 },
     btn: { backgroundColor: c.primary, paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
-    btnText: { color: c.onPrimary, fontFamily: font.semibold },
+    btnRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'stretch',
+      width: '100%',
+    },
+    btnQuarter: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    btnHalf: { flex: 2, alignItems: 'center', justifyContent: 'center' },
+    btnMark: { fontSize: 20, fontFamily: font.bold },
+    btnLabelPrimary: { fontSize: 16, fontFamily: font.semibold },
     outline: {
       borderWidth: 1,
       borderColor: c.primary,

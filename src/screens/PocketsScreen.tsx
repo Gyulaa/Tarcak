@@ -12,7 +12,9 @@ import {
   View,
 } from 'react-native';
 
+import { ContourOnPrimaryText } from '../components/ContourOnPrimaryText';
 import { PocketEditMenu, PocketEditPencilButton } from '../components/PocketEditMenu';
+import { ScreenWithFooter } from '../components/ScreenWithFooter';
 import * as settingsRepo from '../db/repositories/settings';
 import { useLedgerStore } from '../stores/ledgerStore';
 import { useAppTheme } from '../theme/ThemeContext';
@@ -68,10 +70,11 @@ export default function PocketsScreen({ navigation }) {
   };
 
   return (
+    <ScreenWithFooter>
     <View style={styles.container}>
       {lastError ? <Text style={styles.error}>{lastError}</Text> : null}
       <Pressable style={styles.addBtn} onPress={() => setModalOpen(true)}>
-        <Text style={styles.addBtnText}>+ New pocket</Text>
+        <ContourOnPrimaryText style={styles.addBtnText}>+ New pocket</ContourOnPrimaryText>
       </Pressable>
       <FlatList
         data={listData}
@@ -89,14 +92,13 @@ export default function PocketsScreen({ navigation }) {
                   onPress={() => navigation.navigate('Jar')}
                 >
                   <View style={styles.jarCardIcon}>
-                    <Text style={styles.jarIconGlyph}>J</Text>
+                    <ContourOnPrimaryText style={styles.jarIconGlyph}>J</ContourOnPrimaryText>
                   </View>
                   <View style={styles.jarCardMain}>
                     <Text style={styles.jarBadge}>Jar</Text>
                     <Text style={styles.jarCardTitle}>{item.name}</Text>
                     <Text style={styles.jarCardHint}>Pool · tap to distribute</Text>
                   </View>
-                  <Text style={styles.jarChevron}>›</Text>
                 </Pressable>
                 <PocketEditPencilButton colors={colors} onPress={() => openEdit(item)} />
               </View>
@@ -144,7 +146,7 @@ export default function PocketsScreen({ navigation }) {
                 style={styles.modalOk}
                 disabled={busy || !newName.trim()}
               >
-                <Text style={styles.modalOkText}>Create</Text>
+                <ContourOnPrimaryText style={styles.modalOkText}>Create</ContourOnPrimaryText>
               </Pressable>
             </View>
           </View>
@@ -158,6 +160,7 @@ export default function PocketsScreen({ navigation }) {
         onMutated={() => void refresh()}
       />
     </View>
+    </ScreenWithFooter>
   );
 }
 
@@ -175,7 +178,7 @@ function createStyles(c: AppColors) {
       borderRadius: 10,
       alignItems: 'center',
     },
-    addBtnText: { color: c.onPrimary, fontFamily: font.semibold },
+    addBtnText: { fontFamily: font.semibold },
     card: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -221,7 +224,7 @@ function createStyles(c: AppColors) {
       justifyContent: 'center',
       marginRight: 12,
     },
-    jarIconGlyph: { color: c.onPrimary, fontSize: 20, fontFamily: font.bold },
+    jarIconGlyph: { fontSize: 20, fontFamily: font.bold },
     jarCardMain: { flex: 1 },
     jarBadge: {
       fontSize: 11,
@@ -232,7 +235,6 @@ function createStyles(c: AppColors) {
     },
     jarCardTitle: { fontSize: 17, fontFamily: font.bold, color: c.jarTitle },
     jarCardHint: { fontSize: 13, color: c.jarHint, marginTop: 4 },
-    jarChevron: { fontSize: 26, color: c.primary, fontWeight: '300' },
     modalOverlay: {
       flex: 1,
       backgroundColor: c.modalOverlay,
@@ -254,6 +256,6 @@ function createStyles(c: AppColors) {
     modalCancel: { padding: 8 },
     modalCancelText: { color: c.textMuted, fontSize: 16 },
     modalOk: { backgroundColor: c.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
-    modalOkText: { color: c.onPrimary, fontFamily: font.semibold },
+    modalOkText: { fontFamily: font.semibold },
   });
 }

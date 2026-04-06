@@ -12,6 +12,8 @@ import {
   View,
 } from 'react-native';
 
+import { ContourOnPrimaryText } from '../components/ContourOnPrimaryText';
+import { ScreenWithFooter } from '../components/ScreenWithFooter';
 import * as assetTypesRepo from '../db/repositories/assetTypes';
 import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
@@ -97,13 +99,14 @@ export default function AssetTypesScreen() {
   };
 
   return (
+    <ScreenWithFooter>
     <View style={styles.container}>
       <Text style={styles.p}>
         Codes (e.g. HUF, USD, XMR) are stored on each transaction. Add types here, then pick them when
         recording a transaction or setting the default currency.
       </Text>
       <Pressable style={styles.addBtn} onPress={() => setCreateOpen(true)}>
-        <Text style={styles.addBtnText}>+ New asset type</Text>
+        <ContourOnPrimaryText style={styles.addBtnText}>+ New asset type</ContourOnPrimaryText>
       </Pressable>
       <FlatList
         data={items}
@@ -160,7 +163,7 @@ export default function AssetTypesScreen() {
                 style={styles.modalOk}
                 disabled={busy || !newCode.trim() || !newName.trim()}
               >
-                <Text style={styles.modalOkText}>Create</Text>
+                <ContourOnPrimaryText style={styles.modalOkText}>Create</ContourOnPrimaryText>
               </Pressable>
             </View>
           </View>
@@ -196,13 +199,14 @@ export default function AssetTypesScreen() {
                 style={styles.modalOk}
                 disabled={busy || !renameValue.trim()}
               >
-                <Text style={styles.modalOkText}>Save</Text>
+                <ContourOnPrimaryText style={styles.modalOkText}>Save</ContourOnPrimaryText>
               </Pressable>
             </View>
           </View>
         </View>
       </Modal>
     </View>
+    </ScreenWithFooter>
   );
 }
 
@@ -220,7 +224,7 @@ function createStyles(c: AppColors) {
       borderRadius: 10,
       alignItems: 'center',
     },
-    addBtnText: { color: c.onPrimary, fontFamily: font.semibold },
+    addBtnText: { fontFamily: font.semibold },
     card: {
       backgroundColor: c.surface,
       padding: 14,
@@ -264,6 +268,6 @@ function createStyles(c: AppColors) {
     modalCancel: { padding: 8 },
     modalCancelText: { color: c.textMuted, fontSize: 16 },
     modalOk: { backgroundColor: c.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
-    modalOkText: { color: c.onPrimary, fontFamily: font.semibold },
+    modalOkText: { fontFamily: font.semibold },
   });
 }

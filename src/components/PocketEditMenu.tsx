@@ -1,5 +1,4 @@
 // @ts-nocheck
-import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -11,6 +10,9 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+
+import { ContourOnPrimaryText } from './ContourOnPrimaryText';
 
 import * as pocketsRepo from '../db/repositories/pockets';
 import * as settingsRepo from '../db/repositories/settings';
@@ -289,7 +291,7 @@ export function PocketEditMenu({ visible, pocket, onClose, onMutated, afterArchi
                   style={styles.modalOk}
                   disabled={renameBusy || !renameDraft.trim()}
                 >
-                  <Text style={styles.modalOkText}>Save</Text>
+                  <ContourOnPrimaryText style={styles.modalOkText}>Save</ContourOnPrimaryText>
                 </Pressable>
               </View>
             </>
@@ -399,6 +401,6 @@ function createStyles(c: AppColors) {
       paddingVertical: 8,
       borderRadius: 8,
     },
-    modalOkText: { color: c.onPrimary, fontFamily: font.semibold },
+    modalOkText: { fontFamily: font.semibold },
   });
 }
