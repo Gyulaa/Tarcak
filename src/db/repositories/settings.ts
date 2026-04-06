@@ -6,6 +6,7 @@ const KEY_DEFAULT_CURRENCY = 'default_currency';
 const KEY_JAR_ENABLED = 'jar_enabled';
 const KEY_ADVANCED_JAR = 'advanced_jar_enabled';
 const KEY_DARK_THEME = 'dark_theme_enabled';
+const KEY_SHOW_ARCHIVED_POCKETS = 'show_archived_pockets';
 
 export async function getSetting(key: string): Promise<string | null> {
   const db = await openMainDatabase();
@@ -79,4 +80,18 @@ export async function getDarkThemeEnabled(): Promise<boolean> {
 
 export async function setDarkThemeEnabled(enabled: boolean): Promise<void> {
   await setSetting(KEY_DARK_THEME, enabled ? '1' : '0');
+}
+
+/** When true, user-archived regular pockets appear in Pockets and transaction pickers. Default off. */
+export async function getShowArchivedPockets(): Promise<boolean> {
+  const v = await getSetting(KEY_SHOW_ARCHIVED_POCKETS);
+  if (v == null || v.trim() === '') {
+    return false;
+  }
+  const t = v.trim().toLowerCase();
+  return t === '1' || t === 'true' || t === 'yes';
+}
+
+export async function setShowArchivedPockets(enabled: boolean): Promise<void> {
+  await setSetting(KEY_SHOW_ARCHIVED_POCKETS, enabled ? '1' : '0');
 }

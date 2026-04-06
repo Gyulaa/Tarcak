@@ -346,3 +346,31 @@ ORDER BY currency COLLATE NOCASE ASC
   );
   return rows;
 }
+
+/** True if this pocket has any currency with a non-zero net balance. */
+export async function pocketHasNonZeroBalance(pocketId: string): Promise<boolean> {
+  const db = await openMainDatabase();
+  const r = await db.getFirstAsync<{ c: number }>(
+    `
+SELECT COUNT(*) AS c FROM (
+  SELECT 1 FROM (
+    SELECT currency, amount_minor AS delta FROM transactions
+      WHERE kind = 'income' AND pocket_id = ?
+    UNION ALL
+    SELECT currency, -amount_minor AS delta FROM transactions
+      WHERE kind = 'expense' AND pocket_id = ?
+    UNION ALL
+    SELECT currency, -amount_minor AS delta FROM transactions
+      WHERE kind = 'transfer' AND from_pocket_id = ?
+    UNION ALL
+    SELECT currency, amount_minor AS delta FROM transactions
+      WHERE kind = 'transfer' AND to_pocket_id = ?
+  ) u
+  GROUP BY currency
+  HAVING SUM(delta) != 0
+) t
+  `,
+    [pocketId, pocketId, pocketId, pocketId]
+  );
+  return (r?.c ?? 0) > 0;
+}

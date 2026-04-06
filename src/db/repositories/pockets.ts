@@ -25,21 +25,32 @@ function mapRow(r: PocketRow): Pocket {
   };
 }
 
-/** Active pockets only (excludes archived). Used for lists and transaction pickers. */
-export async function listPockets(): Promise<Pocket[]> {
+/**
+ * Pockets for navigation lists and pickers.
+ * @param includeUserArchived When true, includes user-archived **regular** pockets (still excludes the Jar while pool is off).
+ */
+export async function listPockets(includeUserArchived = false): Promise<Pocket[]> {
   const db = await openMainDatabase();
-  const rows = await db.getAllAsync<PocketRow>(
-    `SELECT id, name, sort_index, created_at, updated_at, is_jar, archived FROM pockets
-     WHERE archived = 0
-     ORDER BY is_jar DESC, sort_index ASC, name COLLATE NOCASE ASC`
-  );
+  const sql = includeUserArchived
+    ? `SELECT id, name, sort_index, created_at, updated_at, is_jar, archived FROM pockets
+       WHERE (is_jar = 1 AND archived = 0) OR (is_jar = 0)
+       ORDER BY is_jar DESC, archived ASC, sort_index ASC, name COLLATE NOCASE ASC`
+    : `SELECT id, name, sort_index, created_at, updated_at, is_jar, archived FROM pockets
+       WHERE archived = 0
+       ORDER BY is_jar DESC, sort_index ASC, name COLLATE NOCASE ASC`;
+  const rows = await db.getAllAsync<PocketRow>(sql);
   return rows.map(mapRow);
 }
 
-/** Pockets shown in the main list (excludes the system Jar). */
+/** Active regular pockets only (Jar split / Advanced Jar targets — never archived). */
 export async function listRegularPockets(): Promise<Pocket[]> {
-  const all = await listPockets();
-  return all.filter((p) => !p.is_jar);
+  const db = await openMainDatabase();
+  const rows = await db.getAllAsync<PocketRow>(
+    `SELECT id, name, sort_index, created_at, updated_at, is_jar, archived FROM pockets
+     WHERE archived = 0 AND is_jar = 0
+     ORDER BY sort_index ASC, name COLLATE NOCASE ASC`
+  );
+  return rows.map(mapRow);
 }
 
 /** By id, including archived rows (e.g. pocket detail opened from history). */
@@ -108,6 +119,24 @@ export async function renamePocket(id: string, name: string): Promise<void> {
   const now = Date.now();
   const res = await db.runAsync(`UPDATE pockets SET name = ?, updated_at = ? WHERE id = ?`, [
     trimmed,
+    now,
+    id,
+  ]);
+  if (res.changes === 0) {
+    throw new Error('Pocket not found.');
+  }
+}
+
+/** Archive or unarchive a **regular** pocket. Does not change the system Jar (use pool toggle for that). */
+export async function setRegularPocketArchived(id: string, archived: boolean): Promise<void> {
+  const p = await getPocket(id);
+  if (!p || p.is_jar) {
+    throw new Error('Only regular pockets can be archived this way.');
+  }
+  const db = await openMainDatabase();
+  const now = Date.now();
+  const res = await db.runAsync(`UPDATE pockets SET archived = ?, updated_at = ? WHERE id = ? AND is_jar = 0`, [
+    archived ? 1 : 0,
     now,
     id,
   ]);

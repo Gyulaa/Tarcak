@@ -22,6 +22,7 @@ export default function SettingsScreen() {
   const [loaded, setLoaded] = useState(false);
   const [jarEnabled, setJarEnabled] = useState(true);
   const [advancedJarEnabled, setAdvancedJarEnabled] = useState(false);
+  const [showArchivedPockets, setShowArchivedPockets] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -32,6 +33,7 @@ export default function SettingsScreen() {
         setDefaultCode(c);
         setJarEnabled(await settingsRepo.getJarEnabled());
         setAdvancedJarEnabled(await settingsRepo.getAdvancedJarEnabled());
+        setShowArchivedPockets(await settingsRepo.getShowArchivedPockets());
         setLoaded(true);
       })();
     }, [])
@@ -50,6 +52,15 @@ export default function SettingsScreen() {
     try {
       await settingsRepo.setAdvancedJarEnabled(value);
       setAdvancedJarEnabled(value);
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const onShowArchivedToggle = async (value) => {
+    try {
+      await settingsRepo.setShowArchivedPockets(value);
+      setShowArchivedPockets(value);
     } catch (e) {
       Alert.alert('Error', e instanceof Error ? e.message : String(e));
     }
@@ -175,6 +186,26 @@ export default function SettingsScreen() {
       >
         <Text style={styles.secondaryBtnText}>Configure Advanced Jar…</Text>
       </Pressable>
+
+      <View style={styles.divider} />
+
+      <Text style={styles.label}>Pockets</Text>
+      <View style={styles.switchRow}>
+        <View style={styles.switchTextCol}>
+          <Text style={styles.switchTitle}>Show archived pockets</Text>
+          <Text style={styles.switchHint}>
+            Lists pockets you archived (zero balance, with history). Turn on to see them in Pockets,
+            pickers, and Statistics; open a pocket and tap Unarchive to use it again.
+          </Text>
+        </View>
+        <Switch
+          value={showArchivedPockets}
+          onValueChange={(v) => void onShowArchivedToggle(v)}
+          disabled={!loaded}
+          trackColor={{ false: colors.switchTrackOff, true: colors.switchTrackOn }}
+          thumbColor={showArchivedPockets ? colors.switchThumbOn : colors.switchThumbOff}
+        />
+      </View>
 
       <View style={styles.divider} />
 

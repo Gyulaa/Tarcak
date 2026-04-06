@@ -5,6 +5,7 @@ import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ModalSelectField } from '../components/ModalSelectField';
 import * as pocketsRepo from '../db/repositories/pockets';
+import * as settingsRepo from '../db/repositories/settings';
 import * as txRepo from '../db/repositories/transactions';
 import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
@@ -54,7 +55,8 @@ export default function HistoryScreen({ navigation, route }) {
     });
     setItems(list);
 
-    const active = await pocketsRepo.listPockets();
+    const showArchived = await settingsRepo.getShowArchivedPockets();
+    const active = await pocketsRepo.listPockets(showArchived);
     const map = new Map(active.map((p) => [p.id, p.name]));
     const need = new Set();
     for (const tx of list) {

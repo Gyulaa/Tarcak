@@ -2,6 +2,7 @@ import { create } from 'zustand';
 
 import type { BalanceRow, Pocket } from '../domain/types';
 import * as pocketsRepo from '../db/repositories/pockets';
+import * as settingsRepo from '../db/repositories/settings';
 import * as txRepo from '../db/repositories/transactions';
 
 type LedgerState = {
@@ -24,7 +25,8 @@ export const useLedgerStore = create<LedgerState>((set, get) => ({
   refresh: async () => {
     set({ loading: true, lastError: null });
     try {
-      const pockets = await pocketsRepo.listPockets();
+      const showArchived = await settingsRepo.getShowArchivedPockets();
+      const pockets = await pocketsRepo.listPockets(showArchived);
       const homeBalances = await txRepo.sumBalancesAll();
       set({ pockets, homeBalances, loading: false });
     } catch (e) {

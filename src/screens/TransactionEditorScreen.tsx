@@ -45,7 +45,8 @@ export default function TransactionEditorScreen({ navigation, route }) {
   useFocusEffect(
     useCallback(() => {
       void (async () => {
-        const list = await pocketsRepo.listPockets();
+        const showArchived = await settingsRepo.getShowArchivedPockets();
+        const list = await pocketsRepo.listPockets(showArchived);
         setPockets(list);
         const types = await assetTypesRepo.listAssetTypes();
         setAssetTypes(types);

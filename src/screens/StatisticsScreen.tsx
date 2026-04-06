@@ -125,11 +125,12 @@ export default function StatisticsScreen() {
   useFocusEffect(
     useCallback(() => {
       void (async () => {
+        const showArchived = await settingsRepo.getShowArchivedPockets();
         const [types, def, jar, plist, early] = await Promise.all([
           assetTypesRepo.listAssetTypes(),
           settingsRepo.getDefaultCurrency(),
           pocketsRepo.getJarPocket(),
-          pocketsRepo.listPockets(),
+          pocketsRepo.listPockets(showArchived),
           getEarliestOccurredAt(),
         ]);
         setAssetTypes(types);

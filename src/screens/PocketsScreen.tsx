@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 
+import { PocketEditMenu, PocketEditPencilButton } from '../components/PocketEditMenu';
 import * as settingsRepo from '../db/repositories/settings';
 import { useLedgerStore } from '../stores/ledgerStore';
 import { useAppTheme } from '../theme/ThemeContext';
@@ -27,9 +28,9 @@ export default function PocketsScreen({ navigation }) {
   const listData = jarPocket ? [jarPocket, ...regularPockets] : regularPockets;
   const refresh = useLedgerStore((s) => s.refresh);
   const addPocket = useLedgerStore((s) => s.addPocket);
-  const removePocketIfEmpty = useLedgerStore((s) => s.removePocketIfEmpty);
   const lastError = useLedgerStore((s) => s.lastError);
 
+  const [editTarget, setEditTarget] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [newName, setNewName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -57,20 +58,13 @@ export default function PocketsScreen({ navigation }) {
     }
   };
 
-  const tryDelete = (id: string, name: string) => {
-    Alert.alert('Delete pocket', `Remove "${name}"? Only allowed if it has no transactions.`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          const ok = await removePocketIfEmpty(id);
-          if (!ok) {
-            Alert.alert('Still in use', 'Remove or reassign transactions first.');
-          }
-        },
-      },
-    ]);
+  const openEdit = (item) => {
+    setEditTarget({
+      id: item.id,
+      name: item.name,
+      is_jar: item.is_jar,
+      archived: item.archived,
+    });
   };
 
   return (
@@ -89,38 +83,41 @@ export default function PocketsScreen({ navigation }) {
           const jarUx = isJarRow && jarEnabled;
           if (jarUx) {
             return (
-              <Pressable
-                style={styles.jarCard}
-                onPress={() => navigation.navigate('Jar')}
-              >
-                <View style={styles.jarCardIcon}>
-                  <Text style={styles.jarIconGlyph}>J</Text>
-                </View>
-                <View style={styles.jarCardMain}>
-                  <Text style={styles.jarBadge}>Jar</Text>
-                  <Text style={styles.jarCardTitle}>{item.name}</Text>
-                  <Text style={styles.jarCardHint}>Pool · tap to distribute</Text>
-                </View>
-                <Text style={styles.jarChevron}>›</Text>
-              </Pressable>
+              <View style={styles.jarCard}>
+                <Pressable
+                  style={styles.jarCardPress}
+                  onPress={() => navigation.navigate('Jar')}
+                >
+                  <View style={styles.jarCardIcon}>
+                    <Text style={styles.jarIconGlyph}>J</Text>
+                  </View>
+                  <View style={styles.jarCardMain}>
+                    <Text style={styles.jarBadge}>Jar</Text>
+                    <Text style={styles.jarCardTitle}>{item.name}</Text>
+                    <Text style={styles.jarCardHint}>Pool · tap to distribute</Text>
+                  </View>
+                  <Text style={styles.jarChevron}>›</Text>
+                </Pressable>
+                <PocketEditPencilButton colors={colors} onPress={() => openEdit(item)} />
+              </View>
             );
           }
+          const isArchivedRegular = !isJarRow && item.archived;
           return (
-            <Pressable
-              style={styles.card}
-              onPress={() => navigation.navigate('PocketDetail', { pocketId: item.id })}
-            >
-              <View style={styles.cardMain}>
-                <Text style={styles.cardTitle}>{item.name}</Text>
-              </View>
-              {!isJarRow ? (
-                <Pressable onPress={() => tryDelete(item.id, item.name)} hitSlop={10}>
-                  <Text style={styles.delete}>Delete</Text>
-                </Pressable>
-              ) : (
-                <View style={styles.jarNoDelete} />
-              )}
-            </Pressable>
+            <View style={[styles.card, isArchivedRegular && styles.cardArchived]}>
+              <Pressable
+                style={styles.cardPress}
+                onPress={() => navigation.navigate('PocketDetail', { pocketId: item.id })}
+              >
+                <View style={styles.cardMain}>
+                  <Text style={styles.cardTitle}>{item.name}</Text>
+                  {isArchivedRegular ? (
+                    <Text style={styles.archivedHint}>Archived · use edit to unarchive</Text>
+                  ) : null}
+                </View>
+              </Pressable>
+              <PocketEditPencilButton colors={colors} onPress={() => openEdit(item)} />
+            </View>
           );
         }}
       />
@@ -153,6 +150,13 @@ export default function PocketsScreen({ navigation }) {
           </View>
         </View>
       </Modal>
+
+      <PocketEditMenu
+        visible={!!editTarget}
+        pocket={editTarget}
+        onClose={() => setEditTarget(null)}
+        onMutated={() => void refresh()}
+      />
     </View>
   );
 }
@@ -176,19 +180,20 @@ function createStyles(c: AppColors) {
       flexDirection: 'row',
       alignItems: 'center',
       backgroundColor: c.surface,
-      padding: 14,
       borderRadius: 10,
       marginBottom: 8,
       borderWidth: 1,
       borderColor: c.border,
     },
+    cardPress: { flex: 1, padding: 14, minWidth: 0 },
     cardMain: { flex: 1 },
     cardTitle: { fontSize: 16, fontFamily: font.semibold, color: c.text },
+    cardArchived: { opacity: 0.85, borderStyle: 'dashed' },
+    archivedHint: { fontSize: 12, color: c.textMuted, marginTop: 4 },
     jarCard: {
       flexDirection: 'row',
       alignItems: 'center',
       backgroundColor: c.jarSoftBg,
-      padding: 14,
       borderRadius: 14,
       marginBottom: 10,
       borderWidth: 1,
@@ -198,6 +203,14 @@ function createStyles(c: AppColors) {
       shadowRadius: 8,
       shadowOffset: { width: 0, height: 2 },
       elevation: 2,
+    },
+    jarCardPress: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 14,
+      paddingRight: 4,
+      minWidth: 0,
     },
     jarCardIcon: {
       width: 44,
@@ -220,8 +233,6 @@ function createStyles(c: AppColors) {
     jarCardTitle: { fontSize: 17, fontFamily: font.bold, color: c.jarTitle },
     jarCardHint: { fontSize: 13, color: c.jarHint, marginTop: 4 },
     jarChevron: { fontSize: 26, color: c.primary, fontWeight: '300' },
-    jarNoDelete: { width: 48 },
-    delete: { color: c.danger, fontSize: 14 },
     modalOverlay: {
       flex: 1,
       backgroundColor: c.modalOverlay,

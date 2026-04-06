@@ -1,18 +1,13 @@
 // @ts-nocheck
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useLayoutEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { PocketEditMenu, PocketEditPencilButton } from '../components/PocketEditMenu';
 import * as pocketsRepo from '../db/repositories/pockets';
 import * as settingsRepo from '../db/repositories/settings';
 import * as txRepo from '../db/repositories/transactions';
+import { useLedgerStore } from '../stores/ledgerStore';
 import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
@@ -23,28 +18,33 @@ export default function PocketDetailScreen({ navigation, route }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { pocketId } = route.params;
+  const refreshLedger = useLedgerStore((s) => s.refresh);
   const [pocketName, setPocketName] = useState('');
   const [isJar, setIsJar] = useState(false);
   const [pocketArchived, setPocketArchived] = useState(false);
   const [balances, setBalances] = useState([]);
   const [txs, setTxs] = useState([]);
+  const [txnCount, setTxnCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [jarFeaturesOn, setJarFeaturesOn] = useState(true);
+  const [editMenuVisible, setEditMenuVisible] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [p, jarOn] = await Promise.all([
+      const [p, jarOn, n, b, t] = await Promise.all([
         pocketsRepo.getPocket(pocketId),
         settingsRepo.getJarEnabled(),
+        pocketsRepo.countTransactionsForPocket(pocketId),
+        txRepo.sumBalancesForPocket(pocketId),
+        txRepo.listTransactions({ pocketId, limit: 80 }),
       ]);
       setJarFeaturesOn(jarOn);
       setPocketName(p?.name ?? 'Pocket');
       setIsJar(!!p?.is_jar);
       setPocketArchived(!!p?.archived);
-      const b = await txRepo.sumBalancesForPocket(pocketId);
+      setTxnCount(n);
       setBalances(b);
-      const t = await txRepo.listTransactions({ pocketId, limit: 80 });
       setTxs(t);
     } finally {
       setLoading(false);
@@ -57,9 +57,37 @@ export default function PocketDetailScreen({ navigation, route }) {
     }, [load])
   );
 
+  const editMenuPocket = useMemo(
+    () =>
+      pocketId
+        ? {
+            id: pocketId,
+            name: pocketName || 'Pocket',
+            is_jar: isJar,
+            archived: pocketArchived,
+          }
+        : null,
+    [pocketId, pocketName, isJar, pocketArchived]
+  );
+
   useLayoutEffect(() => {
-    navigation.setOptions({ title: pocketName || 'Pocket' });
-  }, [navigation, pocketName]);
+    navigation.setOptions({
+      title: pocketName || 'Pocket',
+      headerRight:
+        loading && !pocketName
+          ? undefined
+          : () => (
+              <View style={{ marginRight: 6 }}>
+                <PocketEditPencilButton
+                  colors={colors}
+                  onPress={() => setEditMenuVisible(true)}
+                />
+              </View>
+            ),
+    });
+  }, [navigation, pocketName, loading, colors]);
+
+  const showTxActions = !pocketArchived;
 
   const header = (
     <View>
@@ -69,7 +97,7 @@ export default function PocketDetailScreen({ navigation, route }) {
           <Text style={styles.archivedSub}>
             {isJar
               ? 'Hidden from pocket lists and new transactions. Enable Pool & distribute under Settings to restore the Jar.'
-              : 'This pocket is archived and hidden from normal lists.'}
+              : 'Hidden from Pockets and pickers unless you enable Show archived pockets in Settings. History is unchanged.'}
           </Text>
         </View>
       ) : null}
@@ -81,7 +109,11 @@ export default function PocketDetailScreen({ navigation, route }) {
       ) : null}
       <Text style={styles.section}>Balances</Text>
       {balances.length === 0 ? (
-        <Text style={styles.muted}>No activity in this pocket yet.</Text>
+        <Text style={styles.muted}>
+          {txnCount > 0
+            ? 'All assets net to zero in this pocket.'
+            : 'No activity in this pocket yet.'}
+        </Text>
       ) : (
         balances.map((item) => (
           <View key={item.currency} style={styles.row}>
@@ -92,30 +124,34 @@ export default function PocketDetailScreen({ navigation, route }) {
       )}
 
       <View style={styles.actions}>
-        <Pressable
-          style={styles.btn}
-          onPress={() =>
-            navigation.navigate('TransactionEditor', { presetKind: 'income', pocketId })
-          }
-        >
-          <Text style={styles.btnText}>Income</Text>
-        </Pressable>
-        <Pressable
-          style={styles.btn}
-          onPress={() =>
-            navigation.navigate('TransactionEditor', { presetKind: 'expense', pocketId })
-          }
-        >
-          <Text style={styles.btnText}>Expense</Text>
-        </Pressable>
-        <Pressable
-          style={styles.btn}
-          onPress={() =>
-            navigation.navigate('TransactionEditor', { presetKind: 'transfer', fromPocketId: pocketId })
-          }
-        >
-          <Text style={styles.btnText}>Transfer</Text>
-        </Pressable>
+        {showTxActions ? (
+          <>
+            <Pressable
+              style={styles.btn}
+              onPress={() =>
+                navigation.navigate('TransactionEditor', { presetKind: 'income', pocketId })
+              }
+            >
+              <Text style={styles.btnText}>Income</Text>
+            </Pressable>
+            <Pressable
+              style={styles.btn}
+              onPress={() =>
+                navigation.navigate('TransactionEditor', { presetKind: 'expense', pocketId })
+              }
+            >
+              <Text style={styles.btnText}>Expense</Text>
+            </Pressable>
+            <Pressable
+              style={styles.btn}
+              onPress={() =>
+                navigation.navigate('TransactionEditor', { presetKind: 'transfer', fromPocketId: pocketId })
+              }
+            >
+              <Text style={styles.btnText}>Transfer</Text>
+            </Pressable>
+          </>
+        ) : null}
         <Pressable
           style={styles.outline}
           onPress={() => navigation.navigate('History', { pocketId })}
@@ -137,32 +173,51 @@ export default function PocketDetailScreen({ navigation, route }) {
   }
 
   return (
-    <FlatList
-      style={styles.container}
-      contentContainerStyle={styles.listPad}
-      data={txs}
-      keyExtractor={(item) => item.id}
-      ListHeaderComponent={header}
-      ListEmptyComponent={<Text style={styles.muted}>No transactions.</Text>}
-      renderItem={({ item }) => (
-        <Pressable
-          style={styles.txRow}
-          onPress={() => navigation.navigate('TransactionEditor', { transactionId: item.id })}
-        >
-          <Text style={styles.txDate}>{formatOccurredAt(item.occurred_at)}</Text>
-          <Text style={styles.txTitle}>{item.title}</Text>
-          <Text style={styles.txMeta}>
-            {item.kind} · {item.currency} · {formatMinorForDisplay(item.amount_minor, item.currency)}
-          </Text>
-        </Pressable>
-      )}
-    />
+    <View style={styles.container}>
+      <FlatList
+        style={styles.listFlex}
+        contentContainerStyle={styles.listPad}
+        data={txs}
+        keyExtractor={(item) => item.id}
+        ListHeaderComponent={header}
+        ListEmptyComponent={<Text style={styles.muted}>No transactions.</Text>}
+        renderItem={({ item }) => (
+          <Pressable
+            style={styles.txRow}
+            onPress={() => navigation.navigate('TransactionEditor', { transactionId: item.id })}
+          >
+            <Text style={styles.txDate}>{formatOccurredAt(item.occurred_at)}</Text>
+            <Text style={styles.txTitle}>{item.title}</Text>
+            <Text style={styles.txMeta}>
+              {item.kind} · {item.currency} · {formatMinorForDisplay(item.amount_minor, item.currency)}
+            </Text>
+          </Pressable>
+        )}
+      />
+
+      <PocketEditMenu
+        visible={editMenuVisible}
+        pocket={editMenuPocket}
+        onClose={() => setEditMenuVisible(false)}
+        onMutated={async () => {
+          await refreshLedger();
+          await load();
+        }}
+        afterArchive={async () => {
+          const show = await settingsRepo.getShowArchivedPockets();
+          if (!show) {
+            navigation.goBack();
+          }
+        }}
+      />
+    </View>
   );
 }
 
 function createStyles(c: AppColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: c.bg },
+    listFlex: { flex: 1 },
     listPad: { padding: 16, paddingBottom: 32 },
     centered: { flex: 1, justifyContent: 'center', backgroundColor: c.bg },
     archivedBanner: {
@@ -191,15 +246,17 @@ function createStyles(c: AppColors) {
     row: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      padding: 12,
+      alignItems: 'center',
+      paddingVertical: 14,
+      paddingHorizontal: 14,
       backgroundColor: c.surface,
-      borderRadius: 8,
-      marginBottom: 6,
+      borderRadius: 10,
+      marginBottom: 8,
       borderWidth: 1,
       borderColor: c.border,
     },
-    currency: { fontFamily: font.semibold, color: c.text },
-    balanceAmt: { color: c.textSecondary },
+    currency: { fontSize: 15, fontFamily: font.semibold, color: c.textSecondary },
+    balanceAmt: { fontSize: 22, fontFamily: font.bold, color: c.text },
     actions: { marginVertical: 16, gap: 8 },
     btn: { backgroundColor: c.primary, paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
     btnText: { color: c.onPrimary, fontFamily: font.semibold },
