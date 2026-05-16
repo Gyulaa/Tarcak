@@ -257,13 +257,13 @@ export default function JarScreen({ navigation }) {
       >
         <View style={styles.btnRow}>
           <View style={styles.btnQuarter}>
-            <ContourOnPrimaryText style={styles.btnMark}>{'<<'}</ContourOnPrimaryText>
+            <ContourOnPrimaryText style={styles.btnMark}>/</ContourOnPrimaryText>
           </View>
           <View style={styles.btnHalf}>
             <ContourOnPrimaryText style={styles.btnLabelPrimary}>Distribute</ContourOnPrimaryText>
           </View>
           <View style={styles.btnQuarter}>
-            <ContourOnPrimaryText style={styles.btnMark}>{'>>'}</ContourOnPrimaryText>
+            <ContourOnPrimaryText style={styles.btnMark}>/</ContourOnPrimaryText>
           </View>
         </View>
       </Pressable>

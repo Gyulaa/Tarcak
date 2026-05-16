@@ -14,6 +14,8 @@
 import * as SecureStore from 'expo-secure-store';
 
 import { SECURE_STORE_KEYS } from './constants';
+import type { BackupVaultSnapshot } from './backupFormat';
+import { VaultCryptoError } from './errors';
 
 const OPTIONS: SecureStore.SecureStoreOptions = {
   // User asked for password, not biometrics, as the primary gate — do not require device auth here.
@@ -51,6 +53,27 @@ export async function setPbkdf2IterationsStored(value: string): Promise<void> {
 
 export async function getPbkdf2IterationsStored(): Promise<string | null> {
   return SecureStore.getItemAsync(SECURE_STORE_KEYS.pbkdf2Iterations, OPTIONS);
+}
+
+/** Snapshot vault metadata for encrypted portable backup (no secrets in plaintext). */
+export async function readVaultSnapshotForBackup(): Promise<BackupVaultSnapshot> {
+  const [passwordSaltB64, wrappedDekB64, pbkdf2Iterations] = await Promise.all([
+    getPasswordSaltBase64(),
+    getWrappedDekBase64(),
+    getPbkdf2IterationsStored(),
+  ]);
+  if (!passwordSaltB64 || !wrappedDekB64 || !pbkdf2Iterations) {
+    throw new VaultCryptoError('Vault metadata is incomplete — cannot export backup.');
+  }
+  return { passwordSaltB64, wrappedDekB64, pbkdf2Iterations };
+}
+
+/** Restore vault metadata after importing a backup (database file written separately). */
+export async function restoreVaultFromSnapshot(snapshot: BackupVaultSnapshot): Promise<void> {
+  await setPasswordSaltBase64(snapshot.passwordSaltB64);
+  await setWrappedDekBase64(snapshot.wrappedDekB64);
+  await setPbkdf2IterationsStored(snapshot.pbkdf2Iterations);
+  await setVaultExistsFlag('1');
 }
 
 /** Remove all vault records (development / “reset app” only — use with extreme care). */

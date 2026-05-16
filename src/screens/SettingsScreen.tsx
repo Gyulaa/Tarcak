@@ -1,14 +1,23 @@
 // @ts-nocheck
 import { useCallback, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import * as DocumentPicker from 'expo-document-picker';
+import * as Sharing from 'expo-sharing';
 
+import { BackupPasswordModal } from '../components/BackupPasswordModal';
 import { ModalSelectField } from '../components/ModalSelectField';
 import { ScreenWithFooter } from '../components/ScreenWithFooter';
 import * as assetTypesRepo from '../db/repositories/assetTypes';
 import * as settingsRepo from '../db/repositories/settings';
 import { useLockVault } from '../navigation/LockVaultContext';
+import { WrongVaultPasswordError } from '../security';
+import {
+  BACKUP_EXTENSION,
+  exportEncryptedBackup,
+  importEncryptedBackup,
+} from '../security/backup';
 import { COLOR_THEME_META, COLOR_THEME_ORDER, normalizeColorThemeId } from '../theme/colorThemes';
 import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
@@ -25,6 +34,8 @@ export default function SettingsScreen() {
   const [jarEnabled, setJarEnabled] = useState(true);
   const [advancedJarEnabled, setAdvancedJarEnabled] = useState(false);
   const [showArchivedPockets, setShowArchivedPockets] = useState(false);
+  const [backupModal, setBackupModal] = useState(null);
+  const [backupBusy, setBackupBusy] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -112,6 +123,93 @@ export default function SettingsScreen() {
       setDefaultCode(code);
     } catch (e) {
       Alert.alert('Error', e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const runExportBackup = async (backupPassword) => {
+    setBackupBusy(true);
+    try {
+      const uri = await exportEncryptedBackup(backupPassword);
+      setBackupModal(null);
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        Alert.alert('Backup created', `Saved to:\n${uri}\n\nSharing is not available on this device.`);
+        return;
+      }
+      await Sharing.shareAsync(uri, {
+        mimeType: 'application/octet-stream',
+        dialogTitle: 'Save Tarcak backup',
+        UTI: 'com.gyulaa.tarcak.backup',
+      });
+    } catch (e) {
+      Alert.alert('Export failed', e instanceof Error ? e.message : String(e));
+    } finally {
+      setBackupBusy(false);
+    }
+  };
+
+  const startImportBackup = async () => {
+    if (Platform.OS === 'web') {
+      Alert.alert('Not on web', 'Import and export backups from the Android or iOS app.');
+      return;
+    }
+    try {
+      const picked = await DocumentPicker.getDocumentAsync({
+        type: '*/*',
+        copyToCacheDirectory: true,
+      });
+      if (picked.canceled || !picked.assets?.[0]?.uri) {
+        return;
+      }
+      const name = picked.assets[0].name ?? '';
+      if (name && !name.toLowerCase().endsWith(BACKUP_EXTENSION)) {
+        Alert.alert(
+          'Wrong file type?',
+          `Expected a ${BACKUP_EXTENSION} file. You can still try to import if you are sure.`
+        );
+      }
+      setBackupModal({ mode: 'import', fileUri: picked.assets[0].uri });
+    } catch (e) {
+      Alert.alert('Could not open file', e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const runImportBackup = (backupPassword) => {
+    if (!backupModal || backupModal.mode !== 'import') return;
+    Alert.alert(
+      'Replace all data on this device?',
+      'Importing replaces your vault and database with the backup. This cannot be undone unless you have another copy.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Import',
+          style: 'destructive',
+          onPress: () => void doImportBackup(backupPassword, backupModal.fileUri),
+        },
+      ]
+    );
+  };
+
+  const doImportBackup = async (backupPassword, fileUri) => {
+    setBackupBusy(true);
+    try {
+      await importEncryptedBackup(fileUri, backupPassword);
+      setBackupModal(null);
+      Alert.alert(
+        'Import complete',
+        'Your data was restored. For security, the app will lock now — unlock with your vault password (the same one you used when you created the backup).',
+        [{ text: 'OK', onPress: () => void lockVault() }]
+      );
+    } catch (e) {
+      const msg =
+        e instanceof WrongVaultPasswordError
+          ? 'Incorrect backup password.'
+          : e instanceof Error
+            ? e.message
+            : String(e);
+      Alert.alert('Import failed', msg);
+    } finally {
+      setBackupBusy(false);
     }
   };
 
@@ -241,10 +339,58 @@ export default function SettingsScreen() {
 
       <View style={styles.divider} />
 
+      <Text style={styles.label}>Backup & restore</Text>
+      <Text style={styles.backupHint}>
+        Export creates an encrypted {BACKUP_EXTENSION} file (backup password + your existing vault
+        password). Store it somewhere safe. Import replaces everything on this device — use only
+        files you exported from Tarcak.
+      </Text>
+      <Pressable
+        style={styles.secondaryBtn}
+        onPress={() => setBackupModal({ mode: 'export' })}
+        disabled={!loaded || backupBusy || Platform.OS === 'web'}
+      >
+        {backupBusy && backupModal?.mode === 'export' ? (
+          <ActivityIndicator color={colors.primary} />
+        ) : (
+          <Text style={styles.secondaryBtnText}>Export encrypted backup…</Text>
+        )}
+      </Pressable>
+      <Pressable
+        style={[styles.secondaryBtn, Platform.OS === 'web' && styles.secondaryBtnDim]}
+        onPress={() => void startImportBackup()}
+        disabled={!loaded || backupBusy || Platform.OS === 'web'}
+      >
+        <Text style={styles.secondaryBtnText}>Import encrypted backup…</Text>
+      </Pressable>
+
+      <View style={styles.divider} />
+
       <Pressable style={styles.lockRow} onPress={() => void lockVault()}>
         <Text style={styles.lockText}>Lock vault</Text>
         <Text style={styles.lockHint}>Closes the database and clears keys from memory.</Text>
       </Pressable>
+
+      <BackupPasswordModal
+        visible={backupModal != null}
+        title={backupModal?.mode === 'export' ? 'Export backup' : 'Import backup'}
+        subtitle={
+          backupModal?.mode === 'export'
+            ? 'Choose a strong backup password. You will need it to open this file on another device. Your vault password stays the same.'
+            : 'Enter the backup password for the file you selected.'
+        }
+        confirmPassword={backupModal?.mode === 'export'}
+        submitLabel={backupModal?.mode === 'export' ? 'Create file' : 'Continue'}
+        busy={backupBusy}
+        onCancel={() => !backupBusy && setBackupModal(null)}
+        onSubmit={(pw) => {
+          if (backupModal?.mode === 'export') {
+            void runExportBackup(pw);
+          } else {
+            runImportBackup(pw);
+          }
+        }}
+      />
     </ScrollView>
     </ScreenWithFooter>
   );
@@ -287,5 +433,6 @@ function createStyles(c: AppColors) {
     lockRow: { paddingVertical: 8 },
     lockText: { fontSize: 17, fontFamily: font.semibold, color: c.danger },
     lockHint: { color: c.textMuted, marginTop: 6, fontSize: 13 },
+    backupHint: { fontSize: 13, color: c.textMuted, lineHeight: 19, marginBottom: 12 },
   });
 }
