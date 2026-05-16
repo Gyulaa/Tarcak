@@ -19,6 +19,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "typecheck:src": "tsc --noEmit -p tsconfig.src.json",
+    "test:jar": "node scripts/jar-advanced-chart-selftest.mjs",
     "security:scan": "node scripts/security-scan.mjs"
   },
   "dependencies": {

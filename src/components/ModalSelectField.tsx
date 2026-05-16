@@ -28,6 +28,11 @@ type Props = {
   compact?: boolean;
   /** Soft warm tint on compact labels, chevron, field border, and sheet top edge (e.g. History filters). */
   accent?: boolean;
+  /** Tap picks one and closes; long-press toggles checkmarks without closing. */
+  multiSelect?: boolean;
+  /** Values currently toggled on (long-press); shown with a checkmark. */
+  selectedValues?: string[];
+  onToggleValue?: (value: string) => void;
 };
 
 export function ModalSelectField({
@@ -42,6 +47,9 @@ export function ModalSelectField({
   emptyMessage = 'Nothing to choose yet.',
   compact = false,
   accent = false,
+  multiSelect = false,
+  selectedValues = [],
+  onToggleValue,
 }: Props) {
   const { colors } = useAppTheme();
   const styles = useMemo(
@@ -74,25 +82,45 @@ export function ModalSelectField({
         <Pressable style={styles.overlay} onPress={() => setOpen(false)}>
           <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
             <Text style={styles.sheetTitle}>{modalTitle}</Text>
+            {multiSelect ? (
+              <Text style={styles.multiHint}>Tap one · Hold to add or remove several</Text>
+            ) : null}
             <ScrollView style={styles.scroll} keyboardShouldPersistTaps="handled">
               {options.length === 0 ? (
                 <Text style={styles.empty}>{emptyMessage}</Text>
               ) : (
-                options.map((opt) => (
-                  <Pressable
-                    key={opt.value}
-                    style={styles.row}
-                    onPress={() => {
-                      onSelect(opt.value);
-                      setOpen(false);
-                    }}
-                  >
-                    <View style={styles.rowText}>
-                      <Text style={styles.rowTitle}>{opt.title}</Text>
-                      {opt.subtitle ? <Text style={styles.rowSub}>{opt.subtitle}</Text> : null}
-                    </View>
-                  </Pressable>
-                ))
+                options.map((opt) => {
+                  const checked =
+                    multiSelect &&
+                    opt.value !== '__all__' &&
+                    selectedValues.includes(opt.value);
+                  return (
+                    <Pressable
+                      key={opt.value}
+                      style={[styles.row, checked && styles.rowChecked]}
+                      onPress={() => {
+                        onSelect(opt.value);
+                        setOpen(false);
+                      }}
+                      onLongPress={() => {
+                        if (multiSelect && onToggleValue) {
+                          onToggleValue(opt.value);
+                        }
+                      }}
+                      delayLongPress={380}
+                    >
+                      {multiSelect ? (
+                        <View style={[styles.checkSlot, checked && styles.checkSlotOn]}>
+                          {checked ? <Text style={styles.checkMark}>✓</Text> : null}
+                        </View>
+                      ) : null}
+                      <View style={styles.rowText}>
+                        <Text style={styles.rowTitle}>{opt.title}</Text>
+                        {opt.subtitle ? <Text style={styles.rowSub}>{opt.subtitle}</Text> : null}
+                      </View>
+                    </Pressable>
+                  );
+                })
               )}
             </ScrollView>
             <Pressable style={styles.closeBtn} onPress={() => setOpen(false)}>
@@ -168,6 +196,12 @@ function createStyles(
       marginBottom: 12,
       color: c.text,
     },
+    multiHint: {
+      fontSize: 12,
+      color: c.textMuted,
+      marginTop: -6,
+      marginBottom: 10,
+    },
     scroll: { maxHeight: 360 },
     empty: { color: c.textMuted, paddingVertical: 16, fontSize: 15 },
     row: {
@@ -180,6 +214,30 @@ function createStyles(
       backgroundColor: rowBg,
       borderWidth: 1,
       borderColor: rowBorder,
+    },
+    rowChecked: {
+      borderColor: c.primary,
+      backgroundColor: accent ? c.chipBg : rowBg,
+    },
+    checkSlot: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      borderWidth: 1.5,
+      borderColor: c.borderStrong,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 10,
+    },
+    checkSlotOn: {
+      borderColor: c.primary,
+      backgroundColor: c.primary,
+    },
+    checkMark: {
+      color: c.onPrimary,
+      fontSize: 14,
+      fontFamily: font.bold,
+      lineHeight: 16,
     },
     rowText: { flex: 1 },
     rowTitle: { fontSize: 16, fontFamily: font.semibold, color: c.text },

@@ -129,8 +129,8 @@ export default function JarAdvancedHub({ navigation }) {
     <View style={styles.root}>
       <ScrollView contentContainerStyle={styles.inner}>
         <Text style={styles.lead}>
-          Each listed asset uses its own default split while the Jar balance stays at or below the
-          ceiling, then blends toward milestone splits as the balance grows. Distribution from the
+          Each asset has a balance chart: one line per pocket, tap knots to edit milestones, slide
+          the chart to preview how splits blend as your Jar balance grows. Distribution from the
           Jar only runs for assets you configure here.
         </Text>
 
@@ -157,7 +157,7 @@ export default function JarAdvancedHub({ navigation }) {
               >
                 <Text style={styles.rowCode}>{s.currency}</Text>
                 <Text style={styles.rowSub}>
-                  Ceiling {formatMinorForDisplay(s.defaultCeilingMinor, s.currency)} ·{' '}
+                  Visual editor · ceiling {formatMinorForDisplay(s.defaultCeilingMinor, s.currency)} ·{' '}
                   {s.milestoneCount} milestone{s.milestoneCount === 1 ? '' : 's'}
                 </Text>
               </Pressable>

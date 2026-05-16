@@ -15,6 +15,13 @@ import { formatMinorForDisplay } from '../utils/formatMinor';
 import { formatOccurredAt } from '../utils/formatOccurredAt';
 
 const ALL = '__all__';
+const HISTORY_FETCH_LIMIT = 500;
+
+const KIND_LABELS = {
+  income: 'Income',
+  expense: 'Expense',
+  transfer: 'Transfer',
+};
 
 function txInvolvesPocket(tx, pocketId) {
   if (!pocketId) return true;
@@ -24,11 +31,32 @@ function txInvolvesPocket(tx, pocketId) {
   return tx.pocket_id === pocketId;
 }
 
-function applyHistoryFilters(items, { kind, currency, pocketId }) {
+/** Income filter also includes transfers into the Jar (money pooled from other pockets). */
+function txMatchesKindFilter(tx, kinds, jarPocketId) {
+  if (!kinds.length) return true;
+  for (const kind of kinds) {
+    if (kind === 'income') {
+      if (tx.kind === 'income') return true;
+      if (
+        jarPocketId &&
+        tx.kind === 'transfer' &&
+        tx.to_pocket_id === jarPocketId &&
+        tx.from_pocket_id !== jarPocketId
+      ) {
+        return true;
+      }
+    } else if (tx.kind === kind) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function applyHistoryFilters(items, { kinds, currencies, pocketIds, jarPocketId }) {
   return items.filter((tx) => {
-    if (kind && tx.kind !== kind) return false;
-    if (currency && tx.currency !== currency) return false;
-    if (pocketId && !txInvolvesPocket(tx, pocketId)) return false;
+    if (!txMatchesKindFilter(tx, kinds, jarPocketId)) return false;
+    if (currencies.length && !currencies.includes(tx.currency)) return false;
+    if (pocketIds.length && !pocketIds.some((id) => txInvolvesPocket(tx, id))) return false;
     return true;
   });
 }
@@ -42,6 +70,18 @@ function pocketLineForHistory(tx, names) {
   return null;
 }
 
+function toggleInList(list, value, allToken = ALL) {
+  if (value === allToken) return [];
+  return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
+}
+
+function formatMultiDisplay(values, labelFor) {
+  if (!values.length) return '';
+  if (values.length === 1) return labelFor(values[0]);
+  if (values.length === 2) return `${labelFor(values[0])}, ${labelFor(values[1])}`;
+  return `${values.length} selected`;
+}
+
 export default function HistoryScreen({ navigation, route }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -49,10 +89,11 @@ export default function HistoryScreen({ navigation, route }) {
   const [scopePocketId, setScopePocketId] = useState(paramPocketId);
   const [items, setItems] = useState([]);
   const [pocketNames, setPocketNames] = useState(() => new Map());
+  const [jarPocketId, setJarPocketId] = useState(null);
   const [filterLabel, setFilterLabel] = useState('');
-  const [filterKind, setFilterKind] = useState(null);
-  const [filterCurrency, setFilterCurrency] = useState(null);
-  const [filterPocketId, setFilterPocketId] = useState(null);
+  const [filterKinds, setFilterKinds] = useState([]);
+  const [filterCurrencies, setFilterCurrencies] = useState([]);
+  const [filterPocketIds, setFilterPocketIds] = useState([]);
 
   useEffect(() => {
     setScopePocketId(paramPocketId);
@@ -61,19 +102,26 @@ export default function HistoryScreen({ navigation, route }) {
   const load = useCallback(async () => {
     const list = await txRepo.listTransactions({
       pocketId: scopePocketId ?? null,
-      limit: 300,
+      limit: HISTORY_FETCH_LIMIT,
     });
     setItems(list);
+
+    const jar = await pocketsRepo.getJarPocket();
+    setJarPocketId(jar?.id ?? null);
 
     const showArchived = await settingsRepo.getShowArchivedPockets();
     const active = await pocketsRepo.listPockets(showArchived);
     const map = new Map(active.map((p) => [p.id, p.name]));
+    if (jar) map.set(jar.id, jar.name);
+
     const need = new Set();
     for (const tx of list) {
       if (tx.pocket_id) need.add(tx.pocket_id);
       if (tx.from_pocket_id) need.add(tx.from_pocket_id);
       if (tx.to_pocket_id) need.add(tx.to_pocket_id);
     }
+    if (jar) need.add(jar.id);
+
     const missing = [...need].filter((id) => !map.has(id));
     await Promise.all(
       missing.map(async (id) => {
@@ -115,15 +163,20 @@ export default function HistoryScreen({ navigation, route }) {
       if (tx.from_pocket_id) ids.add(tx.from_pocket_id);
       if (tx.to_pocket_id) ids.add(tx.to_pocket_id);
     }
+    if (jarPocketId) ids.add(jarPocketId);
     return [...ids]
-      .map((id) => ({ id, name: pocketNames.get(id) ?? '…' }))
+      .map((id) => ({
+        id,
+        name: pocketNames.get(id) ?? '…',
+        subtitle: id === jarPocketId ? 'Jar' : undefined,
+      }))
       .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
-  }, [items, pocketNames]);
+  }, [items, pocketNames, jarPocketId]);
 
   const kindModalOptions = useMemo(
     () => [
       { value: ALL, title: 'All types' },
-      { value: 'income', title: 'Income' },
+      { value: 'income', title: 'Income', subtitle: 'Includes deposits and transfers into the Jar' },
       { value: 'expense', title: 'Expense' },
       { value: 'transfer', title: 'Transfer' },
     ],
@@ -141,39 +194,50 @@ export default function HistoryScreen({ navigation, route }) {
   const pocketModalOptions = useMemo(
     () => [
       { value: ALL, title: 'All pockets' },
-      ...pocketFilterOptions.map((p) => ({ value: p.id, title: p.name })),
+      ...pocketFilterOptions.map((p) => ({
+        value: p.id,
+        title: p.name,
+        subtitle: p.subtitle,
+      })),
     ],
     [pocketFilterOptions]
   );
 
-  const kindDisplay =
-    filterKind === 'income'
-      ? 'Income'
-      : filterKind === 'expense'
-        ? 'Expense'
-        : filterKind === 'transfer'
-          ? 'Transfer'
-          : '';
-
-  const currencyDisplay = filterCurrency ?? '';
-  const pocketDisplay = filterPocketId ? pocketNames.get(filterPocketId) ?? 'Pocket' : '';
+  const kindDisplay = formatMultiDisplay(filterKinds, (k) => KIND_LABELS[k] ?? k);
+  const currencyDisplay = formatMultiDisplay(filterCurrencies, (c) => c);
+  const pocketDisplay = formatMultiDisplay(
+    filterPocketIds,
+    (id) => pocketNames.get(id) ?? 'Pocket'
+  );
 
   const displayItems = useMemo(
     () =>
       applyHistoryFilters(items, {
-        kind: filterKind,
-        currency: filterCurrency,
-        pocketId: filterPocketId,
+        kinds: filterKinds,
+        currencies: filterCurrencies,
+        pocketIds: filterPocketIds,
+        jarPocketId,
       }),
-    [items, filterKind, filterCurrency, filterPocketId]
+    [items, filterKinds, filterCurrencies, filterPocketIds, jarPocketId]
   );
 
-  const hasActiveFilters = filterKind != null || filterCurrency != null || filterPocketId != null;
+  const hasActiveFilters =
+    filterKinds.length > 0 || filterCurrencies.length > 0 || filterPocketIds.length > 0;
 
   const clearFilters = () => {
-    setFilterKind(null);
-    setFilterCurrency(null);
-    setFilterPocketId(null);
+    setFilterKinds([]);
+    setFilterCurrencies([]);
+    setFilterPocketIds([]);
+  };
+
+  const handleKindTap = (v) => {
+    setFilterKinds(v === ALL ? [] : [v]);
+  };
+  const handleCurrencyTap = (v) => {
+    setFilterCurrencies(v === ALL ? [] : [v]);
+  };
+  const handlePocketTap = (v) => {
+    setFilterPocketIds(v === ALL ? [] : [v]);
   };
 
   return (
@@ -200,24 +264,30 @@ export default function HistoryScreen({ navigation, route }) {
             <ModalSelectField
               compact
               accent
+              multiSelect
               label="Type"
               displayValue={kindDisplay}
               placeholder="All types"
               modalTitle="Transaction type"
               options={kindModalOptions}
-              onSelect={(v) => setFilterKind(v === ALL ? null : v)}
+              selectedValues={filterKinds}
+              onSelect={handleKindTap}
+              onToggleValue={(v) => setFilterKinds((prev) => toggleInList(prev, v))}
             />
           </View>
           <View style={styles.filterCell}>
             <ModalSelectField
               compact
               accent
+              multiSelect
               label="Asset"
               displayValue={currencyDisplay}
               placeholder="All assets"
               modalTitle="Asset"
               options={currencyModalOptions}
-              onSelect={(v) => setFilterCurrency(v === ALL ? null : v)}
+              selectedValues={filterCurrencies}
+              onSelect={handleCurrencyTap}
+              onToggleValue={(v) => setFilterCurrencies((prev) => toggleInList(prev, v))}
               emptyMessage="No assets in this list yet."
             />
           </View>
@@ -225,12 +295,15 @@ export default function HistoryScreen({ navigation, route }) {
             <ModalSelectField
               compact
               accent
+              multiSelect
               label="Pocket"
               displayValue={pocketDisplay}
               placeholder="All pockets"
               modalTitle="Pocket"
               options={pocketModalOptions}
-              onSelect={(v) => setFilterPocketId(v === ALL ? null : v)}
+              selectedValues={filterPocketIds}
+              onSelect={handlePocketTap}
+              onToggleValue={(v) => setFilterPocketIds((prev) => toggleInList(prev, v))}
               variant="pocket"
               emptyMessage="No pockets in this list yet."
             />
