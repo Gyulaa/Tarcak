@@ -18,11 +18,8 @@ Local-first personal finance app: **pockets** (budget segments), **multi-currenc
 
 ## Support / donations
 
-**Bitcoin (BTC):** `bc1qc9lsmkgmf0fyznw3fnqxq3jwwffjkdfsd0umr7`
+**Bitcoin (BTC):** `bc1q7ztcxrnc5hlkms02m79rxsv4mqxmuh8f8tjsrk`
 
-On **Home**, tap the thin grey line below the shortcut buttons to open a sheet with copy-to-clipboard for donation addresses.
-
-Sponsor links: [`.github/FUNDING.yml`](.github/FUNDING.yml).
 
 `app.json` enables the **expo-sqlite** config plugin with **`useSQLCipher: true`**. That only applies after a **native build** (`npx expo prebuild` / EAS / `expo run:*`). **Expo Go does not ship SQLCipher** — the app still runs, but the DB file is **plaintext** there (a console warning explains this). Use a **development build** to validate real encryption.
 

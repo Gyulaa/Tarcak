@@ -4,7 +4,7 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -20,8 +20,14 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { MainNavigator } from './src/navigation/MainNavigator';
 import { AppThemeProvider, useAppTheme } from './src/theme/ThemeContext';
-import { COLOR_THEMES, DEFAULT_COLOR_THEME_ID } from './src/theme/colorThemes';
+import {
+  readAppearanceCache,
+  resolveAppearanceColors,
+  type AppearanceCache,
+} from './src/theme/appearanceCache';
+import { DEFAULT_COLOR_THEME_ID } from './src/theme/colorThemes';
 import { font } from './src/theme/fonts';
+import type { AppColors } from './src/theme/palette';
 import {
   createFirstVault,
   eraseAllLocalTarcakData,
@@ -71,6 +77,11 @@ const CREATE_PHASE_STEPS: { key: VaultPhaseKey; title: string; body: string }[] 
 /**
  * Vault gate, then main ledger UI (navigation + screens).
  */
+const DEFAULT_APPEARANCE: AppearanceCache = {
+  isDark: false,
+  colorThemeId: DEFAULT_COLOR_THEME_ID,
+};
+
 export default function AppBoot() {
   const [vaultPresent, setVaultPresent] = useState<boolean | null>(null);
   const [unlocked, setUnlocked] = useState(false);
@@ -80,6 +91,10 @@ export default function AppBoot() {
   const [vaultPhaseKey, setVaultPhaseKey] = useState<VaultPhaseKey | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [passwordVisible, setPasswordVisible] = useState(false);
+  const [appearance, setAppearance] = useState<AppearanceCache>(DEFAULT_APPEARANCE);
+
+  const vaultColors = useMemo(() => resolveAppearanceColors(appearance), [appearance]);
+  const vaultStyles = useMemo(() => createVaultGateStyles(vaultColors), [vaultColors]);
 
   const refreshVaultFlag = useCallback(async () => {
     setVaultPresent(await hasVault());
@@ -88,6 +103,7 @@ export default function AppBoot() {
   useEffect(() => {
     registerLockOnBackground();
     void refreshVaultFlag();
+    void readAppearanceCache().then(setAppearance);
   }, [refreshVaultFlag]);
 
   useEffect(() => {
@@ -150,6 +166,7 @@ export default function AppBoot() {
   const handleLockFromApp = async () => {
     await lockVaultSession();
     setUnlocked(false);
+    setAppearance(await readAppearanceCache());
   };
 
   const confirmEraseAllData = () => {
@@ -199,9 +216,9 @@ export default function AppBoot() {
   if (vaultPresent === null) {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <View style={styles.centered}>
-          <ActivityIndicator />
-          <StatusBar style="auto" />
+        <View style={[bootStyles.centered, { backgroundColor: vaultColors.bg }]}>
+          <ActivityIndicator color={vaultColors.primary} />
+          <StatusBar style={appearance.isDark ? 'light' : 'dark'} />
         </View>
       </GestureHandlerRootView>
     );
@@ -222,23 +239,24 @@ export default function AppBoot() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <View style={styles.container}>
-        <Text style={styles.title}>Tarcak — unlock</Text>
+      <View style={vaultStyles.container}>
+        <Text style={vaultStyles.title}>Tarcak — unlock</Text>
 
-        <View style={styles.inputOuter}>
+        <View style={vaultStyles.inputOuter}>
           <TextInput
-            style={styles.input}
+            style={vaultStyles.input}
             placeholder="Password"
-            placeholderTextColor="#888"
+            placeholderTextColor={vaultColors.placeholder}
             secureTextEntry={!passwordVisible}
             value={password}
             onChangeText={setPassword}
             autoCapitalize="none"
             autoCorrect={false}
             editable={!busy}
+            selectionColor={vaultColors.primary}
           />
           <Pressable
-            style={styles.eyeBtn}
+            style={vaultStyles.eyeBtn}
             onPress={() => setPasswordVisible((v) => !v)}
             disabled={busy}
             hitSlop={10}
@@ -248,7 +266,7 @@ export default function AppBoot() {
             <Ionicons
               name={passwordVisible ? 'eye-off-outline' : 'eye-outline'}
               size={22}
-              color={busy ? '#bbb' : '#666'}
+              color={busy ? vaultColors.textMuted : vaultColors.textSecondary}
             />
           </Pressable>
         </View>
@@ -256,68 +274,72 @@ export default function AppBoot() {
         {!vaultPresent ? (
           <Pressable
             style={({ pressed }) => [
-              styles.primaryBtn,
-              busy && styles.primaryBtnBusy,
-              pressed && !busy && styles.primaryBtnPressed,
+              vaultStyles.primaryBtn,
+              busy && vaultStyles.primaryBtnBusy,
+              pressed && !busy && vaultStyles.primaryBtnPressed,
             ]}
             onPress={() => void onCreateVault()}
             disabled={busy}
           >
-            <Text style={styles.primaryBtnText}>Create vault</Text>
+            <Text style={vaultStyles.primaryBtnText}>Create vault</Text>
           </Pressable>
         ) : (
           <>
             <Pressable
               style={({ pressed }) => [
-                styles.primaryBtn,
-                busy && styles.primaryBtnBusy,
-                pressed && !busy && styles.primaryBtnPressed,
+                vaultStyles.primaryBtn,
+                busy && vaultStyles.primaryBtnBusy,
+                pressed && !busy && vaultStyles.primaryBtnPressed,
               ]}
               onPress={() => void onUnlock()}
               disabled={busy}
             >
-              <Text style={styles.primaryBtnText}>Unlock</Text>
+              <Text style={vaultStyles.primaryBtnText}>Unlock</Text>
             </Pressable>
             <Pressable
               onPress={confirmEraseAllData}
               disabled={busy}
-              style={({ pressed }) => [styles.forgotWrap, pressed && styles.forgotPressed]}
+              style={({ pressed }) => [vaultStyles.forgotWrap, pressed && vaultStyles.forgotPressed]}
             >
-              <Text style={styles.forgotText}>Forgot password? Erase data and start over</Text>
+              <Text style={vaultStyles.forgotText}>Forgot password? Erase data and start over</Text>
             </Pressable>
           </>
         )}
 
         {busy && vaultPhaseKey ? (
-          <View style={styles.phaseCard}>
-            <Text style={styles.phaseCardTitle}>Please wait</Text>
+          <View style={vaultStyles.phaseCard}>
+            <Text style={vaultStyles.phaseCardTitle}>Please wait</Text>
             {(vaultPresent ? UNLOCK_PHASE_STEPS : CREATE_PHASE_STEPS).map((step, i) => {
               const steps = vaultPresent ? UNLOCK_PHASE_STEPS : CREATE_PHASE_STEPS;
               const activeIdx = steps.findIndex((s) => s.key === vaultPhaseKey);
               const done = i < activeIdx;
               const current = i === activeIdx;
               return (
-                <View key={step.key} style={styles.phaseRow}>
+                <View key={step.key} style={vaultStyles.phaseRow}>
                   <View
                     style={[
-                      styles.phaseDot,
-                      done && styles.phaseDotDone,
-                      current && styles.phaseDotCurrent,
+                      vaultStyles.phaseDot,
+                      done && vaultStyles.phaseDotDone,
+                      current && vaultStyles.phaseDotCurrent,
                     ]}
                   >
                     {done ? (
-                      <Text style={styles.phaseCheck}>✓</Text>
+                      <Text style={vaultStyles.phaseCheck}>✓</Text>
                     ) : (
-                      <Text style={[styles.phaseNum, current && styles.phaseNumCurrent]}>{i + 1}</Text>
+                      <Text style={[vaultStyles.phaseNum, current && vaultStyles.phaseNumCurrent]}>
+                        {i + 1}
+                      </Text>
                     )}
                   </View>
-                  <View style={styles.phaseTextCol}>
-                    <Text style={[styles.phaseStepTitle, current && styles.phaseStepTitleCurrent]}>
+                  <View style={vaultStyles.phaseTextCol}>
+                    <Text
+                      style={[vaultStyles.phaseStepTitle, current && vaultStyles.phaseStepTitleCurrent]}
+                    >
                       {step.title}
                     </Text>
-                    <Text style={styles.phaseStepBody}>{step.body}</Text>
+                    <Text style={vaultStyles.phaseStepBody}>{step.body}</Text>
                     {current ? (
-                      <ActivityIndicator style={styles.phaseSpinner} color={vaultLight.primary} />
+                      <ActivityIndicator style={vaultStyles.phaseSpinner} color={vaultColors.primary} />
                     ) : null}
                   </View>
                 </View>
@@ -325,164 +347,165 @@ export default function AppBoot() {
             })}
           </View>
         ) : busy ? (
-          <ActivityIndicator style={styles.spinner} color={vaultLight.primary} />
+          <ActivityIndicator style={vaultStyles.spinner} color={vaultColors.primary} />
         ) : null}
-        {message ? <Text style={styles.message}>{message}</Text> : null}
+        {message ? <Text style={vaultStyles.message}>{message}</Text> : null}
 
-        <StatusBar style="auto" />
+        <StatusBar style={appearance.isDark ? 'light' : 'dark'} />
       </View>
     </GestureHandlerRootView>
   );
 }
 
-const vaultLight = COLOR_THEMES[DEFAULT_COLOR_THEME_ID].light;
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    padding: 24,
-    paddingTop: 56,
-    gap: 12,
-  },
+const bootStyles = StyleSheet.create({
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  title: {
-    fontSize: 20,
-    fontFamily: font.semibold,
-    color: '#111',
-    marginBottom: 8,
-  },
-  inputOuter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    backgroundColor: '#fff',
-    paddingRight: 4,
-  },
-  input: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    fontSize: 16,
-    /** Android release often inherits theme text color (e.g. white); without this, text can match #fff container. */
-    color: '#111',
-    backgroundColor: 'transparent',
-  },
-  eyeBtn: {
-    padding: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  primaryBtn: {
-    backgroundColor: vaultLight.primary,
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  primaryBtnPressed: {
-    opacity: 0.88,
-  },
-  /** While working: dim the bar slightly but keep label white (avoids RN Button grey disabled text). */
-  primaryBtnBusy: {
-    opacity: 0.55,
-  },
-  primaryBtnText: {
-    color: '#fff',
-    fontFamily: font.semibold,
-    fontSize: 17,
-  },
-  spinner: {
-    marginTop: 16,
-  },
-  phaseCard: {
-    marginTop: 16,
-    padding: 16,
-    borderRadius: 12,
-    backgroundColor: '#f8f9fa',
-    borderWidth: 1,
-    borderColor: '#e8e8e8',
-  },
-  phaseCardTitle: {
-    fontFamily: font.bold,
-    fontSize: 16,
-    color: '#111',
-    marginBottom: 14,
-  },
-  phaseRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  phaseDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#e0e0e0',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-    marginTop: 2,
-  },
-  phaseDotDone: {
-    backgroundColor: '#2e7d32',
-  },
-  phaseDotCurrent: {
-    backgroundColor: vaultLight.chipBg,
-    borderWidth: 2,
-    borderColor: vaultLight.primary,
-  },
-  phaseCheck: {
-    color: '#fff',
-    fontSize: 14,
-    fontFamily: font.bold,
-  },
-  phaseNum: {
-    fontSize: 13,
-    fontFamily: font.semibold,
-    color: '#666',
-  },
-  phaseNumCurrent: {
-    color: vaultLight.primary,
-  },
-  phaseTextCol: { flex: 1 },
-  phaseStepTitle: {
-    fontSize: 15,
-    fontFamily: font.semibold,
-    color: '#555',
-  },
-  phaseStepTitleCurrent: {
-    color: '#111',
-  },
-  phaseStepBody: {
-    fontSize: 13,
-    color: '#666',
-    lineHeight: 19,
-    marginTop: 4,
-  },
-  phaseSpinner: {
-    marginTop: 10,
-    alignSelf: 'flex-start',
-  },
-  message: {
-    marginTop: 12,
-    color: '#333',
-  },
-  forgotWrap: {
-    marginTop: 20,
-    paddingVertical: 8,
-    alignSelf: 'center',
-  },
-  forgotPressed: { opacity: 0.6 },
-  forgotText: {
-    color: '#b00020',
-    fontSize: 14,
-    textDecorationLine: 'underline',
-    textAlign: 'center',
-  },
 });
+
+function createVaultGateStyles(c: AppColors) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: c.bg,
+      padding: 24,
+      paddingTop: 56,
+      gap: 12,
+    },
+    title: {
+      fontSize: 20,
+      fontFamily: font.semibold,
+      color: c.text,
+      marginBottom: 8,
+    },
+    inputOuter: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: c.inputBorder,
+      borderRadius: 8,
+      backgroundColor: c.inputBg,
+      paddingRight: 4,
+    },
+    input: {
+      flex: 1,
+      paddingVertical: 12,
+      paddingHorizontal: 12,
+      fontSize: 16,
+      color: c.inputText,
+      backgroundColor: 'transparent',
+    },
+    eyeBtn: {
+      padding: 10,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    primaryBtn: {
+      backgroundColor: c.primary,
+      paddingVertical: 14,
+      borderRadius: 10,
+      alignItems: 'center',
+    },
+    primaryBtnPressed: {
+      opacity: 0.88,
+    },
+    primaryBtnBusy: {
+      opacity: 0.55,
+    },
+    primaryBtnText: {
+      color: '#fff',
+      fontFamily: font.semibold,
+      fontSize: 17,
+    },
+    spinner: {
+      marginTop: 16,
+    },
+    phaseCard: {
+      marginTop: 16,
+      padding: 16,
+      borderRadius: 12,
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    phaseCardTitle: {
+      fontFamily: font.bold,
+      fontSize: 16,
+      color: c.text,
+      marginBottom: 14,
+    },
+    phaseRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      marginBottom: 16,
+    },
+    phaseDot: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: c.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 12,
+      marginTop: 2,
+    },
+    phaseDotDone: {
+      backgroundColor: c.success,
+    },
+    phaseDotCurrent: {
+      backgroundColor: c.chipBg,
+      borderWidth: 2,
+      borderColor: c.primary,
+    },
+    phaseCheck: {
+      color: '#fff',
+      fontSize: 14,
+      fontFamily: font.bold,
+    },
+    phaseNum: {
+      fontSize: 13,
+      fontFamily: font.semibold,
+      color: c.textMuted,
+    },
+    phaseNumCurrent: {
+      color: c.primary,
+    },
+    phaseTextCol: { flex: 1 },
+    phaseStepTitle: {
+      fontSize: 15,
+      fontFamily: font.semibold,
+      color: c.textMuted,
+    },
+    phaseStepTitleCurrent: {
+      color: c.text,
+    },
+    phaseStepBody: {
+      fontSize: 13,
+      color: c.textSecondary,
+      lineHeight: 19,
+      marginTop: 4,
+    },
+    phaseSpinner: {
+      marginTop: 10,
+      alignSelf: 'flex-start',
+    },
+    message: {
+      marginTop: 12,
+      color: c.textSecondary,
+    },
+    forgotWrap: {
+      marginTop: 20,
+      paddingVertical: 8,
+      alignSelf: 'center',
+    },
+    forgotPressed: { opacity: 0.6 },
+    forgotText: {
+      color: c.danger,
+      fontSize: 14,
+      textDecorationLine: 'underline',
+      textAlign: 'center',
+    },
+  });
+}

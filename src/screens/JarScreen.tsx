@@ -255,7 +255,17 @@ export default function JarScreen({ navigation }) {
         onPress={onDistributePress}
         disabled={busy || !canDistribute}
       >
-        <ContourOnPrimaryText style={styles.primaryBtnText}>Distribute</ContourOnPrimaryText>
+        <View style={styles.btnRow}>
+          <View style={styles.btnQuarter}>
+            <ContourOnPrimaryText style={styles.btnMark}>{'<<'}</ContourOnPrimaryText>
+          </View>
+          <View style={styles.btnHalf}>
+            <ContourOnPrimaryText style={styles.btnLabelPrimary}>Distribute</ContourOnPrimaryText>
+          </View>
+          <View style={styles.btnQuarter}>
+            <ContourOnPrimaryText style={styles.btnMark}>{'>>'}</ContourOnPrimaryText>
+          </View>
+        </View>
       </Pressable>
 
       {advancedJarOn ? (
@@ -272,7 +282,17 @@ export default function JarScreen({ navigation }) {
         style={[styles.primaryBtn, styles.recordIncomeBtn]}
         onPress={() => navigation.navigate('TransactionEditor', { presetKind: 'income', pocketId: jarId })}
       >
-        <ContourOnPrimaryText style={styles.primaryBtnText}>Record income to Jar</ContourOnPrimaryText>
+        <View style={styles.btnRow}>
+          <View style={styles.btnQuarter}>
+            <ContourOnPrimaryText style={styles.btnMark}>+</ContourOnPrimaryText>
+          </View>
+          <View style={styles.btnHalf}>
+            <ContourOnPrimaryText style={styles.btnLabelPrimary}>Record income to Jar</ContourOnPrimaryText>
+          </View>
+          <View style={styles.btnQuarter}>
+            <ContourOnPrimaryText style={styles.btnMark}>+</ContourOnPrimaryText>
+          </View>
+        </View>
       </Pressable>
 
       <View style={styles.sectionDivider} />
@@ -407,6 +427,16 @@ function createJarStyles(c: AppColors) {
     },
     btnDisabled: { opacity: 0.45 },
     primaryBtnText: { fontFamily: font.bold, fontSize: 17 },
+    btnRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'stretch',
+      width: '100%',
+    },
+    btnQuarter: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    btnHalf: { flex: 2, alignItems: 'center', justifyContent: 'center' },
+    btnMark: { fontSize: 20, fontFamily: font.bold },
+    btnLabelPrimary: { fontSize: 16, fontFamily: font.semibold },
     ghostBtn: {
       marginTop: 12,
       paddingVertical: 14,

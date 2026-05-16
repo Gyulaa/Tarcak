@@ -3,13 +3,14 @@ import { DarkTheme, DefaultTheme } from '@react-navigation/native';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import * as settingsRepo from '../db/repositories/settings';
-import type { AppColors } from './palette';
+import { writeAppearanceCache } from './appearanceCache';
 import {
   COLOR_THEMES,
   DEFAULT_COLOR_THEME_ID,
   normalizeColorThemeId,
   type ColorThemeId,
 } from './colorThemes';
+import type { AppColors } from './palette';
 
 export type AppThemeContextValue = {
   colors: AppColors;
@@ -50,8 +51,10 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
         settingsRepo.getColorThemeId(),
       ]);
       if (cancelled) return;
+      const themeId = normalizeColorThemeId(rawTheme);
       setIsDark(dark);
-      setColorThemeIdState(normalizeColorThemeId(rawTheme));
+      setColorThemeIdState(themeId);
+      await writeAppearanceCache({ isDark: dark, colorThemeId: themeId });
     })();
     return () => {
       cancelled = true;
@@ -66,13 +69,15 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
   const setDarkMode = useCallback(async (enabled: boolean) => {
     setIsDark(enabled);
     await settingsRepo.setDarkThemeEnabled(enabled);
-  }, []);
+    await writeAppearanceCache({ isDark: enabled, colorThemeId });
+  }, [colorThemeId]);
 
   const setColorTheme = useCallback(async (id: ColorThemeId) => {
     const next = normalizeColorThemeId(id);
     setColorThemeIdState(next);
     await settingsRepo.setColorThemeId(next);
-  }, []);
+    await writeAppearanceCache({ isDark, colorThemeId: next });
+  }, [isDark]);
 
   const navTheme = useMemo(() => buildNavTheme(colors, isDark), [colors, isDark]);
 
