@@ -1,7 +1,5 @@
 import type { JarAdvancedAssetPayload } from '../db/repositories/jarAdvanced';
 import {
-  JAR_ADV_TOTAL_BPS,
-  normalizeSplitRowsTo100,
   splitsSumValid,
   type EditorMilestone,
   type SplitRow,
@@ -10,8 +8,7 @@ import {
 export function splitRowsToPayload(
   rows: SplitRow[]
 ): { target_pocket_id: string; percent_bps: number }[] {
-  const normalized = normalizeSplitRowsTo100(rows);
-  return normalized.map((r) => ({
+  return rows.map((r) => ({
     target_pocket_id: r.pocketId,
     percent_bps: Math.round(r.percent * 100),
   }));
@@ -30,7 +27,7 @@ export function validateEditorForSave(params: {
     return { ok: false, message: 'Default ceiling must be a non-negative amount.' };
   }
   if (!splitsSumValid(params.defaultSplits)) {
-    return { ok: false, message: 'Default split must total 100% with at least one pocket.' };
+    return { ok: false, message: 'Default split must have at least one pocket above 0% and must not exceed 100%.' };
   }
 
   const milestonePayload = [];
@@ -47,7 +44,7 @@ export function validateEditorForSave(params: {
       };
     }
     if (!splitsSumValid(m.splits)) {
-      return { ok: false, message: `Milestone ${i + 1}: split must total 100%.` };
+      return { ok: false, message: `Milestone ${i + 1}: split must have at least one pocket above 0% and must not exceed 100%.` };
     }
     thresholds.push(m.thresholdMinor);
     milestonePayload.push({
@@ -64,11 +61,6 @@ export function validateEditorForSave(params: {
     if (i > 0 && thresholds[i] === thresholds[i - 1]) {
       return { ok: false, message: 'Each milestone threshold must be unique.' };
     }
-  }
-
-  const sumCheck = splitRowsToPayload(params.defaultSplits).reduce((a, e) => a + e.percent_bps, 0);
-  if (sumCheck !== JAR_ADV_TOTAL_BPS) {
-    return { ok: false, message: 'Default split must total 100%.' };
   }
 
   return {

@@ -28,20 +28,25 @@ function mapRuleRow(r: RuleRow): JarDistributionRule {
   };
 }
 
-/** Split `totalMinor` across `bpsList` (sum must be TOTAL_BPS). Last entry absorbs remainder. */
+/**
+ * Split `totalMinor` across `bpsList`.
+ * Sum may be ≤ TOTAL_BPS; any undistributed portion stays in the Jar (caller's responsibility).
+ * Last entry absorbs rounding remainder within the distributed portion.
+ */
 export function splitAmountByBps(totalMinor: number, bpsList: number[]): number[] {
   if (bpsList.length === 0) {
     return [];
   }
   const sum = bpsList.reduce((a, b) => a + b, 0);
-  if (sum !== TOTAL_BPS) {
-    throw new Error('Split must total 100%.');
+  if (sum > TOTAL_BPS) {
+    throw new Error('Split must not exceed 100%.');
   }
+  const totalToDistribute = Math.floor((totalMinor * sum) / TOTAL_BPS);
   const out: number[] = [];
   let allocated = 0;
   for (let i = 0; i < bpsList.length; i++) {
     if (i === bpsList.length - 1) {
-      out.push(totalMinor - allocated);
+      out.push(totalToDistribute - allocated);
     } else {
       const share = Math.floor((totalMinor * bpsList[i]) / TOTAL_BPS);
       out.push(share);
@@ -150,8 +155,8 @@ export async function distributeJarCurrency(params: {
     for (const v of bpsMap.values()) {
       sum += v;
     }
-    if (sum !== JAR_ADV_TOTAL_BPS) {
-      throw new Error('Internal split error.');
+    if (sum > JAR_ADV_TOTAL_BPS) {
+      throw new Error('Internal split error: split exceeds 100%.');
     }
     ordered = [...bpsMap.entries()]
       .filter(([, bps]) => bps > 0)

@@ -61,12 +61,12 @@ const terracottaLight: AppColors = {
   switchThumbOn: '#d45a12',
   pillBg: '#e8e8e8',
   pillText: '#333333',
-  pocketPickBg: '#1c1c1e',
-  pocketPickBgSelected: '#2d2d32',
-  pocketPickBorder: '#3a3a3e',
+  pocketPickBg: '#f4f4f4',
+  pocketPickBgSelected: '#fff3e8',
+  pocketPickBorder: '#e0e0e0',
   pocketPickBorderSelected: '#d45a12',
-  pocketPickText: '#e8e8ed',
-  pocketPickTextSelected: '#f0a060',
+  pocketPickText: '#111111',
+  pocketPickTextSelected: '#d45a12',
 };
 
 const terracottaDark: AppColors = {

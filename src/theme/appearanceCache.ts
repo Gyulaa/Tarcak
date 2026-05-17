@@ -37,7 +37,7 @@ export async function readAppearanceCache(): Promise<AppearanceCache> {
     SecureStore.getItemAsync(KEYS.colorTheme, OPTIONS),
   ]);
   return {
-    isDark: darkRaw === '1',
+    isDark: darkRaw === null ? true : darkRaw === '1',
     colorThemeId: normalizeColorThemeId(themeRaw),
   };
 }

@@ -140,12 +140,14 @@ function createStyles(
   accent: boolean
 ) {
   /** Compact filter rows use one grey for all three fields; full-size pocket pickers keep tile styling. */
-  const fieldBg = variant === 'pocket' && !compact ? c.pocketPickBg : c.inputBg;
-  const fieldBorderDefault =
-    variant === 'pocket' && !compact ? c.pocketPickBorder : c.inputBorder;
+  const isPocket = variant === 'pocket';
+  const fieldBg = isPocket && !compact ? c.pocketPickBg : c.inputBg;
+  const fieldBorderDefault = isPocket && !compact ? c.pocketPickBorder : c.inputBorder;
   const fieldBorder = accent && compact ? c.jarSoftBorder : fieldBorderDefault;
-  const rowBg = variant === 'pocket' ? c.pocketPickBg : c.surface;
-  const rowBorder = variant === 'pocket' ? c.pocketPickBorder : c.border;
+  const rowBg = isPocket ? c.pocketPickBg : c.surface;
+  const rowBorder = isPocket ? c.pocketPickBorder : c.border;
+  const fieldTextColor = isPocket && !compact ? c.pocketPickText : c.inputText;
+  const rowTextColor = isPocket ? c.pocketPickText : c.text;
 
   return StyleSheet.create({
     label: {
@@ -167,7 +169,7 @@ function createStyles(
       gap: compact ? 4 : 10,
     },
     fieldDisabled: { opacity: 0.5 },
-    fieldText: { flex: 1, fontSize: compact ? 13 : 16, color: c.inputText },
+    fieldText: { flex: 1, fontSize: compact ? 13 : 16, color: fieldTextColor },
     fieldPlaceholder: { color: c.placeholder },
     chevron: {
       fontSize: compact ? 18 : 22,
@@ -240,8 +242,8 @@ function createStyles(
       lineHeight: 16,
     },
     rowText: { flex: 1 },
-    rowTitle: { fontSize: 16, fontFamily: font.semibold, color: c.text },
-    rowSub: { fontSize: 13, color: c.textMuted, marginTop: 3 },
+    rowTitle: { fontSize: 16, fontFamily: font.semibold, color: rowTextColor },
+    rowSub: { fontSize: 13, color: isPocket ? c.pocketPickText : c.textMuted, marginTop: 3, opacity: isPocket ? 0.65 : 1 },
     closeBtn: { marginTop: 12, alignItems: 'center', paddingVertical: 12 },
     closeBtnText: { color: c.textMuted, fontFamily: font.semibold, fontSize: 16 },
   });

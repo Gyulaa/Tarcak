@@ -1,11 +1,10 @@
 // @ts-nocheck
 import { useCallback, useMemo, useState } from 'react';
-import { LayoutChangeEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Svg, { Circle, G, Line, Polyline, Rect } from 'react-native-svg';
 
 import {
-  axisTickBalances,
   balanceToXInPlot,
   buildChartLayout,
   buildChartPlotArea,
@@ -25,7 +24,6 @@ import { formatMinorForDisplay } from '../../utils/formatMinor';
 import { buildThemeChartPalette, pocketChartColor } from '../../utils/pocketChartColors';
 
 const CHART_HEIGHT = 248;
-const LEGEND_ROW_HEIGHT = 28;
 const KNOT_HIT = 40;
 
 type Props = {
@@ -92,7 +90,7 @@ export function JarAdvancedBalanceChart({
   const scrubX =
     previewBalanceMinor != null ? balanceToXInPlot(previewBalanceMinor, plot) : null;
 
-  const ticks = useMemo(() => axisTickBalances(layout.maxMinor, 4), [layout.maxMinor]);
+  const ticks = useMemo(() => [layout.maxMinor], [layout.maxMinor]);
   const axisY = plot.top + plot.height;
 
   const scrubBalance = useCallback(
@@ -136,7 +134,7 @@ export function JarAdvancedBalanceChart({
         </Pressable>
       </View>
 
-      <View style={[styles.chartBox, { height: CHART_HEIGHT }]}>
+      <View style={[styles.chartBox, { height: CHART_HEIGHT + 22 }]}>
         <Svg width={chartWidth} height={CHART_HEIGHT}>
           {renderPlotBackground(plot, colors)}
           {renderGrid(plot, ticks, colors)}
@@ -225,10 +223,12 @@ export function JarAdvancedBalanceChart({
         >
           {ticks.map((t) => {
             const x = balanceToXInPlot(t, plot);
+            const labelW = 60;
+            const clampedLeft = Math.max(0, Math.min(x - labelW / 2, chartWidth - labelW));
             return (
               <Text
                 key={`lbl-${t}`}
-                style={[styles.tickLabel, { left: x - 40, width: 80 }]}
+                style={[styles.tickLabel, { left: clampedLeft, width: labelW }]}
                 numberOfLines={1}
               >
                 {formatMinorForDisplay(t, currency)}
@@ -239,12 +239,7 @@ export function JarAdvancedBalanceChart({
       </View>
 
       {lineSeries.length > 0 ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.legendScroll}
-          contentContainerStyle={styles.legendRow}
-        >
+        <View style={styles.legendWrap}>
           {lineSeries.map((s) => {
             const color = pocketChartColor(s.pocketId, palette);
             const active =
@@ -262,7 +257,7 @@ export function JarAdvancedBalanceChart({
               </View>
             );
           })}
-        </ScrollView>
+        </View>
       ) : (
         <Text style={styles.emptyLegend}>Add pockets to your split to see lines.</Text>
       )}
@@ -414,11 +409,7 @@ function renderKnotOnAxis(knot, plot, selectedKnotId, colors) {
 function createStyles(c: AppColors) {
   return StyleSheet.create({
     wrap: {
-      backgroundColor: c.surface,
-      borderRadius: 14,
-      borderWidth: 1,
-      borderColor: c.border,
-      padding: 12,
+      marginHorizontal: 4,
       marginBottom: 12,
     },
     toolbar: {
@@ -490,12 +481,11 @@ function createStyles(c: AppColors) {
       textAlign: 'center',
       fontFamily: font.regular,
     },
-    legendScroll: { marginTop: 10, maxHeight: LEGEND_ROW_HEIGHT + 4 },
-    legendRow: {
+    legendWrap: {
       flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-      paddingRight: 4,
+      flexWrap: 'wrap',
+      gap: 6,
+      marginTop: 10,
     },
     legendItem: {
       flexDirection: 'row',

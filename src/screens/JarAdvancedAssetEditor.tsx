@@ -22,7 +22,7 @@ import { JarAdvancedBalanceChart } from '../components/jarAdvanced/JarAdvancedBa
 import { ScreenWithFooter } from '../components/ScreenWithFooter';
 import { effectiveSplitRowsAtBalance, suggestMilestoneBalance } from '../domain/jarAdvancedChartModel';
 import {
-  normalizeSplitRowsTo100,
+  splitsSumExact100,
   splitsSumValid,
   type SplitRow,
 } from '../domain/jarAdvancedEditorTypes';
@@ -194,12 +194,12 @@ export default function JarAdvancedAssetEditor({ navigation, route }) {
     if (selection.kind !== 'edit') return;
     const row = { pocketId: p.id, name: p.name, percent: 0 };
     if (selection.knotId === 'default') {
-      setDefaultSplits((prev) => normalizeSplitRowsTo100([...prev, row]));
+      setDefaultSplits((prev) => [...prev, row]);
     } else {
       setMilestones((prev) =>
         prev.map((m) =>
           m.id === selection.knotId
-            ? { ...m, splits: normalizeSplitRowsTo100([...m.splits, row]) }
+            ? { ...m, splits: [...m.splits, row] }
             : m
         )
       );
@@ -237,7 +237,7 @@ export default function JarAdvancedAssetEditor({ navigation, route }) {
         id,
         thresholdMinor: bal,
         thresholdStr: formatMinorToAmountString(bal),
-        splits: normalizeSplitRowsTo100(splits),
+        splits: splits.map((r) => ({ ...r })),
       },
     ];
     next.sort((a, b) => a.thresholdMinor - b.thresholdMinor);
@@ -263,6 +263,20 @@ export default function JarAdvancedAssetEditor({ navigation, route }) {
         },
       },
     ]);
+  };
+
+  const doSave = async (validated) => {
+    setBusy(true);
+    try {
+      await jarAdvancedRepo.saveJarAdvancedAsset(validated.payload);
+      Alert.alert('Saved', `Advanced rules for ${currency} are updated.`, [
+        { text: 'OK', onPress: () => navigation.goBack() },
+      ]);
+    } catch (e) {
+      Alert.alert('Could not save', e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
   };
 
   const save = async () => {
@@ -291,17 +305,21 @@ export default function JarAdvancedAssetEditor({ navigation, route }) {
       Alert.alert('Cannot save', validated.message);
       return;
     }
-    setBusy(true);
-    try {
-      await jarAdvancedRepo.saveJarAdvancedAsset(validated.payload);
-      Alert.alert('Saved', `Advanced rules for ${currency} are updated.`, [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
-    } catch (e) {
-      Alert.alert('Could not save', e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
+    const anyPartial =
+      !splitsSumExact100(defaultSplits) ||
+      milestonesForSave.some((m) => !splitsSumExact100(m.splits));
+    if (anyPartial) {
+      Alert.alert(
+        'Partial split',
+        'One or more splits total less than 100%. The undistributed portion will stay in the Jar when you distribute.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Save anyway', onPress: () => void doSave(validated) },
+        ]
+      );
+      return;
     }
+    void doSave(validated);
   };
 
   if (!currency) {

@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { useAppTheme } from '../../theme/ThemeContext';
@@ -7,7 +7,6 @@ import { font } from '../../theme/fonts';
 import type { AppColors } from '../../theme/palette';
 import {
   equalSplitPercents,
-  normalizeSplitRowsTo100,
   splitsSumValid,
   type SplitRow,
 } from '../../domain/jarAdvancedEditorTypes';
@@ -31,26 +30,42 @@ export function JarAdvancedSplitEditor({
 }: Props) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const sumOk = splitsSumValid(rows);
+
+  // Per-pocket raw text while the user is actively editing, so the TextInput
+  // doesn't fight typing (e.g. clear → retype, trailing dot, etc.).
+  const [localText, setLocalText] = useState<Record<string, string>>({});
+
+  const sum = rows.reduce((a, r) => a + r.percent, 0);
+  const sumOver = sum > 100.05;
+  const sumOk = splitsSumValid(rows); // 0 < sum <= 100
 
   const updatePercent = (pocketId: string, text: string) => {
-    const t = text.trim().replace(',', '.');
-    if (t === '') {
+    const t = text.replace(',', '.');
+    setLocalText((prev) => ({ ...prev, [pocketId]: t }));
+    if (t === '' || t === '.') {
       onChange(rows.map((r) => (r.pocketId === pocketId ? { ...r, percent: 0 } : r)));
       return;
     }
     const n = Number(t);
-    if (!Number.isFinite(n)) return;
-    const next = rows.map((r) =>
-      r.pocketId === pocketId ? { ...r, percent: Math.max(0, Math.min(100, n)) } : r
-    );
-    onChange(normalizeSplitRowsTo100(next));
+    if (!Number.isFinite(n) || n < 0) return;
+    onChange(rows.map((r) => (r.pocketId === pocketId ? { ...r, percent: n } : r)));
+  };
+
+  const commitPercent = (pocketId: string) => {
+    setLocalText((prev) => {
+      const copy = { ...prev };
+      delete copy[pocketId];
+      return copy;
+    });
   };
 
   const removePocket = (pocketId: string) => {
-    const next = rows.filter((r) => r.pocketId !== pocketId);
-    if (next.length > 0) onChange(normalizeSplitRowsTo100(next));
-    else onChange(next);
+    setLocalText((prev) => {
+      const copy = { ...prev };
+      delete copy[pocketId];
+      return copy;
+    });
+    onChange(rows.filter((r) => r.pocketId !== pocketId));
   };
 
   if (rows.length === 0) {
@@ -86,41 +101,48 @@ export function JarAdvancedSplitEditor({
         </View>
       ) : null}
 
-      {rows.map((r) => (
-        <View key={r.pocketId} style={styles.row}>
-          <View style={styles.rowTop}>
-            <Text style={styles.rowName} numberOfLines={1}>
-              {r.name}
-            </Text>
-            {!readOnly ? (
-              <Pressable onPress={() => removePocket(r.pocketId)} hitSlop={8}>
-                <Text style={styles.remove}>Remove</Text>
-              </Pressable>
-            ) : null}
+      {rows.map((r) => {
+        const display =
+          r.pocketId in localText
+            ? localText[r.pocketId]
+            : String(Math.round(r.percent * 100) / 100);
+        return (
+          <View key={r.pocketId} style={styles.row}>
+            <View style={styles.rowTop}>
+              <Text style={styles.rowName} numberOfLines={1}>
+                {r.name}
+              </Text>
+              {!readOnly ? (
+                <Pressable onPress={() => removePocket(r.pocketId)} hitSlop={8}>
+                  <Text style={styles.remove}>Remove</Text>
+                </Pressable>
+              ) : null}
+            </View>
+            <View style={styles.rowInputWrap}>
+              <TextInput
+                style={[styles.rowInput, readOnly && styles.rowInputReadOnly]}
+                value={display}
+                onChangeText={(t) => updatePercent(r.pocketId, t)}
+                onBlur={() => commitPercent(r.pocketId)}
+                keyboardType="decimal-pad"
+                editable={!readOnly}
+                placeholderTextColor={colors.placeholder}
+                selectionColor={colors.primary}
+              />
+              <Text style={styles.pctSuffix}>%</Text>
+            </View>
           </View>
-          <View style={styles.rowInputWrap}>
-            <TextInput
-              style={[styles.rowInput, readOnly && styles.rowInputReadOnly]}
-              value={String(r.percent)}
-              onChangeText={(t) => updatePercent(r.pocketId, t)}
-              keyboardType="decimal-pad"
-              editable={!readOnly}
-              placeholderTextColor={colors.placeholder}
-              selectionColor={colors.primary}
-            />
-            <Text style={styles.pctSuffix}>%</Text>
-          </View>
-        </View>
-      ))}
+        );
+      })}
 
       <View style={styles.sumRow}>
         <Text style={styles.sumLabel}>Total</Text>
-        <Text style={[styles.sumValue, sumOk && styles.sumOk]}>
-          {rows.reduce((a, r) => a + r.percent, 0).toFixed(2)}%
+        <Text style={[styles.sumValue, sumOk && styles.sumOk, sumOver && styles.sumOver]}>
+          {sum.toFixed(2)}%
         </Text>
       </View>
-      {!sumOk && !readOnly ? (
-        <Text style={styles.warn}>Adjust percentages to total 100%.</Text>
+      {sumOver ? (
+        <Text style={styles.warn}>Total exceeds 100% — reduce before saving.</Text>
       ) : null}
     </View>
   );
@@ -173,8 +195,9 @@ function createStyles(c: AppColors) {
       paddingTop: 8,
     },
     sumLabel: { fontFamily: font.semibold, color: c.textMuted },
-    sumValue: { fontFamily: font.bold, color: c.danger },
+    sumValue: { fontFamily: font.bold, color: c.textMuted },
     sumOk: { color: c.success },
+    sumOver: { color: c.danger },
     warn: { color: c.danger, fontSize: 13, marginTop: 6 },
   });
 }

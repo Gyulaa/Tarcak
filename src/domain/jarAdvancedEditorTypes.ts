@@ -95,8 +95,16 @@ export function normalizeSplitRowsTo100(rows: SplitRow[]): SplitRow[] {
   return scaled;
 }
 
-export function splitsSumValid(rows: SplitRow[]): boolean {
+/** True only when the sum is within 0.05% of exactly 100 (use for warnings). */
+export function splitsSumExact100(rows: SplitRow[]): boolean {
   if (rows.length === 0) return false;
   const sum = rows.reduce((a, r) => a + r.percent, 0);
   return Math.abs(sum - 100) < 0.05;
+}
+
+/** True when there is at least one pocket with a positive allocation and the sum does not exceed 100%. */
+export function splitsSumValid(rows: SplitRow[]): boolean {
+  if (rows.length === 0) return false;
+  const sum = rows.reduce((a, r) => a + r.percent, 0);
+  return sum > 0.05 && sum < 100.05;
 }
