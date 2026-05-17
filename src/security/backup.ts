@@ -6,6 +6,7 @@
  */
 
 import { File, Paths } from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as SQLite from 'expo-sqlite';
 import { defaultDatabaseDirectory } from 'expo-sqlite';
 
@@ -41,6 +42,53 @@ function buildExportFilename(): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   const stamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   return `tarcak-backup-${stamp}${BACKUP_EXTENSION}`;
+}
+
+/** expo-sqlite directory is often a plain path; File.write on Android needs a file:// URI. */
+function buildMainDatabaseFileUri(): string {
+  const dir = defaultDatabaseDirectory;
+  if (dir == null || String(dir).trim() === '') {
+    throw new VaultCryptoError('Database directory is not available on this platform.');
+  }
+  const dirStr = String(dir).replace(/\/+$/, '');
+  const filePath = `${dirStr}/${MAIN_DATABASE_NAME}`;
+  if (filePath.startsWith('file://')) {
+    return filePath;
+  }
+  if (filePath.startsWith('/')) {
+    return `file://${filePath}`;
+  }
+  const doc = FileSystem.documentDirectory;
+  if (!doc) {
+    throw new VaultCryptoError('Document directory is not available on this platform.');
+  }
+  return `${doc}${dirStr.replace(/^\/+/, '')}/${MAIN_DATABASE_NAME}`;
+}
+
+function parentDirectoryUri(fileUri: string): string {
+  const idx = fileUri.lastIndexOf('/');
+  return idx > 0 ? fileUri.slice(0, idx + 1) : fileUri;
+}
+
+/** Document-picker URIs on Android may be content:// — copy into cache for a stable file:// read. */
+async function resolveReadableBackupUri(fileUri: string): Promise<string> {
+  if (!fileUri.startsWith('content://')) {
+    return fileUri;
+  }
+  const cache = FileSystem.cacheDirectory;
+  if (!cache) {
+    throw new VaultCryptoError('Cannot read backup: cache directory unavailable.');
+  }
+  const dest = `${cache}tarcak-import-${Date.now()}${BACKUP_EXTENSION}`;
+  await FileSystem.copyAsync({ from: fileUri, to: dest });
+  return dest;
+}
+
+async function readBackupFileBytes(fileUri: string): Promise<Uint8Array> {
+  const readableUri = await resolveReadableBackupUri(fileUri);
+  const infile = new File(readableUri);
+  const b64 = await infile.base64();
+  return backupBase64ToBytes(b64);
 }
 
 function parsePayloadV1(json: string): BackupPayloadV1 {
@@ -103,12 +151,16 @@ export async function exportEncryptedBackup(backupPassword: string): Promise<str
 }
 
 async function writeDatabaseBytesToDisk(dbBytes: Uint8Array): Promise<void> {
-  const dir = defaultDatabaseDirectory as string | null;
-  if (!dir) {
-    throw new VaultCryptoError('Database directory is not available on this platform.');
+  const uri = buildMainDatabaseFileUri();
+  const parent = parentDirectoryUri(uri);
+  try {
+    await FileSystem.makeDirectoryAsync(parent, { intermediates: true });
+  } catch {
+    /* directory may already exist */
   }
-  const dbFile = new File(dir, MAIN_DATABASE_NAME);
-  dbFile.write(uint8ArrayToBase64(dbBytes), { encoding: 'base64' });
+  await FileSystem.writeAsStringAsync(uri, uint8ArrayToBase64(dbBytes), {
+    encoding: FileSystem.EncodingType.Base64,
+  });
 }
 
 /**
@@ -119,9 +171,7 @@ async function writeDatabaseBytesToDisk(dbBytes: Uint8Array): Promise<void> {
 export async function importEncryptedBackup(fileUri: string, backupPassword: string): Promise<void> {
   assertPasswordAcceptable(backupPassword);
 
-  const infile = new File(fileUri);
-  const b64 = await infile.base64();
-  const fileBytes = backupBase64ToBytes(b64);
+  const fileBytes = await readBackupFileBytes(fileUri);
   const payloadUtf8 = await decryptBackupPayloadUtf8(backupPassword, fileBytes);
   const json = new TextDecoder().decode(payloadUtf8);
   const payload = parsePayloadV1(json);
