@@ -13,9 +13,11 @@ import { openMainDatabase } from '../db/client';
 import { readAppearanceCache, writeAppearanceCache } from '../theme/appearanceCache';
 import { normalizeColorThemeId } from '../theme/colorThemes';
 import {
+  BACKUP_INCLUDES,
   BACKUP_PAYLOAD_VERSION,
   type BackupPayloadV1,
 } from './backupFormat';
+import { recordBackupRestored } from './backupImportMeta';
 import {
   backupBase64ToBytes,
   backupBytesToBase64,
@@ -86,6 +88,10 @@ export async function exportEncryptedBackup(backupPassword: string): Promise<str
       isDark: appearance.isDark,
       colorThemeId: appearance.colorThemeId,
     },
+    contents: {
+      summary: 'Full encrypted snapshot of this vault',
+      includes: [...BACKUP_INCLUDES],
+    },
   };
 
   const payloadUtf8 = new TextEncoder().encode(JSON.stringify(payload));
@@ -107,7 +113,8 @@ async function writeDatabaseBytesToDisk(dbBytes: Uint8Array): Promise<void> {
 
 /**
  * Replace local vault + database from an encrypted backup file.
- * Caller should lock the UI afterward; session DEK is cleared by `lockVaultSession`.
+ * Decrypts while the session is still open; locks afterward so the user re-unlocks with the
+ * vault password from the backup (unchanged).
  */
 export async function importEncryptedBackup(fileUri: string, backupPassword: string): Promise<void> {
   assertPasswordAcceptable(backupPassword);
@@ -141,6 +148,8 @@ export async function importEncryptedBackup(fileUri: string, backupPassword: str
       colorThemeId: normalizeColorThemeId(payload.appearance.colorThemeId),
     });
   }
+
+  await recordBackupRestored(payload.exportedAt);
 }
 
-export { BACKUP_EXTENSION };
+export { BACKUP_EXTENSION, BACKUP_INCLUDES };

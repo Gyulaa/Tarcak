@@ -3,6 +3,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useLayoutEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { BackupRestoredBanner } from '../components/BackupRestoredBanner';
 import { ContourOnPrimaryText } from '../components/ContourOnPrimaryText';
 import { ScreenWithFooter } from '../components/ScreenWithFooter';
 import * as settingsRepo from '../db/repositories/settings';
@@ -47,6 +48,7 @@ export default function HomeScreen({ navigation }) {
 
   const listHeader = (
     <View>
+      <BackupRestoredBanner />
       {jarPocket && jarEnabled ? (
         <Pressable style={styles.jarCard} onPress={() => navigation.navigate('Jar')}>
           <View style={styles.jarCardText}>

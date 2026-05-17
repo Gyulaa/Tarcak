@@ -7,14 +7,21 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
 
 import { BackupPasswordModal } from '../components/BackupPasswordModal';
+import { BackupRestoredBanner } from '../components/BackupRestoredBanner';
 import { ModalSelectField } from '../components/ModalSelectField';
 import { ScreenWithFooter } from '../components/ScreenWithFooter';
 import * as assetTypesRepo from '../db/repositories/assetTypes';
 import * as settingsRepo from '../db/repositories/settings';
 import { useLockVault } from '../navigation/LockVaultContext';
-import { WrongVaultPasswordError } from '../security';
+import {
+  resumeVaultLockOnBackground,
+  suspendVaultLockOnBackground,
+  VaultCryptoError,
+  WrongVaultPasswordError,
+} from '../security';
 import {
   BACKUP_EXTENSION,
+  BACKUP_INCLUDES,
   exportEncryptedBackup,
   importEncryptedBackup,
 } from '../security/backup';
@@ -126,14 +133,24 @@ export default function SettingsScreen() {
     }
   };
 
+  const closeBackupModal = () => {
+    setBackupModal(null);
+    resumeVaultLockOnBackground();
+  };
+
   const runExportBackup = async (backupPassword) => {
     setBackupBusy(true);
+    suspendVaultLockOnBackground();
     try {
       const uri = await exportEncryptedBackup(backupPassword);
-      setBackupModal(null);
+      closeBackupModal();
+      const includesList = BACKUP_INCLUDES.map((line) => `• ${line}`).join('\n');
       const canShare = await Sharing.isAvailableAsync();
       if (!canShare) {
-        Alert.alert('Backup created', `Saved to:\n${uri}\n\nSharing is not available on this device.`);
+        Alert.alert(
+          'Backup created',
+          `Saved to:\n${uri}\n\nIncludes:\n${includesList}\n\nSharing is not available on this device.`
+        );
         return;
       }
       await Sharing.shareAsync(uri, {
@@ -141,9 +158,14 @@ export default function SettingsScreen() {
         dialogTitle: 'Save Tarcak backup',
         UTI: 'com.gyulaa.tarcak.backup',
       });
+      Alert.alert(
+        'Backup ready',
+        `Your ${BACKUP_EXTENSION} file includes:\n${includesList}\n\nKeep your backup password safe — it is separate from your vault password.`
+      );
     } catch (e) {
       Alert.alert('Export failed', e instanceof Error ? e.message : String(e));
     } finally {
+      resumeVaultLockOnBackground();
       setBackupBusy(false);
     }
   };
@@ -153,12 +175,14 @@ export default function SettingsScreen() {
       Alert.alert('Not on web', 'Import and export backups from the Android or iOS app.');
       return;
     }
+    suspendVaultLockOnBackground();
     try {
       const picked = await DocumentPicker.getDocumentAsync({
         type: '*/*',
         copyToCacheDirectory: true,
       });
       if (picked.canceled || !picked.assets?.[0]?.uri) {
+        resumeVaultLockOnBackground();
         return;
       }
       const name = picked.assets[0].name ?? '';
@@ -170,6 +194,7 @@ export default function SettingsScreen() {
       }
       setBackupModal({ mode: 'import', fileUri: picked.assets[0].uri });
     } catch (e) {
+      resumeVaultLockOnBackground();
       Alert.alert('Could not open file', e instanceof Error ? e.message : String(e));
     }
   };
@@ -192,23 +217,27 @@ export default function SettingsScreen() {
 
   const doImportBackup = async (backupPassword, fileUri) => {
     setBackupBusy(true);
+    suspendVaultLockOnBackground();
     try {
       await importEncryptedBackup(fileUri, backupPassword);
-      setBackupModal(null);
+      closeBackupModal();
       Alert.alert(
         'Import complete',
-        'Your data was restored. For security, the app will lock now — unlock with your vault password (the same one you used when you created the backup).',
+        'Your backup replaced all data on this device. The app will lock now — unlock with your vault password (the same one you used when you exported). After unlock, Home shows a banner marking data from this import.',
         [{ text: 'OK', onPress: () => void lockVault() }]
       );
     } catch (e) {
       const msg =
         e instanceof WrongVaultPasswordError
           ? 'Incorrect backup password.'
-          : e instanceof Error
+          : e instanceof VaultCryptoError
             ? e.message
-            : String(e);
+            : e instanceof Error
+              ? e.message
+              : String(e);
       Alert.alert('Import failed', msg);
     } finally {
+      resumeVaultLockOnBackground();
       setBackupBusy(false);
     }
   };
@@ -216,6 +245,7 @@ export default function SettingsScreen() {
   return (
     <ScreenWithFooter>
     <ScrollView style={styles.container} contentContainerStyle={styles.inner}>
+      <BackupRestoredBanner compact />
       <Text style={styles.p}>
         Default asset type is applied when you open a new transaction. Create types under Asset
         types, then choose one below.
@@ -341,9 +371,11 @@ export default function SettingsScreen() {
 
       <Text style={styles.label}>Backup & restore</Text>
       <Text style={styles.backupHint}>
-        Export creates an encrypted {BACKUP_EXTENSION} file (backup password + your existing vault
-        password). Store it somewhere safe. Import replaces everything on this device — use only
-        files you exported from Tarcak.
+        Export creates an encrypted {BACKUP_EXTENSION} file with your full vault:{' '}
+        {BACKUP_INCLUDES.join('; ')}. You choose a backup password for the file; your vault password
+        stays the same. Import replaces everything on this device — the file picker will not lock
+        you out mid-import. After a successful import, unlock and look for the “Restored from backup”
+        banner on Home.
       </Text>
       <Pressable
         style={styles.secondaryBtn}
@@ -382,7 +414,7 @@ export default function SettingsScreen() {
         confirmPassword={backupModal?.mode === 'export'}
         submitLabel={backupModal?.mode === 'export' ? 'Create file' : 'Continue'}
         busy={backupBusy}
-        onCancel={() => !backupBusy && setBackupModal(null)}
+        onCancel={() => !backupBusy && closeBackupModal()}
         onSubmit={(pw) => {
           if (backupModal?.mode === 'export') {
             void runExportBackup(pw);

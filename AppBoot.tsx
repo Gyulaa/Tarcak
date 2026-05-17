@@ -28,6 +28,7 @@ import {
 import { DEFAULT_COLOR_THEME_ID } from './src/theme/colorThemes';
 import { font } from './src/theme/fonts';
 import type { AppColors } from './src/theme/palette';
+import { applyPendingBackupImportToSettings } from './src/security/backupImportMeta';
 import {
   createFirstVault,
   eraseAllLocalTarcakData,
@@ -149,6 +150,7 @@ export default function AppBoot() {
       setVaultPhaseKey('db');
       setPassword('');
       await openMainDatabase();
+      await applyPendingBackupImportToSettings();
       setUnlocked(true);
       setMessage('Unlocked.');
     } catch (e) {

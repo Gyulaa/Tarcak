@@ -11,7 +11,13 @@ export {
 
 export { lockVaultSession } from './lockdown';
 export { eraseAllLocalTarcakData } from './resetLocalData';
-export { registerLockOnBackground, isSessionUnlocked } from './session';
+export {
+  registerLockOnBackground,
+  isSessionUnlocked,
+  suspendVaultLockOnBackground,
+  resumeVaultLockOnBackground,
+  isVaultLockSuspended,
+} from './session';
 
 export { openMainDatabase, closeMainDatabase, isSqlCipherAvailableInThisBuild } from '../db/client';
 

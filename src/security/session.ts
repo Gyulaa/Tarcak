@@ -16,6 +16,25 @@ let sessionDataKey: Uint8Array | null = null;
 
 let backgroundListenerRegistered = false;
 
+/** While > 0, AppState background/inactive does not lock (document picker, share sheet, import). */
+let vaultLockSuspensionDepth = 0;
+
+/**
+ * Prevent automatic vault lock while the app is inactive (e.g. system file picker).
+ * Pair every call with `resumeVaultLockOnBackground()` in `finally`.
+ */
+export function suspendVaultLockOnBackground(): void {
+  vaultLockSuspensionDepth += 1;
+}
+
+export function resumeVaultLockOnBackground(): void {
+  vaultLockSuspensionDepth = Math.max(0, vaultLockSuspensionDepth - 1);
+}
+
+export function isVaultLockSuspended(): boolean {
+  return vaultLockSuspensionDepth > 0;
+}
+
 /**
  * Store a copy of the DEK for this session. Any previous session key is zeroed first.
  */
@@ -59,6 +78,9 @@ export function registerLockOnBackground(): void {
   backgroundListenerRegistered = true;
 
   const onChange = (next: AppStateStatus) => {
+    if (vaultLockSuspensionDepth > 0) {
+      return;
+    }
     if (next === 'background' || next === 'inactive') {
       void import('./lockdown').then(({ lockVaultSession }) => lockVaultSession());
     }

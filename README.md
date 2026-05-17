@@ -49,9 +49,9 @@ Semantic colors (not raw hex in screens) come from **`useAppTheme()`** in [`src/
 | **Vault password** | Unlocks the app after restore (unchanged). |
 | **Backup password** | Encrypts the `.tarcak` file at rest (cloud, USB, email). |
 
-**Export:** serializes the SQLCipher database (`serializeAsync`), vault metadata (salt, wrapped DEK, PBKDF2 iteration count), and appearance → JSON → AES-GCM with the backup password → file `tarcak-backup-YYYY-MM-DD.tarcak` in cache, then **share** sheet ([`expo-sharing`](https://docs.expo.dev/versions/latest/sdk/sharing/)).
+**Export:** serializes the SQLCipher database (`serializeAsync`), vault metadata (salt, wrapped DEK, PBKDF2 iteration count), appearance, and a **contents manifest** (pockets, transactions, asset types, Jar basic + Advanced rules, settings) → JSON → AES-GCM with the backup password → file `tarcak-backup-YYYY-MM-DD.tarcak` in cache, then **share** sheet ([`expo-sharing`](https://docs.expo.dev/versions/latest/sdk/sharing/)). While the share sheet is open, automatic **lock-on-background is suspended** so the session stays alive.
 
-**Import:** document picker ([`expo-document-picker`](https://docs.expo.dev/versions/latest/sdk/document-picker/)) → decrypt → replace DB file + SecureStore vault → lock session (user unlocks with **vault** password). **Destructive** on device: overwrites local data.
+**Import:** document picker ([`expo-document-picker`](https://docs.expo.dev/versions/latest/sdk/document-picker/)) with the same **lock suspension** (so choosing a file does not kick you to the password screen) → decrypt while unlocked → replace DB file + SecureStore vault → record restore metadata → lock session (user unlocks with **vault** password). **Destructive** on device: overwrites local data. After unlock, **Home** and **Settings** show a **“Restored from backup”** banner (backup created / imported timestamps) until dismissed.
 
 Implementation: [`src/security/backup.ts`](src/security/backup.ts), [`src/security/backupCrypto.ts`](src/security/backupCrypto.ts), [`src/security/backupFormat.ts`](src/security/backupFormat.ts), [`src/components/BackupPasswordModal.tsx`](src/components/BackupPasswordModal.tsx). Imported directly from Settings (not the `security/index` barrel) so backup code does not load at cold start.
 
