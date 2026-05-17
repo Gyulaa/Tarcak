@@ -4,7 +4,7 @@
 
 Local-first personal finance app: **pockets** (budget segments), **multi-currency balances**, and a **unified ledger** for income, expenses, and transfers between pockets. All data stays on the device and is stored **encrypted**; unlocking the data uses a **password** you choose (not biometrics as the primary secret).
 
-**App version (native):** `1.2.0` in [`app.json`](app.json) (`android.versionCode` `2`).
+**App version (native):** `1.2.1` in [`app.json`](app.json) (`android.versionCode` `2`).
 
 ## Current project setup
 
@@ -49,11 +49,11 @@ Semantic colors (not raw hex in screens) come from **`useAppTheme()`** in [`src/
 | **Vault password** | Unlocks the app after restore (unchanged). |
 | **Backup password** | Encrypts the `.tarcak` file at rest (cloud, USB, email). |
 
-**Export:** serializes the SQLCipher database (`serializeAsync`), vault metadata (salt, wrapped DEK, PBKDF2 iteration count), appearance, and a **contents manifest** (pockets, transactions, asset types, Jar basic + Advanced rules, settings) → JSON → AES-GCM with the backup password → file `tarcak-backup-YYYY-MM-DD.tarcak` in cache, then **share** sheet ([`expo-sharing`](https://docs.expo.dev/versions/latest/sdk/sharing/)). While the share sheet is open, automatic **lock-on-background is suspended** so the session stays alive.
+**Export:** flushes WAL (`PRAGMA wal_checkpoint(FULL)`), then reads the **on-disk SQLCipher-encrypted file directly** (raw encrypted bytes — not `serializeAsync`, which returns decrypted in-memory pages and was the root cause of the historic import bug), bundles vault metadata (salt, wrapped DEK, PBKDF2 iteration count), appearance, and a **contents manifest** (pockets, transactions, asset types, Jar basic + Advanced rules, settings) → JSON → AES-GCM with the backup password → file `tarcak-backup-YYYY-MM-DD.tarcak` in cache, then **share** sheet ([`expo-sharing`](https://docs.expo.dev/versions/latest/sdk/sharing/)). While the share sheet is open, automatic **lock-on-background is suspended** (depth counter in `session.ts`) so the session stays alive.
 
-**Import:** document picker ([`expo-document-picker`](https://docs.expo.dev/versions/latest/sdk/document-picker/)) with the same **lock suspension** (so choosing a file does not kick you to the password screen) → decrypt while unlocked → replace DB file + SecureStore vault → record restore metadata → lock session (user unlocks with **vault** password). **Destructive** on device: overwrites local data. After unlock, **Home** and **Settings** show a **“Restored from backup”** banner (backup created / imported timestamps) until dismissed.
+**Import:** document picker ([`expo-document-picker`](https://docs.expo.dev/versions/latest/sdk/document-picker/)) with the same **lock suspension** (so choosing a file does not kick you to the password screen) → `content://` URIs are copied to cache first (Android) → decrypt while unlocked → replace DB file + SecureStore vault → record restore metadata ([`backupImportMeta.ts`](src/security/backupImportMeta.ts)) → lock session (user unlocks with **vault** password). **Destructive** on device: overwrites local data. After unlock, **Home** and **Settings** show a **”Restored from backup”** banner (backup created / imported timestamps) until dismissed. **Legacy recovery:** if the imported DB file is plain SQLite (created by an older build that used `serializeAsync`), `db/client.ts` automatically encrypts it in place with `PRAGMA rekey` on the first unlock — no user action needed.
 
-Implementation: [`src/security/backup.ts`](src/security/backup.ts), [`src/security/backupCrypto.ts`](src/security/backupCrypto.ts), [`src/security/backupFormat.ts`](src/security/backupFormat.ts), [`src/components/BackupPasswordModal.tsx`](src/components/BackupPasswordModal.tsx). Imported directly from Settings (not the `security/index` barrel) so backup code does not load at cold start.
+Implementation: [`src/security/backup.ts`](src/security/backup.ts), [`src/security/backupCrypto.ts`](src/security/backupCrypto.ts), [`src/security/backupFormat.ts`](src/security/backupFormat.ts), [`src/security/backupImportMeta.ts`](src/security/backupImportMeta.ts), [`src/components/BackupPasswordModal.tsx`](src/components/BackupPasswordModal.tsx), [`src/components/BackupRestoredBanner.tsx`](src/components/BackupRestoredBanner.tsx). Imported directly from Settings (not the `security/index` barrel) so backup code does not load at cold start.
 
 **Before upgrading** an old install, export a backup if you want a rollback copy.
 
@@ -339,7 +339,8 @@ src/
     wrapDek.ts           # AES-GCM wrap/unwrap DEK with KEK
     backupFormat.ts      # `.tarcak` JSON payload v1
     backupCrypto.ts      # backup-password AES-GCM
-    backup.ts            # export / import (file-system + serialize)
+    backup.ts            # export / import (reads encrypted file directly; legacy rekey recovery)
+    backupImportMeta.ts  # pending restore metadata (SecureStore → DB on first unlock)
     keystore.ts          # expo-secure-store accessors (+ vault snapshot for backup)
     vault.ts             # create / unlock / change password
     session.ts           # in-memory DEK + AppState listener
@@ -385,6 +386,7 @@ src/
   components/
     ModalSelectField.tsx   # dropdown picker; optional multiSelect (History filters)
     BackupPasswordModal.tsx
+    BackupRestoredBanner.tsx
     DonationFooter.tsx
     jarAdvanced/
       JarAdvancedBalanceChart.tsx

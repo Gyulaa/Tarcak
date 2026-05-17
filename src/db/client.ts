@@ -14,6 +14,7 @@ import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Platform } from 'react-native';
 
 import { MAIN_DATABASE_NAME } from '../security/constants';
+import { bytesToLowerHex } from '../security/encoding';
 import { getSessionDataKeyOrThrow } from '../security/session';
 import { runPendingMigrations } from './migrations/runner';
 import { buildRawKeyPragmaSql } from './sqlcipher';
@@ -39,15 +40,54 @@ export function isSqlCipherAvailableInThisBuild(): boolean {
   return Constants.executionEnvironment !== ExecutionEnvironment.StoreClient;
 }
 
+/**
+ * Recover a plain SQLite database written by a legacy backup (exported before the
+ * serializeAsync bug was fixed). Opens the file without a key, encrypts it in place
+ * with PRAGMA rekey, then reopens with the correct DEK.
+ *
+ * Only called when the normal PRAGMA key + verification fails and SQLCipher is active.
+ */
+async function rekeyPlainDatabaseToCipher(dek: Uint8Array): Promise<SQLite.SQLiteDatabase> {
+  const plain = await SQLite.openDatabaseAsync(MAIN_DATABASE_NAME);
+  try {
+    // Confirm the file is actually readable as plain SQLite (not a corrupt file or
+    // a SQLCipher database encrypted with a genuinely wrong key).
+    await plain.getFirstAsync('SELECT count(*) FROM sqlite_master');
+  } catch {
+    await plain.closeAsync();
+    throw new Error(
+      'Database cannot be opened: the vault key does not match and the file is not plain SQLite. ' +
+      'The file may be corrupt.'
+    );
+  }
+  // Encrypt the plain database in place with the session DEK.
+  await plain.execAsync(`PRAGMA rekey = "x'${bytesToLowerHex(dek)}'"`);
+  await plain.closeAsync();
+
+  // Reopen with the key to confirm the rekey succeeded.
+  const encrypted = await SQLite.openDatabaseAsync(MAIN_DATABASE_NAME);
+  await encrypted.execAsync(buildRawKeyPragmaSql(dek));
+  await encrypted.getFirstAsync('SELECT count(*) FROM sqlite_master');
+  return encrypted;
+}
+
 async function openMainDatabaseWork(): Promise<SQLite.SQLiteDatabase> {
   const dek = getSessionDataKeyOrThrow();
-  const db = await SQLite.openDatabaseAsync(MAIN_DATABASE_NAME);
+  let db = await SQLite.openDatabaseAsync(MAIN_DATABASE_NAME);
 
   if (isSqlCipherAvailableInThisBuild()) {
-    const pragmaSql = buildRawKeyPragmaSql(dek);
-    await db.execAsync(pragmaSql);
-    // Verify the key actually matches the file (corruption / wrong key shows up here).
-    await db.getFirstAsync<{ ok: number }>('SELECT 1 AS ok');
+    await db.execAsync(buildRawKeyPragmaSql(dek));
+    try {
+      // Read from sqlite_master to force an actual page read — SELECT 1 is computed
+      // in the query planner and never touches the file, so it cannot verify the key.
+      await db.getFirstAsync('SELECT count(*) FROM sqlite_master');
+    } catch {
+      // Key verification failed. This happens when a legacy backup (plain SQLite from
+      // serializeAsync) was imported before the export bug was fixed. Attempt to
+      // encrypt the plain file in place and continue normally.
+      await db.closeAsync();
+      db = await rekeyPlainDatabaseToCipher(dek);
+    }
   } else {
     console.warn(
       '[Tarcak] SQLCipher is not active in this build (e.g. Expo Go). ' +

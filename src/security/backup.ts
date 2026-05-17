@@ -65,6 +65,19 @@ function buildMainDatabaseFileUri(): string {
   return `${doc}${dirStr.replace(/^\/+/, '')}/${MAIN_DATABASE_NAME}`;
 }
 
+/**
+ * Read the on-disk SQLCipher-encrypted database file as raw bytes.
+ *
+ * serializeAsync('main') returns the *decrypted* in-memory pages — a plain SQLite file.
+ * Reading the file directly gives us the already-encrypted SQLCipher bytes, which can be
+ * written back verbatim on restore and opened normally with PRAGMA key.
+ */
+async function readMainDatabaseBytes(): Promise<Uint8Array> {
+  const file = new File(buildMainDatabaseFileUri());
+  const b64 = await file.base64();
+  return backupBase64ToBytes(b64);
+}
+
 function parentDirectoryUri(fileUri: string): string {
   const idx = fileUri.lastIndexOf('/');
   return idx > 0 ? fileUri.slice(0, idx + 1) : fileUri;
@@ -121,8 +134,12 @@ export async function exportEncryptedBackup(backupPassword: string): Promise<str
   assertPasswordAcceptable(backupPassword);
 
   const db = await openMainDatabase();
-  const [serialized, vault, appearance] = await Promise.all([
-    db.serializeAsync('main'),
+
+  // Flush any WAL data into the main file before reading it (no-op for DELETE journal mode).
+  await db.execAsync('PRAGMA wal_checkpoint(FULL)');
+
+  const [dbBytes, vault, appearance] = await Promise.all([
+    readMainDatabaseBytes(),
     readVaultSnapshotForBackup(),
     readAppearanceCache(),
   ]);
@@ -131,7 +148,7 @@ export async function exportEncryptedBackup(backupPassword: string): Promise<str
     payloadVersion: BACKUP_PAYLOAD_VERSION,
     exportedAt: new Date().toISOString(),
     vault,
-    databaseB64: uint8ArrayToBase64(serialized),
+    databaseB64: uint8ArrayToBase64(dbBytes),
     appearance: {
       isDark: appearance.isDark,
       colorThemeId: appearance.colorThemeId,
