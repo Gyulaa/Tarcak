@@ -41,7 +41,8 @@ Tell users they must allow **“Install unknown apps”** for the browser or fil
 
 ## Version bumps for later releases
 
-- **`app.json`**: bump `"version"` (shown to users) and **`android.versionCode`** (integer, must increase every Play/GitHub release Android cares about).
+- **`app.json`**: bump `"version"` (shown to users) before each release — this one is not automated.
+- **`android.versionCode`**: auto-incremented by EAS (`"autoIncrement": true` on the `preview` and `production` profiles in [`eas.json`](../eas.json)) every time you run `eas build` with either profile. EAS writes the bumped value back into `app.json` — **commit that change** after the build finishes (or before, some workflows prefer running the build once locally-dry to pick up the bump first). You should not need to hand-edit `android.versionCode` anymore.
 
 ## Optional: local build (no EAS)
 
