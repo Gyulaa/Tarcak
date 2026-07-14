@@ -36,6 +36,17 @@ export type AssetType = {
   updated_at: number;
 };
 
+/** User-defined transaction tag (e.g. Groceries, Rent). Optional on income/expense; never set on transfers. */
+export type Category = {
+  id: string;
+  name: string;
+  /** Optional hex color (#RRGGBB); falls back to a hash-based color at render time when null. */
+  color: string | null;
+  sort_index: number;
+  created_at: number;
+  updated_at: number;
+};
+
 /** One row in `transactions` — balances are derived from these rows. */
 export type LedgerTransaction = {
   id: string;
@@ -51,6 +62,7 @@ export type LedgerTransaction = {
   pocket_id: string | null;
   from_pocket_id: string | null;
   to_pocket_id: string | null;
+  category_id: string | null;
 };
 
 export type BalanceRow = {

@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import AssetTypesScreen from '../screens/AssetTypesScreen';
+import CategoriesScreen from '../screens/CategoriesScreen';
 import HistoryScreen from '../screens/HistoryScreen';
 import HomeScreen from '../screens/HomeScreen';
 import JarAdvancedAssetEditor from '../screens/JarAdvancedAssetEditor';
@@ -74,6 +75,11 @@ function MainStack() {
           name="AssetTypes"
           component={AssetTypesScreen}
           options={{ title: 'Asset types' }}
+        />
+        <Stack.Screen
+          name="Categories"
+          component={CategoriesScreen}
+          options={{ title: 'Categories' }}
         />
       </Stack.Navigator>
     </NavigationContainer>

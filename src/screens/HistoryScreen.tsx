@@ -5,6 +5,7 @@ import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ModalSelectField } from '../components/ModalSelectField';
 import { ScreenWithFooter } from '../components/ScreenWithFooter';
+import * as categoriesRepo from '../db/repositories/categories';
 import * as pocketsRepo from '../db/repositories/pockets';
 import * as settingsRepo from '../db/repositories/settings';
 import * as txRepo from '../db/repositories/transactions';
@@ -13,8 +14,10 @@ import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
 import { formatMinorForDisplay } from '../utils/formatMinor';
 import { formatOccurredAt } from '../utils/formatOccurredAt';
+import { buildThemeChartPalette, pocketChartColor } from '../utils/pocketChartColors';
 
 const ALL = '__all__';
+const UNCATEGORIZED = '__uncategorized__';
 const HISTORY_FETCH_LIMIT = 500;
 
 const KIND_LABELS = {
@@ -52,11 +55,17 @@ function txMatchesKindFilter(tx, kinds, jarPocketId) {
   return false;
 }
 
-function applyHistoryFilters(items, { kinds, currencies, pocketIds, jarPocketId }) {
+function txMatchesCategoryFilter(tx, categoryIds) {
+  if (!categoryIds.length) return true;
+  return categoryIds.some((id) => (id === UNCATEGORIZED ? !tx.category_id : tx.category_id === id));
+}
+
+function applyHistoryFilters(items, { kinds, currencies, pocketIds, categoryIds, jarPocketId }) {
   return items.filter((tx) => {
     if (!txMatchesKindFilter(tx, kinds, jarPocketId)) return false;
     if (currencies.length && !currencies.includes(tx.currency)) return false;
     if (pocketIds.length && !pocketIds.some((id) => txInvolvesPocket(tx, id))) return false;
+    if (!txMatchesCategoryFilter(tx, categoryIds)) return false;
     return true;
   });
 }
@@ -83,17 +92,21 @@ function formatMultiDisplay(values, labelFor) {
 }
 
 export default function HistoryScreen({ navigation, route }) {
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const chartPalette = useMemo(() => buildThemeChartPalette(colors, isDark), [colors, isDark]);
   const paramPocketId = route.params?.pocketId;
   const [scopePocketId, setScopePocketId] = useState(paramPocketId);
   const [items, setItems] = useState([]);
   const [pocketNames, setPocketNames] = useState(() => new Map());
+  const [categories, setCategories] = useState([]);
+  const [categoryNames, setCategoryNames] = useState(() => new Map());
   const [jarPocketId, setJarPocketId] = useState(null);
   const [filterLabel, setFilterLabel] = useState('');
   const [filterKinds, setFilterKinds] = useState([]);
   const [filterCurrencies, setFilterCurrencies] = useState([]);
   const [filterPocketIds, setFilterPocketIds] = useState([]);
+  const [filterCategoryIds, setFilterCategoryIds] = useState([]);
 
   useEffect(() => {
     setScopePocketId(paramPocketId);
@@ -108,6 +121,10 @@ export default function HistoryScreen({ navigation, route }) {
 
     const jar = await pocketsRepo.getJarPocket();
     setJarPocketId(jar?.id ?? null);
+
+    const cats = await categoriesRepo.listCategories();
+    setCategories(cats);
+    setCategoryNames(new Map(cats.map((c) => [c.id, { name: c.name, color: c.color }])));
 
     const showArchived = await settingsRepo.getShowArchivedPockets();
     const active = await pocketsRepo.listPockets(showArchived);
@@ -203,11 +220,23 @@ export default function HistoryScreen({ navigation, route }) {
     [pocketFilterOptions]
   );
 
+  const categoryModalOptions = useMemo(
+    () => [
+      { value: ALL, title: 'All categories' },
+      { value: UNCATEGORIZED, title: 'Uncategorized' },
+      ...categories.map((c) => ({ value: c.id, title: c.name })),
+    ],
+    [categories]
+  );
+
   const kindDisplay = formatMultiDisplay(filterKinds, (k) => KIND_LABELS[k] ?? k);
   const currencyDisplay = formatMultiDisplay(filterCurrencies, (c) => c);
   const pocketDisplay = formatMultiDisplay(
     filterPocketIds,
     (id) => pocketNames.get(id) ?? 'Pocket'
+  );
+  const categoryDisplay = formatMultiDisplay(filterCategoryIds, (id) =>
+    id === UNCATEGORIZED ? 'Uncategorized' : (categoryNames.get(id)?.name ?? 'Category')
   );
 
   const displayItems = useMemo(
@@ -216,18 +245,23 @@ export default function HistoryScreen({ navigation, route }) {
         kinds: filterKinds,
         currencies: filterCurrencies,
         pocketIds: filterPocketIds,
+        categoryIds: filterCategoryIds,
         jarPocketId,
       }),
-    [items, filterKinds, filterCurrencies, filterPocketIds, jarPocketId]
+    [items, filterKinds, filterCurrencies, filterPocketIds, filterCategoryIds, jarPocketId]
   );
 
   const hasActiveFilters =
-    filterKinds.length > 0 || filterCurrencies.length > 0 || filterPocketIds.length > 0;
+    filterKinds.length > 0 ||
+    filterCurrencies.length > 0 ||
+    filterPocketIds.length > 0 ||
+    filterCategoryIds.length > 0;
 
   const clearFilters = () => {
     setFilterKinds([]);
     setFilterCurrencies([]);
     setFilterPocketIds([]);
+    setFilterCategoryIds([]);
   };
 
   const handleKindTap = (v) => {
@@ -238,6 +272,9 @@ export default function HistoryScreen({ navigation, route }) {
   };
   const handlePocketTap = (v) => {
     setFilterPocketIds(v === ALL ? [] : [v]);
+  };
+  const handleCategoryTap = (v) => {
+    setFilterCategoryIds(v === ALL ? [] : [v]);
   };
 
   return (
@@ -308,6 +345,22 @@ export default function HistoryScreen({ navigation, route }) {
               emptyMessage="No pockets in this list yet."
             />
           </View>
+          <View style={styles.filterCell}>
+            <ModalSelectField
+              compact
+              accent
+              multiSelect
+              label="Category"
+              displayValue={categoryDisplay}
+              placeholder="All categories"
+              modalTitle="Category"
+              options={categoryModalOptions}
+              selectedValues={filterCategoryIds}
+              onSelect={handleCategoryTap}
+              onToggleValue={(v) => setFilterCategoryIds((prev) => toggleInList(prev, v))}
+              emptyMessage="No categories yet."
+            />
+          </View>
         </View>
       </View>
 
@@ -322,6 +375,9 @@ export default function HistoryScreen({ navigation, route }) {
         }
         renderItem={({ item }) => {
           const pocketLine = pocketLineForHistory(item, pocketNames);
+          const category = item.category_id ? categoryNames.get(item.category_id) : null;
+          const categoryColor =
+            category?.color ?? (item.category_id ? pocketChartColor(item.category_id, chartPalette) : null);
           return (
             <Pressable
               style={styles.row}
@@ -330,6 +386,12 @@ export default function HistoryScreen({ navigation, route }) {
               <Text style={styles.dateLine}>{formatOccurredAt(item.occurred_at)}</Text>
               <Text style={styles.title}>{item.title}</Text>
               {pocketLine ? <Text style={styles.pocketLine}>{pocketLine}</Text> : null}
+              {category ? (
+                <View style={styles.categoryLine}>
+                  <View style={[styles.categoryDot, { backgroundColor: categoryColor }]} />
+                  <Text style={styles.categoryLineText}>{category.name}</Text>
+                </View>
+              ) : null}
               <Text style={styles.meta}>
                 {item.kind} · {item.currency} · {formatMinorForDisplay(item.amount_minor, item.currency)}
               </Text>
@@ -362,6 +424,9 @@ function createStyles(c: AppColors) {
       color: c.textMuted,
       marginTop: 4,
     },
+    categoryLine: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+    categoryDot: { width: 8, height: 8, borderRadius: 4 },
+    categoryLineText: { fontSize: 13, color: c.textMuted },
     meta: { color: c.textMuted, marginTop: 4, fontSize: 13 },
     chip: {
       marginHorizontal: 16,
@@ -397,10 +462,11 @@ function createStyles(c: AppColors) {
     },
     filterFields: {
       flexDirection: 'row',
+      flexWrap: 'wrap',
       gap: 6,
       marginTop: 6,
       alignItems: 'flex-start',
     },
-    filterCell: { flex: 1, minWidth: 0 },
+    filterCell: { flexBasis: '48%', flexGrow: 1, minWidth: 0 },
   });
 }

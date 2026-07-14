@@ -13,6 +13,7 @@ export type RootStackParamList = {
   Statistics: { initialCurrency?: string } | undefined;
   Settings: undefined;
   AssetTypes: undefined;
+  Categories: undefined;
   Jar: undefined;
   JarSplit: undefined;
   JarAdvanced: undefined;

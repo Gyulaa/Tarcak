@@ -6,6 +6,7 @@ export const BACKUP_INCLUDES = [
   'All pockets (including the Jar) and every transaction',
   'Asset type catalog and app settings',
   'Basic Jar split rules and Advanced Jar per-asset rules',
+  'Categories and per-transaction category tagging',
   'Appearance choice (dark mode + accent palette)',
 ] as const;
 

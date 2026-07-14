@@ -12,15 +12,16 @@ import {
 } from 'react-native';
 import { LineChart, PieChart } from 'react-native-gifted-charts';
 
-import { ContourOnPrimaryText } from '../components/ContourOnPrimaryText';
 import { ModalSelectField } from '../components/ModalSelectField';
 import { ScreenWithFooter } from '../components/ScreenWithFooter';
+import { resolveTimeRange, TimeRangePickerField } from '../components/TimeRangePickerField';
 import * as assetTypesRepo from '../db/repositories/assetTypes';
 import * as pocketsRepo from '../db/repositories/pockets';
 import * as settingsRepo from '../db/repositories/settings';
 import {
   downsampleTimeline,
   getBalanceTimeline,
+  getCategorySlices,
   getEarliestOccurredAt,
   getPocketSlicesAt,
 } from '../db/repositories/statistics';
@@ -30,22 +31,53 @@ import type { AppColors } from '../theme/palette';
 import { AMOUNT_MINOR_SCALE, formatMinorToAmountString } from '../utils/amountMinor';
 import { formatMinorForDisplay } from '../utils/formatMinor';
 import { formatOccurredAt } from '../utils/formatOccurredAt';
+import { pocketChartColor } from '../utils/pocketChartColors';
 
 /** Must match LineChart `yAxisLabelWidth` so layout math stays consistent. */
 const Y_AXIS_LABEL_WIDTH = 52;
 const CHART_INITIAL_SPACING = 2;
 const CHART_END_SPACING = 2;
 
-const RANGE_PRESETS = [
-  { id: '7d', label: '7d' },
-  { id: '30d', label: '30d' },
-  { id: '90d', label: '90d' },
-  { id: 'ytd', label: 'YTD' },
-  { id: '1y', label: '1y' },
-  { id: 'all', label: 'All' },
-];
-
 const MAX_LINE_POINTS = 72;
+
+/** Sections above the zero line; matches the `noOfSections` passed to LineChart. */
+const LINE_NO_OF_SECTIONS = 4;
+/**
+ * Hard cap on sections rendered below the zero line. Without an explicit `stepValue`,
+ * gifted-charts derives it from `maxValue / noOfSections` and then sizes the negative area as
+ * `ceil(|mostNegativeValue| / stepValue)` sections of the same height — when a deep negative dip
+ * is small relative to the visible peak, that count (and the chart's total rendered height,
+ * `containerHeight + noOfSectionsBelowXAxis * stepHeight`) can blow up unboundedly. Computing our
+ * own `stepValue`/`maxValue`/`noOfSectionsBelowXAxis` below keeps the total height predictable.
+ */
+const LINE_MAX_NEG_SECTIONS = 2;
+
+function computeLineChartScale(points: { balance_minor: number }[]) {
+  const values = points.map((p) => p.balance_minor);
+  const dataMax = values.length ? Math.max(0, ...values) : 0;
+  const dataMin = values.length ? Math.min(0, ...values) : 0;
+  if (dataMin >= 0) {
+    const maxValue = dataMax || 1;
+    return {
+      maxValue,
+      stepValue: maxValue / LINE_NO_OF_SECTIONS,
+      mostNegativeValue: 0,
+      noOfSectionsBelowXAxis: 0,
+    };
+  }
+  const negMagnitude = Math.abs(dataMin);
+  const stepValue = Math.max(dataMax / LINE_NO_OF_SECTIONS, negMagnitude / LINE_MAX_NEG_SECTIONS) || 1;
+  const noOfSectionsBelowXAxis = Math.max(
+    1,
+    Math.min(LINE_MAX_NEG_SECTIONS, Math.ceil(negMagnitude / stepValue))
+  );
+  return {
+    maxValue: stepValue * LINE_NO_OF_SECTIONS,
+    stepValue,
+    mostNegativeValue: dataMin,
+    noOfSectionsBelowXAxis,
+  };
+}
 
 /** Pie slice colors after the first (theme primary). Kept stable for legend consistency. */
 const PIE_SLICE_COLORS_TAIL = [
@@ -57,28 +89,6 @@ const PIE_SLICE_COLORS_TAIL = [
   '#c62828',
   '#37474f',
 ] as const;
-
-function rangeFromPreset(
-  preset: string,
-  endMs: number,
-  earliest: number | null
-): { startMs: number; endMs: number } {
-  const day = 86_400_000;
-  if (preset === '7d') return { startMs: endMs - 7 * day, endMs };
-  if (preset === '30d') return { startMs: endMs - 30 * day, endMs };
-  if (preset === '90d') return { startMs: endMs - 90 * day, endMs };
-  if (preset === 'ytd') {
-    const d = new Date(endMs);
-    const start = new Date(d.getFullYear(), 0, 1).getTime();
-    return { startMs: start, endMs };
-  }
-  if (preset === '1y') return { startMs: endMs - 365 * day, endMs };
-  if (preset === 'all') {
-    if (earliest != null) return { startMs: earliest, endMs };
-    return { startMs: endMs - 365 * day, endMs };
-  }
-  return { startMs: endMs - 30 * day, endMs };
-}
 
 /**
  * Gifted Charts passes Y tick values in the same numeric space as `data[].value` (here: minor units).
@@ -120,12 +130,14 @@ export default function StatisticsScreen({ route, navigation }) {
   const [jarPocket, setJarPocket] = useState(null);
   const [pockets, setPockets] = useState([]);
   const [scopeKey, setScopeKey] = useState('all');
-  const [rangePreset, setRangePreset] = useState('30d');
+  const [rangeValue, setRangeValue] = useState({ kind: 'preset', id: '30d' });
   const [earliest, setEarliest] = useState(null);
 
   const [lineLoading, setLineLoading] = useState(true);
   const [linePoints, setLinePoints] = useState([]);
   const [pieSlices, setPieSlices] = useState([]);
+  const [categoryExpenseSlices, setCategoryExpenseSlices] = useState([]);
+  const [categoryIncomeSlices, setCategoryIncomeSlices] = useState([]);
   const [rangeMeta, setRangeMeta] = useState({ startMs: 0, endMs: 0 });
   /** Measured width of the chart row (full card content width). */
   const [chartRowWidth, setChartRowWidth] = useState(0);
@@ -214,12 +226,14 @@ export default function StatisticsScreen({ route, navigation }) {
     setLineLoading(true);
     try {
       const endMs = Date.now();
-      const { startMs, endMs: e } = rangeFromPreset(rangePreset, endMs, earliest);
+      const { startMs, endMs: e } = resolveTimeRange(rangeValue, endMs, earliest);
       setRangeMeta({ startMs, endMs: e });
 
       if (!currency) {
         setLinePoints([]);
         setPieSlices([]);
+        setCategoryExpenseSlices([]);
+        setCategoryIncomeSlices([]);
         return;
       }
 
@@ -237,10 +251,14 @@ export default function StatisticsScreen({ route, navigation }) {
       } else {
         setPieSlices([]);
       }
+
+      const categorySlices = await getCategorySlices(currency, statisticsScope, startMs, e);
+      setCategoryExpenseSlices(categorySlices.expense);
+      setCategoryIncomeSlices(categorySlices.income);
     } finally {
       setLineLoading(false);
     }
-  }, [currency, statisticsScope, rangePreset, earliest, jarPocket]);
+  }, [currency, statisticsScope, rangeValue, earliest, jarPocket]);
 
   useFocusEffect(
     useCallback(() => {
@@ -298,6 +316,8 @@ export default function StatisticsScreen({ route, navigation }) {
     };
   }, [chartRowWidth, winW, lineChartData.length]);
 
+  const lineScale = useMemo(() => computeLineChartScale(linePoints), [linePoints]);
+
   const positiveSlices = useMemo(
     () => pieSlices.filter((s) => s.balance_minor > 0),
     [pieSlices]
@@ -322,6 +342,39 @@ export default function StatisticsScreen({ route, navigation }) {
     positiveSlices.length > 0 &&
     pieTotalPositive > 0;
 
+  const categoryColorFor = useCallback(
+    (s) => s.color ?? (s.categoryId ? pocketChartColor(s.categoryId, pieSliceColors) : colors.textMuted),
+    [pieSliceColors, colors.textMuted]
+  );
+
+  const expensePieData = useMemo(
+    () =>
+      categoryExpenseSlices.map((s) => ({
+        value: s.total_minor,
+        color: categoryColorFor(s),
+        text: s.name,
+      })),
+    [categoryExpenseSlices, categoryColorFor]
+  );
+  const expensePieTotal = useMemo(
+    () => categoryExpenseSlices.reduce((a, s) => a + s.total_minor, 0),
+    [categoryExpenseSlices]
+  );
+
+  const incomePieData = useMemo(
+    () =>
+      categoryIncomeSlices.map((s) => ({
+        value: s.total_minor,
+        color: categoryColorFor(s),
+        text: s.name,
+      })),
+    [categoryIncomeSlices, categoryColorFor]
+  );
+  const incomePieTotal = useMemo(
+    () => categoryIncomeSlices.reduce((a, s) => a + s.total_minor, 0),
+    [categoryIncomeSlices]
+  );
+
   return (
     <ScreenWithFooter>
     <ScrollView style={styles.scroll} contentContainerStyle={styles.inner}>
@@ -330,26 +383,12 @@ export default function StatisticsScreen({ route, navigation }) {
         transfers do not change the &quot;All pockets&quot; total.
       </Text>
 
-      <Text style={styles.cardLabel}>Time range</Text>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.chipRow}
-      >
-        {RANGE_PRESETS.map((r) => (
-          <Pressable
-            key={r.id}
-            style={[styles.chip, rangePreset === r.id && styles.chipOn]}
-            onPress={() => setRangePreset(r.id)}
-          >
-            {rangePreset === r.id ? (
-              <ContourOnPrimaryText style={styles.chipTextOn}>{r.label}</ContourOnPrimaryText>
-            ) : (
-              <Text style={styles.chipText}>{r.label}</Text>
-            )}
-          </Pressable>
-        ))}
-      </ScrollView>
+      <TimeRangePickerField
+        label="Time range"
+        value={rangeValue}
+        onChange={setRangeValue}
+        earliestMs={earliest}
+      />
 
       {assetTypes.length === 0 ? (
         <Text style={styles.muted}>Add asset types under Settings to use Statistics.</Text>
@@ -425,7 +464,11 @@ export default function StatisticsScreen({ route, navigation }) {
               xAxisThickness={0}
               rulesType="solid"
               rulesColor={colors.border}
-              noOfSections={4}
+              noOfSections={LINE_NO_OF_SECTIONS}
+              maxValue={lineScale.maxValue}
+              stepValue={lineScale.stepValue}
+              mostNegativeValue={lineScale.mostNegativeValue}
+              noOfSectionsBelowXAxis={lineScale.noOfSectionsBelowXAxis}
               yAxisTextStyle={{ color: colors.textMuted, fontSize: 10, fontFamily: font.regular }}
               xAxisLabelTextStyle={{ color: colors.textMuted, fontSize: 10 }}
               yAxisLabelWidth={Y_AXIS_LABEL_WIDTH}
@@ -523,6 +566,102 @@ export default function StatisticsScreen({ route, navigation }) {
           </Text>
         </View>
       ) : null}
+
+      {!lineLoading && currency ? (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Spending by category</Text>
+          <Text style={styles.cardSub}>
+            {axisDateLabel(rangeMeta.startMs)} → {axisDateLabel(rangeMeta.endMs)} · {currency}
+          </Text>
+          {expensePieData.length === 0 ? (
+            <Text style={styles.muted}>No categorized expenses in this range.</Text>
+          ) : (
+            <>
+              <View style={styles.pieWrap}>
+                <PieChart
+                  data={expensePieData}
+                  donut
+                  showText={false}
+                  innerRadius={48}
+                  radius={92}
+                  innerCircleColor={colors.surface}
+                  centerLabelComponent={() => (
+                    <View style={styles.pieCenter}>
+                      <Text style={styles.pieCenterLabel} numberOfLines={2}>
+                        {formatMinorToAmountString(expensePieTotal)}
+                      </Text>
+                      <Text style={styles.pieCenterSub}>{currency}</Text>
+                    </View>
+                  )}
+                />
+              </View>
+              <View style={styles.legend}>
+                {categoryExpenseSlices.map((s) => (
+                  <View key={s.categoryId ?? '__uncategorized__'} style={styles.legendRow}>
+                    <View
+                      style={[styles.legendSwatch, { backgroundColor: categoryColorFor(s) }]}
+                    />
+                    <Text style={styles.legendName} numberOfLines={1}>
+                      {s.name}
+                    </Text>
+                    <Text style={styles.legendAmt}>
+                      {formatMinorForDisplay(s.total_minor, currency)}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </>
+          )}
+        </View>
+      ) : null}
+
+      {!lineLoading && currency ? (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Income by category</Text>
+          <Text style={styles.cardSub}>
+            {axisDateLabel(rangeMeta.startMs)} → {axisDateLabel(rangeMeta.endMs)} · {currency}
+          </Text>
+          {incomePieData.length === 0 ? (
+            <Text style={styles.muted}>No categorized income in this range.</Text>
+          ) : (
+            <>
+              <View style={styles.pieWrap}>
+                <PieChart
+                  data={incomePieData}
+                  donut
+                  showText={false}
+                  innerRadius={48}
+                  radius={92}
+                  innerCircleColor={colors.surface}
+                  centerLabelComponent={() => (
+                    <View style={styles.pieCenter}>
+                      <Text style={styles.pieCenterLabel} numberOfLines={2}>
+                        {formatMinorToAmountString(incomePieTotal)}
+                      </Text>
+                      <Text style={styles.pieCenterSub}>{currency}</Text>
+                    </View>
+                  )}
+                />
+              </View>
+              <View style={styles.legend}>
+                {categoryIncomeSlices.map((s) => (
+                  <View key={s.categoryId ?? '__uncategorized__'} style={styles.legendRow}>
+                    <View
+                      style={[styles.legendSwatch, { backgroundColor: categoryColorFor(s) }]}
+                    />
+                    <Text style={styles.legendName} numberOfLines={1}>
+                      {s.name}
+                    </Text>
+                    <Text style={styles.legendAmt}>
+                      {formatMinorForDisplay(s.total_minor, currency)}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </>
+          )}
+        </View>
+      ) : null}
     </ScrollView>
     </ScreenWithFooter>
   );
@@ -534,18 +673,6 @@ function createStyles(c: AppColors) {
     inner: { paddingVertical: 16, paddingHorizontal: 12, paddingBottom: 40 },
     lead: { fontSize: 14, color: c.textMuted, lineHeight: 21, marginBottom: 16 },
     cardLabel: { fontSize: 13, fontFamily: font.semibold, color: c.textMuted, marginBottom: 8 },
-    chipRow: { flexDirection: 'row', gap: 8, marginBottom: 16, paddingRight: 8 },
-    chip: {
-      paddingHorizontal: 14,
-      paddingVertical: 8,
-      borderRadius: 20,
-      backgroundColor: c.surface,
-      borderWidth: 1,
-      borderColor: c.borderStrong,
-    },
-    chipOn: { backgroundColor: c.primary, borderColor: c.primary },
-    chipText: { fontFamily: font.semibold, fontSize: 14, color: c.textSecondary },
-    chipTextOn: { fontFamily: font.semibold, fontSize: 14 },
     muted: { fontSize: 14, color: c.textMuted, lineHeight: 20 },
     card: {
       marginTop: 20,

@@ -224,6 +224,68 @@ export async function getPocketSlicesAt(
   return slices;
 }
 
+export type CategorySlice = {
+  categoryId: string | null;
+  name: string;
+  color: string | null;
+  total_minor: number;
+};
+
+/**
+ * Income and expense totals by category for `currency` within [startMs, endMs] for the given scope.
+ * Transfers are excluded (they never carry a category). Unlike `getPocketSlicesAt`, this is a period
+ * sum, not a point-in-time balance — "how much did category X earn/cost in this range" is the natural
+ * question for categories, whereas pockets need a balance snapshot because their totals persist.
+ */
+export async function getCategorySlices(
+  currency: string,
+  scope: StatisticsScope,
+  startMs: number,
+  endMs: number
+): Promise<{ income: CategorySlice[]; expense: CategorySlice[] }> {
+  const db = await openMainDatabase();
+  let scopeSql = '';
+  let scopeParams: string[] = [];
+  if (scope.mode === 'pocket') {
+    scopeSql = 'AND t.pocket_id = ?';
+    scopeParams = [scope.pocketId];
+  } else if (scope.mode === 'exclude_jar') {
+    scopeSql = 'AND t.pocket_id != ?';
+    scopeParams = [scope.jarId];
+  }
+  const rows = await db.getAllAsync<{
+    category_id: string | null;
+    category_name: string | null;
+    category_color: string | null;
+    kind: string;
+    total_minor: number;
+  }>(
+    `SELECT t.category_id AS category_id, c.name AS category_name, c.color AS category_color,
+            t.kind AS kind, SUM(t.amount_minor) AS total_minor
+     FROM transactions t
+     LEFT JOIN categories c ON c.id = t.category_id
+     WHERE t.currency = ? AND t.occurred_at >= ? AND t.occurred_at <= ?
+       AND t.kind IN ('income', 'expense') ${scopeSql}
+     GROUP BY t.category_id, t.kind
+     HAVING SUM(t.amount_minor) > 0
+     ORDER BY total_minor DESC`,
+    [currency, startMs, endMs, ...scopeParams]
+  );
+
+  const income: CategorySlice[] = [];
+  const expense: CategorySlice[] = [];
+  for (const r of rows) {
+    const slice: CategorySlice = {
+      categoryId: r.category_id,
+      name: r.category_name ?? 'Uncategorized',
+      color: r.category_color,
+      total_minor: r.total_minor,
+    };
+    (r.kind === 'income' ? income : expense).push(slice);
+  }
+  return { income, expense };
+}
+
 export async function getEarliestOccurredAt(): Promise<number | null> {
   const db = await openMainDatabase();
   const r = await db.getFirstAsync<{ m: number }>(

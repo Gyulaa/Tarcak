@@ -276,6 +276,17 @@ export default function SettingsScreen() {
 
       <View style={styles.divider} />
 
+      <Text style={styles.label}>Categories</Text>
+      <Text style={styles.p}>
+        Tag income and expense transactions with categories so you can filter History and see
+        per-category totals in Statistics.
+      </Text>
+      <Pressable style={styles.secondaryBtn} onPress={() => navigation.navigate('Categories')}>
+        <Text style={styles.secondaryBtnText}>Categories…</Text>
+      </Pressable>
+
+      <View style={styles.divider} />
+
       <Text style={styles.label}>Appearance</Text>
       <ModalSelectField
         label="Color palette"

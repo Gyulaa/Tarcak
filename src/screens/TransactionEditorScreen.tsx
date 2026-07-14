@@ -15,6 +15,7 @@ import { ModalSelectField } from '../components/ModalSelectField';
 import { ContourOnPrimaryText } from '../components/ContourOnPrimaryText';
 import { ScreenWithFooter } from '../components/ScreenWithFooter';
 import * as assetTypesRepo from '../db/repositories/assetTypes';
+import * as categoriesRepo from '../db/repositories/categories';
 import * as pocketsRepo from '../db/repositories/pockets';
 import * as settingsRepo from '../db/repositories/settings';
 import * as txRepo from '../db/repositories/transactions';
@@ -25,6 +26,7 @@ import { formatMinorToAmountString, parseAmountStringToMinor } from '../utils/am
 import { formatOccurredAt } from '../utils/formatOccurredAt';
 
 const KINDS = ['income', 'expense', 'transfer'];
+const NONE_CATEGORY = '__none__';
 
 export default function TransactionEditorScreen({ navigation, route }) {
   const { colors } = useAppTheme();
@@ -41,6 +43,8 @@ export default function TransactionEditorScreen({ navigation, route }) {
   const [toId, setToId] = useState(toPocketId || '');
   const [pockets, setPockets] = useState([]);
   const [assetTypes, setAssetTypes] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [categoryId, setCategoryId] = useState('');
   /** Preserved when editing; ignored on create (we use time of save). */
   const [occurredAt, setOccurredAt] = useState<number | null>(null);
 
@@ -52,6 +56,8 @@ export default function TransactionEditorScreen({ navigation, route }) {
         setPockets(list);
         const types = await assetTypesRepo.listAssetTypes();
         setAssetTypes(types);
+        const cats = await categoriesRepo.listCategories();
+        setCategories(cats);
       })();
     }, [])
   );
@@ -101,6 +107,7 @@ export default function TransactionEditorScreen({ navigation, route }) {
       setTargetPocketId(row.pocket_id || '');
       setFromId(row.from_pocket_id || '');
       setToId(row.to_pocket_id || '');
+      setCategoryId(row.category_id || '');
       setOccurredAt(row.occurred_at);
       setLoading(false);
     })();
@@ -141,6 +148,7 @@ export default function TransactionEditorScreen({ navigation, route }) {
       }
       const amount_minor = parseAmount();
       const occurred_at = transactionId ? (occurredAt ?? Date.now()) : Date.now();
+      const category_id = kind === 'transfer' ? null : categoryId || null;
       if (transactionId) {
         await txRepo.updateTransaction(transactionId, {
           kind,
@@ -151,6 +159,7 @@ export default function TransactionEditorScreen({ navigation, route }) {
           pocket_id: kind === 'transfer' ? null : targetPocketId || null,
           from_pocket_id: kind === 'transfer' ? fromId : null,
           to_pocket_id: kind === 'transfer' ? toId : null,
+          category_id,
         });
       } else if (kind === 'income') {
         if (!targetPocketId) {
@@ -162,6 +171,7 @@ export default function TransactionEditorScreen({ navigation, route }) {
           currency,
           occurred_at: occurred_at,
           pocket_id: targetPocketId,
+          category_id,
         });
       } else if (kind === 'expense') {
         if (!targetPocketId) {
@@ -173,6 +183,7 @@ export default function TransactionEditorScreen({ navigation, route }) {
           currency,
           occurred_at: occurred_at,
           pocket_id: targetPocketId,
+          category_id,
         });
       } else {
         if (!fromId || !toId) {
@@ -227,6 +238,14 @@ export default function TransactionEditorScreen({ navigation, route }) {
     [pockets]
   );
 
+  const categorySelectOptions = useMemo(
+    () => [
+      { value: NONE_CATEGORY, title: 'None' },
+      ...categories.map((c) => ({ value: c.id, title: c.name })),
+    ],
+    [categories]
+  );
+
   const selectedAssetLabel = useMemo(() => {
     const a = pickerAssetTypes.find((x) => x.code === currency);
     return a ? `${a.code} — ${a.name}` : '';
@@ -246,6 +265,11 @@ export default function TransactionEditorScreen({ navigation, route }) {
     const p = pockets.find((x) => x.id === toId);
     return p?.name ?? '';
   }, [pockets, toId]);
+
+  const categoryLabel = useMemo(() => {
+    const c = categories.find((x) => x.id === categoryId);
+    return c?.name ?? '';
+  }, [categories, categoryId]);
 
   if (loading) {
     return (
@@ -362,6 +386,23 @@ export default function TransactionEditorScreen({ navigation, route }) {
           />
         </>
       )}
+
+      {kind !== 'transfer' ? (
+        <>
+          <ModalSelectField
+            label="Category"
+            displayValue={categoryLabel}
+            placeholder="No category"
+            modalTitle="Category"
+            options={categorySelectOptions}
+            onSelect={(v) => setCategoryId(v === NONE_CATEGORY ? '' : v)}
+            emptyMessage="No categories yet. Add some under Settings → Categories."
+          />
+          <Pressable onPress={() => navigation.navigate('Categories')} style={styles.manageLink}>
+            <Text style={styles.manageLinkText}>Manage categories…</Text>
+          </Pressable>
+        </>
+      ) : null}
 
       <Pressable style={styles.saveBtn} onPress={() => void save()}>
         <ContourOnPrimaryText style={styles.saveBtnText}>

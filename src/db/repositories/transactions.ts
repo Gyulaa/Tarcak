@@ -16,6 +16,7 @@ type TxRow = {
   pocket_id: string | null;
   from_pocket_id: string | null;
   to_pocket_id: string | null;
+  category_id: string | null;
 };
 
 function mapRow(r: TxRow): LedgerTransaction {
@@ -31,6 +32,7 @@ function mapRow(r: TxRow): LedgerTransaction {
     pocket_id: r.pocket_id,
     from_pocket_id: r.from_pocket_id,
     to_pocket_id: r.to_pocket_id,
+    category_id: r.category_id,
   };
 }
 
@@ -40,6 +42,7 @@ export function validateLedgerShape(t: {
   pocket_id: string | null;
   from_pocket_id: string | null;
   to_pocket_id: string | null;
+  category_id: string | null;
   amount_minor: number;
 }): void {
   if (!Number.isInteger(t.amount_minor) || t.amount_minor === 0) {
@@ -63,11 +66,14 @@ export function validateLedgerShape(t: {
     if (t.from_pocket_id === t.to_pocket_id) {
       throw new Error('Cannot transfer to the same pocket.');
     }
+    if (t.category_id) {
+      throw new Error('Transfers cannot have a category.');
+    }
   }
 }
 
 const SELECT_LIST = `SELECT id, kind, title, amount_minor, currency, occurred_at, created_at, updated_at,
-  pocket_id, from_pocket_id, to_pocket_id FROM transactions`;
+  pocket_id, from_pocket_id, to_pocket_id, category_id FROM transactions`;
 
 export async function getTransaction(id: string): Promise<LedgerTransaction | null> {
   const db = await openMainDatabase();
@@ -81,12 +87,15 @@ export async function insertIncome(params: {
   currency: string;
   occurred_at: number;
   pocket_id: string;
+  category_id?: string | null;
 }): Promise<LedgerTransaction> {
+  const category_id = params.category_id?.trim() || null;
   validateLedgerShape({
     kind: 'income',
     pocket_id: params.pocket_id,
     from_pocket_id: null,
     to_pocket_id: null,
+    category_id,
     amount_minor: params.amount_minor,
   });
   const db = await openMainDatabase();
@@ -101,8 +110,8 @@ export async function insertIncome(params: {
   await db.runAsync(
     `INSERT INTO transactions (
       id, kind, title, amount_minor, currency, occurred_at, created_at, updated_at,
-      pocket_id, from_pocket_id, to_pocket_id
-    ) VALUES (?, 'income', ?, ?, ?, ?, ?, ?, ?, NULL, NULL)`,
+      pocket_id, from_pocket_id, to_pocket_id, category_id
+    ) VALUES (?, 'income', ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)`,
     [
       id,
       title,
@@ -112,6 +121,7 @@ export async function insertIncome(params: {
       now,
       now,
       params.pocket_id,
+      category_id,
     ]
   );
   const created = await getTransaction(id);
@@ -127,12 +137,15 @@ export async function insertExpense(params: {
   currency: string;
   occurred_at: number;
   pocket_id: string;
+  category_id?: string | null;
 }): Promise<LedgerTransaction> {
+  const category_id = params.category_id?.trim() || null;
   validateLedgerShape({
     kind: 'expense',
     pocket_id: params.pocket_id,
     from_pocket_id: null,
     to_pocket_id: null,
+    category_id,
     amount_minor: params.amount_minor,
   });
   const db = await openMainDatabase();
@@ -147,8 +160,8 @@ export async function insertExpense(params: {
   await db.runAsync(
     `INSERT INTO transactions (
       id, kind, title, amount_minor, currency, occurred_at, created_at, updated_at,
-      pocket_id, from_pocket_id, to_pocket_id
-    ) VALUES (?, 'expense', ?, ?, ?, ?, ?, ?, ?, NULL, NULL)`,
+      pocket_id, from_pocket_id, to_pocket_id, category_id
+    ) VALUES (?, 'expense', ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)`,
     [
       id,
       title,
@@ -158,6 +171,7 @@ export async function insertExpense(params: {
       now,
       now,
       params.pocket_id,
+      category_id,
     ]
   );
   const created = await getTransaction(id);
@@ -180,6 +194,7 @@ export async function insertTransfer(params: {
     pocket_id: null,
     from_pocket_id: params.from_pocket_id,
     to_pocket_id: params.to_pocket_id,
+    category_id: null,
     amount_minor: params.amount_minor,
   });
   const db = await openMainDatabase();
@@ -194,8 +209,8 @@ export async function insertTransfer(params: {
   await db.runAsync(
     `INSERT INTO transactions (
       id, kind, title, amount_minor, currency, occurred_at, created_at, updated_at,
-      pocket_id, from_pocket_id, to_pocket_id
-    ) VALUES (?, 'transfer', ?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
+      pocket_id, from_pocket_id, to_pocket_id, category_id
+    ) VALUES (?, 'transfer', ?, ?, ?, ?, ?, ?, NULL, ?, ?, NULL)`,
     [
       id,
       title,
@@ -226,6 +241,7 @@ export async function updateTransaction(
     pocket_id: string | null;
     from_pocket_id: string | null;
     to_pocket_id: string | null;
+    category_id: string | null;
   }>
 ): Promise<void> {
   const existing = await getTransaction(id);
@@ -248,6 +264,7 @@ export async function updateTransaction(
     pocket_id: next.pocket_id,
     from_pocket_id: next.from_pocket_id,
     to_pocket_id: next.to_pocket_id,
+    category_id: next.category_id,
     amount_minor: next.amount_minor,
   });
   const now = Date.now();
@@ -255,7 +272,7 @@ export async function updateTransaction(
   await db.runAsync(
     `UPDATE transactions SET
       kind = ?, title = ?, amount_minor = ?, currency = ?, occurred_at = ?,
-      updated_at = ?, pocket_id = ?, from_pocket_id = ?, to_pocket_id = ?
+      updated_at = ?, pocket_id = ?, from_pocket_id = ?, to_pocket_id = ?, category_id = ?
      WHERE id = ?`,
     [
       next.kind,
@@ -267,6 +284,7 @@ export async function updateTransaction(
       next.pocket_id,
       next.from_pocket_id,
       next.to_pocket_id,
+      next.category_id,
       id,
     ]
   );

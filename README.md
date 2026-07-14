@@ -4,7 +4,7 @@
 
 Local-first personal finance app: **pockets** (budget segments), **multi-currency balances**, and a **unified ledger** for income, expenses, and transfers between pockets. All data stays on the device and is stored **encrypted**; unlocking the data uses a **password** you choose (not biometrics as the primary secret).
 
-**App version (native):** `1.2.1` in [`app.json`](app.json) (`android.versionCode` `2`).
+**App version (native):** `1.2.1` in [`app.json`](app.json) (`android.versionCode` `3`).
 
 ## Current project setup
 
@@ -13,7 +13,7 @@ Local-first personal finance app: **pockets** (budget segments), **multi-currenc
 | **Runtime** | Expo SDK `~54`, React Native `0.81`, React `19`, TypeScript `strict` |
 | **Entry** | `index.ts` → `App.tsx` (fonts) → `AppBoot.tsx` (vault gate + main UI) |
 | **Architecture** | New Architecture enabled (`newArchEnabled: true` in `app.json`) |
-| **Implemented** | **Vault** (PBKDF2 + AES-GCM wrapped DEK, SQLCipher, lock on background). **Schema** migrations **`0001`–`0006`** (auto-applied on unlock). **Repositories:** `pockets`, `transactions`, `settings`, `assetTypes`, `jar`, `jarAdvanced`, `statistics`. **UI:** Home (balances by currency, Jar shortcut), Pockets + pocket detail, **History** (scope chip + multi-filter), **Statistics** charts, **Settings** (appearance, Jar toggles, archived pockets, **encrypted backup**), asset-type catalog, transaction editor. **Jar:** Record income, Distribute (basic or Advanced rules), Jar split screen, recent Jar transactions. **Advanced Jar:** hub + per-asset **visual editor** (Balance Chart, split preview bar, milestone knots). **`ModalSelectField`** everywhere including **multi-select** filter sheets (long-press). **Themes:** six accent palettes + dark mode; **unlock screen** uses cached appearance. **Support:** BTC donation address on Home. **Encrypted `.tarcak` backup** export/import. |
+| **Implemented** | **Vault** (PBKDF2 + AES-GCM wrapped DEK, SQLCipher, lock on background). **Schema** migrations **`0001`–`0007`** (auto-applied on unlock). **Repositories:** `pockets`, `transactions`, `settings`, `assetTypes`, `categories`, `jar`, `jarAdvanced`, `statistics`. **UI:** Home (balances by currency, Jar shortcut), Pockets + pocket detail, **History** (scope chip + multi-filter incl. **category**), **Statistics** charts (balance over time, pocket mix, **per-category income/expense breakdown**, compact **time range picker** with quick presets / month browser / custom range), **Settings** (appearance, Jar toggles, archived pockets, **categories**, **encrypted backup**), asset-type catalog, **category catalog** (optional per-transaction tag), transaction editor. **Jar:** Record income, Distribute (basic or Advanced rules), Jar split screen, recent Jar transactions. **Advanced Jar:** hub + per-asset **visual editor** (Balance Chart, split preview bar, milestone knots). **`ModalSelectField`** everywhere including **multi-select** filter sheets (long-press). **Themes:** six accent palettes + dark mode; **unlock screen** uses cached appearance. **Support:** BTC donation address on Home. **Encrypted `.tarcak` backup** export/import. |
 | **Still to add** | Polish (**editable** `occurred_at` in the transaction editor; pocket rename UX), automated tests beyond CI typecheck + `test:jar` checklist, optional FX / converted home total |
 
 ## Support / donations
@@ -49,7 +49,7 @@ Semantic colors (not raw hex in screens) come from **`useAppTheme()`** in [`src/
 | **Vault password** | Unlocks the app after restore (unchanged). |
 | **Backup password** | Encrypts the `.tarcak` file at rest (cloud, USB, email). |
 
-**Export:** flushes WAL (`PRAGMA wal_checkpoint(FULL)`), then reads the **on-disk SQLCipher-encrypted file directly** (raw encrypted bytes — not `serializeAsync`, which returns decrypted in-memory pages and was the root cause of the historic import bug), bundles vault metadata (salt, wrapped DEK, PBKDF2 iteration count), appearance, and a **contents manifest** (pockets, transactions, asset types, Jar basic + Advanced rules, settings) → JSON → AES-GCM with the backup password → file `tarcak-backup-YYYY-MM-DD.tarcak` in cache, then **share** sheet ([`expo-sharing`](https://docs.expo.dev/versions/latest/sdk/sharing/)). While the share sheet is open, automatic **lock-on-background is suspended** (depth counter in `session.ts`) so the session stays alive.
+**Export:** flushes WAL (`PRAGMA wal_checkpoint(FULL)`), then reads the **on-disk SQLCipher-encrypted file directly** (raw encrypted bytes — not `serializeAsync`, which returns decrypted in-memory pages and was the root cause of the historic import bug), bundles vault metadata (salt, wrapped DEK, PBKDF2 iteration count), appearance, and a **contents manifest** (pockets, transactions, asset types, categories, Jar basic + Advanced rules, settings) → JSON → AES-GCM with the backup password → file `tarcak-backup-YYYY-MM-DD.tarcak` in cache, then **share** sheet ([`expo-sharing`](https://docs.expo.dev/versions/latest/sdk/sharing/)). While the share sheet is open, automatic **lock-on-background is suspended** (depth counter in `session.ts`) so the session stays alive. The whole SQLCipher file is copied as-is, so new tables (e.g. `categories`) are always included automatically — the contents manifest in [`backupFormat.ts`](src/security/backupFormat.ts) is just the human-readable description shown in Settings, not a per-table registration list.
 
 **Import:** document picker ([`expo-document-picker`](https://docs.expo.dev/versions/latest/sdk/document-picker/)) with the same **lock suspension** (so choosing a file does not kick you to the password screen) → `content://` URIs are copied to cache first (Android) → decrypt while unlocked → replace DB file + SecureStore vault → record restore metadata ([`backupImportMeta.ts`](src/security/backupImportMeta.ts)) → lock session (user unlocks with **vault** password). **Destructive** on device: overwrites local data. After unlock, **Home** and **Settings** show a **”Restored from backup”** banner (backup created / imported timestamps) until dismissed. **Legacy recovery:** if the imported DB file is plain SQLite (created by an older build that used `serializeAsync`), `db/client.ts` automatically encrypts it in place with `PRAGMA rekey` on the first unlock — no user action needed.
 
@@ -61,7 +61,7 @@ Implementation: [`src/security/backup.ts`](src/security/backup.ts), [`src/securi
 
 ## Upgrading from an older build
 
-Safe to install over an existing vault: on unlock, [`runPendingMigrations`](src/db/migrations/runner.ts) applies any of **`0001`–`0006`** not yet recorded in `schema_migrations`. No new migration is required for recent UI-only releases if you are already at version **6**.
+Safe to install over an existing vault: on unlock, [`runPendingMigrations`](src/db/migrations/runner.ts) applies any of **`0001`–`0007`** not yet recorded in `schema_migrations`. No new migration is required for recent UI-only releases if you are already at version **7**.
 
 | Migration | What changes |
 |-----------|----------------|
@@ -71,6 +71,7 @@ Safe to install over an existing vault: on unlock, [`runPendingMigrations`](src/
 | `0004` | Jar pocket + `jar_distribution_rules` |
 | `0005` | `pockets.archived` |
 | `0006` | Advanced Jar tables |
+| `0007` | `categories` catalog + nullable `transactions.category_id` (FK, `ON DELETE SET NULL`) |
 
 First unlock after a big jump may take a few seconds. Wrong vault password still fails before migrations run. See **Forgot password** if you need a clean slate.
 
@@ -161,6 +162,10 @@ Each transaction stores a **`currency` string** that must match a row in the **`
 
 Amounts are stored as **signed integers**: **one major currency unit = 10⁸ minor units** (8 decimal places), so values like `0.00000001` are exact. **Income / expense** may use negative amounts; **transfers** must be positive (enforced in SQLite and app validation). The UI accepts decimal strings; see `src/utils/amountMinor.ts`. **Never** use floating point for money in logic — only for display derived from integers.
 
+### Category (optional transaction tag)
+
+Users define their own **categories** (e.g. “Groceries”, “Salary”) under **Settings → Categories**, each with an optional hex **color** swatch. A category can be attached to an **income** or **expense** transaction (optional — a transaction can have none); **transfers never carry a category** (enforced in `validateLedgerShape`, since it is not money in/out). `transactions.category_id` is a real FK to `categories.id` with **`ON DELETE SET NULL`**: deleting a category just uncategorizes the transactions that used it, it never blocks the delete. **History** can filter by category (including an “Uncategorized” bucket), and **Statistics** shows income/expense totals grouped by category for the selected asset, scope, and time range.
+
 ### Jar (pool & distribute)
 
 The vault has **one system pocket** with **`is_jar = 1`** (created by migration `0004`, default name “Jar”). It behaves like any other pocket in the ledger (income, expense, transfers). **Distribution:** either **basic split** (**Jar split** — target pockets and percentages as basis points summing to **10 000** = 100%) or, when **Advanced Jar** is enabled in Settings, **only** per-asset rules from **Advanced Jar** (ceiling + milestone splits; each asset in the Jar needs its own config). **Distribute** moves the **full** balance of a chosen asset from the Jar via **transfer** rows (integer split; remainder on the last target).
@@ -195,9 +200,10 @@ Each record has a **title** (short label), **amount** (non-zero integer in minor
 
 - Optional **scope** from navigation (`pocketId`) — chip to widen to all pockets.
 - Loads up to **500** recent transactions, then filters client-side.
-- **Filters** (Type / Asset / Pocket): **tap** one option (closes sheet); **long-press** toggles **multi-select** with checkmarks (OR within each dimension).
+- **Filters** (Type / Asset / Pocket / **Category**): **tap** one option (closes sheet); **long-press** toggles **multi-select** with checkmarks (OR within each dimension).
 - **Income** filter includes `kind = income` and **transfers into the Jar** (money pooled from other pockets).
 - **Jar** always appears in the pocket filter list when the Jar pocket exists.
+- **Category** filter options come from the full `categories` catalog (not just categories present in the loaded batch) plus an **“Uncategorized”** entry for transactions with no `category_id`.
 
 **v1 rule:** **Transfers are same-currency.** Cross-currency moves are either two transactions (sell/buy) or a future `exchange` type when you add rates — avoid ambiguous bookkeeping early.
 
@@ -257,6 +263,16 @@ Partial unique index: at most one row with `is_jar = 1`.
 
 **Advanced Jar** (migration `0006`, when `advanced_jar_enabled` is on): **`jar_advanced_assets`** (per-currency ceiling), **`jar_advanced_default_splits`**, **`jar_advanced_milestones`**, **`jar_advanced_milestone_splits`** — see `jarAdvanced` repository and `domain/jarAdvancedMath.ts`.
 
+### `categories` (migration `0007`)
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `id` | TEXT PK | UUID |
+| `name` | TEXT NOT NULL UNIQUE (case-insensitive) | Display label |
+| `color` | TEXT | Optional `#RRGGBB`; falls back to a hash-based color (`pocketChartColor`) when unset |
+| `sort_index` | INTEGER NOT NULL | UI ordering |
+| `created_at` / `updated_at` | INTEGER NOT NULL | Unix ms |
+
 ### `transactions`
 
 | Column | Type | Purpose |
@@ -277,12 +293,13 @@ Pocket linkage (nullable by kind):
 | `pocket_id` | TEXT FK → pockets.id | `income` (credit), `expense` (debit) |
 | `from_pocket_id` | TEXT FK → pockets.id | `transfer` (debit) |
 | `to_pocket_id` | TEXT FK → pockets.id | `transfer` (credit) |
+| `category_id` | TEXT FK → categories.id (`ON DELETE SET NULL`), nullable | Optional tag on `income` / `expense`; always null on `transfer` (migration `0007`) |
 
 **Constraints (enforce in app or DB triggers):**
 
 - `income`: `pocket_id` set; `from`/`to` null.
 - `expense`: `pocket_id` set; `from`/`to` null.
-- `transfer`: `from_pocket_id` and `to_pocket_id` set, **distinct**; `pocket_id` null; `from` ≠ `to`.
+- `transfer`: `from_pocket_id` and `to_pocket_id` set, **distinct**; `pocket_id` null; `from` ≠ `to`; `category_id` null.
 
 ### `user_settings` (key-value for future-proofing)
 
@@ -319,9 +336,10 @@ For each pocket `p` and currency `c`:
 - **Settings:** `getSetting` / `setSetting`, `getDefaultCurrency` / `setDefaultCurrency`, `getJarEnabled` / `setJarEnabled` (also archives/unarchives the Jar), `getAdvancedJarEnabled` / `setAdvancedJarEnabled`, `getShowArchivedPockets` / `setShowArchivedPockets`.
 - **Backup:** `exportEncryptedBackup`, `importEncryptedBackup` ([`src/security/backup.ts`](src/security/backup.ts)) — require unlocked session.
 - **Asset types:** `listAssetTypes`, `createAssetType`, `updateAssetTypeName`, `deleteAssetType`, `currencyExists`, `requireRegisteredAssetCurrency`.
+- **Categories:** `listCategories`, `createCategory`, `updateCategory`, `deleteCategory` (relies on the `ON DELETE SET NULL` FK — no usage guard, no “keep at least one” rule).
 - **Jar:** `listJarDistributionRules`, `replaceJarDistributionRules`, `distributeJarCurrency`, `splitAmountByBps` (pure helper).
 - **Jar advanced:** `listJarAdvancedSummaries`, `getJarAdvancedAssetDetail`, `saveJarAdvancedAsset`, `deleteJarAdvancedAsset`, `getJarAdvancedDistributeConfig`, `resolveAdvancedEffectiveBps`, etc.
-- **Statistics:** `getBalanceTimeline`, `downsampleTimeline`, `getPocketSlicesAt`, `getEarliestOccurredAt` (for charts and time-range defaults).
+- **Statistics:** `getBalanceTimeline`, `downsampleTimeline`, `getPocketSlicesAt`, `getCategorySlices` (income/expense totals by category for a range), `getEarliestOccurredAt` (for charts and time-range defaults).
 
 ---
 
@@ -366,12 +384,14 @@ src/
       0004_jar.ts
       0005_pockets_archived.ts
       0006_jar_advanced.ts
+      0007_categories.ts
       index.ts           # re-exports
     repositories/
       pockets.ts
       transactions.ts
       settings.ts
       assetTypes.ts
+      categories.ts
       jar.ts
       jarAdvanced.ts
       statistics.ts
@@ -385,6 +405,7 @@ src/
     ledgerStore.ts       # zustand: pockets + home balances refresh
   components/
     ModalSelectField.tsx   # dropdown picker; optional multiSelect (History filters)
+    TimeRangePickerField.tsx # compact field + sheet: presets / month browser / custom range (Statistics)
     BackupPasswordModal.tsx
     BackupRestoredBanner.tsx
     DonationFooter.tsx
@@ -405,6 +426,7 @@ src/
     StatisticsScreen.tsx
     SettingsScreen.tsx
     AssetTypesScreen.tsx
+    CategoriesScreen.tsx
     JarScreen.tsx
     JarSplitScreen.tsx
     JarAdvancedHub.tsx
@@ -434,13 +456,16 @@ Keep **SQL strings and migrations** out of React components.
 | Edit + history | `updateTransaction`, `listTransactions` |
 | Conducted date in UI | `occurred_at` stored + shown in History / pocket detail / editor (edit date: not yet) |
 | Filter history by pocket | `listTransactions({ pocketId })` |
-| History filters (type / asset / pocket) | Client-side on up to 500 rows; `ModalSelectField` tap = one, long-press = multi + ✓ |
+| History filters (type / asset / pocket / category) | Client-side on up to 500 rows; `ModalSelectField` tap = one, long-press = multi + ✓ |
 | History Income + Jar | Income filter includes transfers **to** the Jar pocket |
 | Appearance / themes | `colorThemes.ts` + `ThemeContext` + `appearanceCache` on vault gate |
 | Encrypted backup | `backup.ts` → `.tarcak` file; separate backup password |
 | Advanced Jar Balance Chart | `jarAdvancedChartModel` + `JarAdvancedBalanceChart` visual editor |
-| Statistics charts | `statistics` repository + `StatisticsScreen` (`react-native-gifted-charts`) |
+| Statistics charts | `statistics` repository + `StatisticsScreen` (`react-native-gifted-charts`); bounded negative-range scaling so the balance chart can't stretch unboundedly |
+| Statistics time range | `TimeRangePickerField` — quick presets, month browser (any past year), manual custom range |
+| Per-category income/expense breakdown | `getCategorySlices` + two donut cards in `StatisticsScreen` |
 | Asset type catalog | `asset_types` + `assetTypes` repository + Settings / editor dropdowns |
+| Category catalog | `categories` + `categories` repository + Settings / transaction editor / History / Statistics |
 | Jar pool & split distribute | `is_jar` pocket, `jar_distribution_rules`, `jar` repository, Jar / Jar split screens |
 | Advanced Jar | `0006` tables + `jarAdvanced` repository + hub / per-asset editor; optional vs basic split |
 | Jar off → archive pocket | `user_settings.jar_enabled` + `pockets.archived` + `setJarEnabled` |
