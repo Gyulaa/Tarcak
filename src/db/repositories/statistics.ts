@@ -9,6 +9,26 @@ export type StatisticsScope =
   | { mode: 'pocket'; pocketId: string }
   | { mode: 'exclude_jar'; jarId: string };
 
+/** Restricts balance/mix queries to one category's income+expense rows (transfers never have a category). */
+export type CategoryFilter =
+  | { mode: 'all' }
+  | { mode: 'uncategorized' }
+  | { mode: 'one'; categoryId: string };
+
+const ALL_CATEGORY_FILTER: CategoryFilter = { mode: 'all' };
+
+/** `kind` restriction is required alongside the category predicate: transfers always have a NULL
+ *  category_id, so without it an "Uncategorized" filter would also sweep in every transfer. */
+function categoryFilterSql(filter: CategoryFilter): { sql: string; params: string[] } {
+  if (filter.mode === 'uncategorized') {
+    return { sql: `AND kind IN ('income', 'expense') AND category_id IS NULL`, params: [] };
+  }
+  if (filter.mode === 'one') {
+    return { sql: `AND kind IN ('income', 'expense') AND category_id = ?`, params: [filter.categoryId] };
+  }
+  return { sql: '', params: [] };
+}
+
 export type BalanceTimelinePoint = {
   /** Unix ms */
   at: number;
@@ -57,9 +77,11 @@ function deltaForScope(row: TxRow, scope: StatisticsScope): number {
 async function baselineMinorBefore(
   currency: string,
   scope: StatisticsScope,
-  beforeMs: number
+  beforeMs: number,
+  categoryFilter: CategoryFilter = ALL_CATEGORY_FILTER
 ): Promise<number> {
   const db = await openMainDatabase();
+  const cat = categoryFilterSql(categoryFilter);
   if (scope.mode === 'all') {
     const r = await db.getFirstAsync<{ b: number }>(
       `SELECT COALESCE(SUM(
@@ -69,8 +91,8 @@ async function baselineMinorBefore(
           ELSE 0
         END
       ), 0) AS b
-      FROM transactions WHERE currency = ? AND occurred_at < ?`,
-      [currency, beforeMs]
+      FROM transactions WHERE currency = ? AND occurred_at < ? ${cat.sql}`,
+      [currency, beforeMs, ...cat.params]
     );
     return r?.b ?? 0;
   }
@@ -86,8 +108,8 @@ async function baselineMinorBefore(
           ELSE 0
         END
       ), 0) AS b
-      FROM transactions WHERE currency = ? AND occurred_at < ?`,
-      [p, p, p, p, currency, beforeMs]
+      FROM transactions WHERE currency = ? AND occurred_at < ? ${cat.sql}`,
+      [p, p, p, p, currency, beforeMs, ...cat.params]
     );
     return r?.b ?? 0;
   }
@@ -102,8 +124,8 @@ async function baselineMinorBefore(
         ELSE 0
       END
     ), 0) AS b
-    FROM transactions WHERE currency = ? AND occurred_at < ?`,
-    [j, j, j, j, currency, beforeMs]
+    FROM transactions WHERE currency = ? AND occurred_at < ? ${cat.sql}`,
+    [j, j, j, j, currency, beforeMs, ...cat.params]
   );
   return r?.b ?? 0;
 }
@@ -117,18 +139,20 @@ export async function getBalanceTimeline(
   currency: string,
   scope: StatisticsScope,
   startMs: number,
-  endMs: number
+  endMs: number,
+  categoryFilter: CategoryFilter = ALL_CATEGORY_FILTER
 ): Promise<BalanceTimelinePoint[]> {
   const db = await openMainDatabase();
+  const cat = categoryFilterSql(categoryFilter);
   const rows = await db.getAllAsync<TxRow>(
     `SELECT kind, amount_minor, occurred_at, pocket_id, from_pocket_id, to_pocket_id
      FROM transactions
-     WHERE currency = ? AND occurred_at >= ? AND occurred_at <= ?
+     WHERE currency = ? AND occurred_at >= ? AND occurred_at <= ? ${cat.sql}
      ORDER BY occurred_at ASC, id ASC`,
-    [currency, startMs, endMs]
+    [currency, startMs, endMs, ...cat.params]
   );
 
-  let running = await baselineMinorBefore(currency, scope, startMs);
+  let running = await baselineMinorBefore(currency, scope, startMs, categoryFilter);
   const points: BalanceTimelinePoint[] = [{ at: startMs, balance_minor: running }];
 
   for (const row of rows) {
@@ -175,9 +199,11 @@ export function downsampleTimeline(
 async function balanceMinorForPocketAt(
   pocketId: string,
   currency: string,
-  atMs: number
+  atMs: number,
+  categoryFilter: CategoryFilter = ALL_CATEGORY_FILTER
 ): Promise<number> {
   const db = await openMainDatabase();
+  const cat = categoryFilterSql(categoryFilter);
   const r = await db.getFirstAsync<{ b: number }>(
     `SELECT COALESCE(SUM(
       CASE
@@ -188,8 +214,8 @@ async function balanceMinorForPocketAt(
         ELSE 0
       END
     ), 0) AS b
-    FROM transactions WHERE currency = ? AND occurred_at <= ?`,
-    [pocketId, pocketId, pocketId, pocketId, currency, atMs]
+    FROM transactions WHERE currency = ? AND occurred_at <= ? ${cat.sql}`,
+    [pocketId, pocketId, pocketId, pocketId, currency, atMs, ...cat.params]
   );
   return r?.b ?? 0;
 }
@@ -202,11 +228,14 @@ export type PocketSlice = {
 
 /**
  * Non-zero pocket balances for one currency at `atMs` (for donut). Excludes archived pockets if not passed.
+ * With a category filter active, "balance" becomes "net signed total of that category's income/expense
+ * transactions routed through this pocket" — transfers never carry a category, so they drop out entirely.
  */
 export async function getPocketSlicesAt(
   currency: string,
   atMs: number,
-  options: { jarId: string | null; excludeJar: boolean }
+  options: { jarId: string | null; excludeJar: boolean },
+  categoryFilter: CategoryFilter = ALL_CATEGORY_FILTER
 ): Promise<PocketSlice[]> {
   const db = await openMainDatabase();
   const prows = await db.getAllAsync<{ id: string; name: string; is_jar: number; archived: number }>(
@@ -217,7 +246,7 @@ export async function getPocketSlicesAt(
   for (const p of prows) {
     if (p.archived === 1) continue;
     if (options.excludeJar && options.jarId && p.id === options.jarId) continue;
-    const bal = await balanceMinorForPocketAt(p.id, currency, atMs);
+    const bal = await balanceMinorForPocketAt(p.id, currency, atMs, categoryFilter);
     if (bal === 0) continue;
     slices.push({ pocketId: p.id, name: p.name, balance_minor: bal });
   }

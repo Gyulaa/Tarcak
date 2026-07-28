@@ -13,7 +13,7 @@ Local-first personal finance app: **pockets** (budget segments), **multi-currenc
 | **Runtime** | Expo SDK `~54`, React Native `0.81`, React `19`, TypeScript `strict` |
 | **Entry** | `index.ts` → `App.tsx` (fonts) → `AppBoot.tsx` (vault gate + main UI) |
 | **Architecture** | New Architecture enabled (`newArchEnabled: true` in `app.json`) |
-| **Implemented** | **Vault** (PBKDF2 + AES-GCM wrapped DEK, SQLCipher, lock on background). **Schema** migrations **`0001`–`0007`** (auto-applied on unlock). **Repositories:** `pockets`, `transactions`, `settings`, `assetTypes`, `categories`, `jar`, `jarAdvanced`, `statistics`. **UI:** Home (balances by currency, Jar shortcut), Pockets + pocket detail, **History** (scope chip + multi-filter incl. **category**), **Statistics** charts (balance over time, pocket mix, **per-category income/expense breakdown**, compact **time range picker** with quick presets / month browser / custom range), **Settings** (appearance, Jar toggles, archived pockets, **categories**, **encrypted backup**), asset-type catalog, **category catalog** (optional per-transaction tag), transaction editor. **Jar:** Record income, Distribute (basic or Advanced rules), Jar split screen, recent Jar transactions. **Advanced Jar:** hub + per-asset **visual editor** (Balance Chart, split preview bar, milestone knots). **`ModalSelectField`** everywhere including **multi-select** filter sheets (long-press). **Themes:** six accent palettes + dark mode; **unlock screen** uses cached appearance. **Support:** BTC donation address on Home. **Encrypted `.tarcak` backup** export/import. |
+| **Implemented** | **Vault** (PBKDF2 + AES-GCM wrapped DEK, SQLCipher, lock on background). **Schema** migrations **`0001`–`0007`** (auto-applied on unlock). **Repositories:** `pockets`, `transactions`, `settings`, `assetTypes`, `categories`, `jar`, `jarAdvanced`, `statistics`. **UI:** Home (balances by currency, Jar shortcut), Pockets + pocket detail, **History** (collapsible multi-filter panel — Type / Asset / Pocket / **Category**, tap-to-toggle, summary chips when collapsed), **Statistics** (collapsible **settings panel** — Asset / Scope / **Category filter** / Time range — plus balance-over-time, pocket mix with a **negative-balance fallback**, **per-category income/expense breakdown**, and a fixed-position chart value readout), **Settings** (appearance, Jar toggles, archived pockets, **categories**, **encrypted backup**), asset-type catalog, **category catalog** (optional per-transaction tag), transaction editor. **Jar:** Record income, Distribute (basic or Advanced rules), Jar split screen, recent Jar transactions. **Advanced Jar:** hub + per-asset **visual editor** (Balance Chart, split preview bar, milestone knots). **`ModalSelectField`** everywhere including **multi-select** filter sheets (tap toggles a checkmark and keeps the sheet open; tapping "All" clears and closes). **Themes:** six accent palettes + dark mode; **unlock screen** uses cached appearance. **Support:** BTC donation address on Home. **Encrypted `.tarcak` backup** export/import. |
 | **Still to add** | Polish (**editable** `occurred_at` in the transaction editor; pocket rename UX), automated tests beyond CI typecheck + `test:jar` checklist, optional FX / converted home total |
 
 ## Support / donations
@@ -198,12 +198,21 @@ Each record has a **title** (short label), **amount** (non-zero integer in minor
 
 **History screen** ([`HistoryScreen.tsx`](src/screens/HistoryScreen.tsx)):
 
-- Optional **scope** from navigation (`pocketId`) — chip to widen to all pockets.
-- Loads up to **500** recent transactions, then filters client-side.
-- **Filters** (Type / Asset / Pocket / **Category**): **tap** one option (closes sheet); **long-press** toggles **multi-select** with checkmarks (OR within each dimension).
+- **Filter panel is collapsible** — collapsed by default (a header row + removable summary chips for whatever is active); tapping the header, a chip, or expanding shows the full Type / Asset / Pocket / **Category** filter grid. Keeps the screen from permanently losing space to filter UI once nothing is being changed.
+- Optional **scope** from navigation (`pocketId`, e.g. opening History from a pocket) pre-selects that pocket in the **Pocket filter** (shown as a summary chip, panel stays collapsed) rather than a separate always-visible banner — a single selected pocket also still scopes the underlying SQL query itself (most-recent-N **for that pocket**, not a client-side slice of the global most-recent-N).
+- Loads up to **500** recent transactions (scoped to one pocket when exactly one is filtered, otherwise global), then filters client-side.
+- **Filters** (Type / Asset / Pocket / **Category**): tapping a non-"All" option **toggles its checkmark and keeps the sheet open** so several can be picked (OR within each dimension); tapping **"All"** clears that dimension and closes. (Earlier versions required a hidden long-press to multi-select — tap now does it directly.)
 - **Income** filter includes `kind = income` and **transfers into the Jar** (money pooled from other pockets).
 - **Jar** always appears in the pocket filter list when the Jar pocket exists.
-- **Category** filter options come from the full `categories` catalog (not just categories present in the loaded batch) plus an **“Uncategorized”** entry for transactions with no `category_id`.
+- **Asset / Pocket / Category** filter option lists are sourced from the **full catalogs** (`assetTypes`, `pockets`, `categories`), independent of the currently loaded transaction batch — otherwise, once a single-pocket scope narrowed that batch, the other pickers would only offer whatever happened to appear in the narrowed set. **Category** additionally has an **“Uncategorized”** entry for transactions with no `category_id`.
+
+**Statistics screen** ([`StatisticsScreen.tsx`](src/screens/StatisticsScreen.tsx), [`statistics.ts`](src/db/repositories/statistics.ts)):
+
+- **Settings panel is collapsible** — Asset / Scope (pocket) / **Category filter** / Time range, same collapsed-by-default + summary-chip pattern as History's filters; all four have sensible defaults so charts render before you ever open it.
+- **Category filter** (`CategoryFilter`: all / uncategorized / one category) is a peer to the pocket **Scope** filter — it narrows the balance-over-time line, the pocket-mix donut, and their SQL queries down to just that category's income/expense rows (transfers never carry a category, so they drop out entirely once a category filter is active). The two "Spending/Income by category" breakdown cards hide themselves while a specific category is selected, since breaking one category down "by category" would just be a single trivial slice.
+- **Pocket mix** falls back to showing the **negative distribution** (magnitude-sized donut, real signed amounts in the legend/center label) when there are no positive pocket balances but there are negative ones — the normal case once you filter down to an expense-only category, where every pocket's total is negative.
+- **Balance-over-time chart** height is bounded even when the balance dips deep negative relative to its peak — `computeLineChartScale` caps how many extra sections gifted-charts can render below the zero line (`LINE_MAX_NEG_SECTIONS`), instead of trusting the library's default (`stepValue` derived only from the max value), which could otherwise blow the chart's rendered height up unboundedly.
+- **Touched-point readout** is a fixed row above the chart (date + amount), not a floating tooltip anchored to your finger — a floating, absolutely-positioned label from the chart library kept getting clipped by Android's ScrollView view-flattening whenever it needed to render outside its own box, regardless of z-index/elevation/`collapsable` tuning. A row in normal layout flow can't be clipped that way since nothing needs to escape its own bounds.
 
 **v1 rule:** **Transfers are same-currency.** Cross-currency moves are either two transactions (sell/buy) or a future `exchange` type when you add rates — avoid ambiguous bookkeeping early.
 
@@ -339,7 +348,7 @@ For each pocket `p` and currency `c`:
 - **Categories:** `listCategories`, `createCategory`, `updateCategory`, `deleteCategory` (relies on the `ON DELETE SET NULL` FK — no usage guard, no “keep at least one” rule).
 - **Jar:** `listJarDistributionRules`, `replaceJarDistributionRules`, `distributeJarCurrency`, `splitAmountByBps` (pure helper).
 - **Jar advanced:** `listJarAdvancedSummaries`, `getJarAdvancedAssetDetail`, `saveJarAdvancedAsset`, `deleteJarAdvancedAsset`, `getJarAdvancedDistributeConfig`, `resolveAdvancedEffectiveBps`, etc.
-- **Statistics:** `getBalanceTimeline`, `downsampleTimeline`, `getPocketSlicesAt`, `getCategorySlices` (income/expense totals by category for a range), `getEarliestOccurredAt` (for charts and time-range defaults).
+- **Statistics:** `getBalanceTimeline`, `downsampleTimeline`, `getPocketSlicesAt`, `getCategorySlices` (income/expense totals by category for a range), `getEarliestOccurredAt` (for charts and time-range defaults). `getBalanceTimeline` and `getPocketSlicesAt` both take an optional `CategoryFilter` (all / uncategorized / one category) that narrows their underlying SQL to that category's income/expense rows.
 
 ---
 
@@ -404,7 +413,7 @@ src/
   stores/
     ledgerStore.ts       # zustand: pockets + home balances refresh
   components/
-    ModalSelectField.tsx   # dropdown picker; optional multiSelect (History filters)
+    ModalSelectField.tsx   # dropdown picker; optional multiSelect (tap toggles, stays open)
     TimeRangePickerField.tsx # compact field + sheet: presets / month browser / custom range (Statistics)
     BackupPasswordModal.tsx
     BackupRestoredBanner.tsx
@@ -456,14 +465,18 @@ Keep **SQL strings and migrations** out of React components.
 | Edit + history | `updateTransaction`, `listTransactions` |
 | Conducted date in UI | `occurred_at` stored + shown in History / pocket detail / editor (edit date: not yet) |
 | Filter history by pocket | `listTransactions({ pocketId })` |
-| History filters (type / asset / pocket / category) | Client-side on up to 500 rows; `ModalSelectField` tap = one, long-press = multi + ✓ |
+| History filters (type / asset / pocket / category) | Collapsible panel, tap-to-toggle multi-select (no hidden long-press); Asset/Pocket/Category options from full catalogs, not the loaded batch |
 | History Income + Jar | Income filter includes transfers **to** the Jar pocket |
 | Appearance / themes | `colorThemes.ts` + `ThemeContext` + `appearanceCache` on vault gate |
 | Encrypted backup | `backup.ts` → `.tarcak` file; separate backup password |
 | Advanced Jar Balance Chart | `jarAdvancedChartModel` + `JarAdvancedBalanceChart` visual editor |
 | Statistics charts | `statistics` repository + `StatisticsScreen` (`react-native-gifted-charts`); bounded negative-range scaling so the balance chart can't stretch unboundedly |
+| Statistics settings panel | Collapsible Asset / Scope / Category / Time-range panel with summary chips, same pattern as History's filters |
 | Statistics time range | `TimeRangePickerField` — quick presets, month browser (any past year), manual custom range |
-| Per-category income/expense breakdown | `getCategorySlices` + two donut cards in `StatisticsScreen` |
+| Statistics category filter | `CategoryFilter` threaded through `getBalanceTimeline` / `getPocketSlicesAt`; narrows balance-over-time and pocket-mix to one category |
+| Pocket mix negative fallback | Shows the negative-balance distribution when there are no positive pocket slices (e.g. an expense-only category filter) |
+| Chart value readout | Fixed row above the chart instead of a floating per-touch tooltip (avoids Android ScrollView clipping of absolutely-positioned overflow content) |
+| Per-category income/expense breakdown | `getCategorySlices` + two donut cards in `StatisticsScreen`; hidden while a specific category filter is active |
 | Asset type catalog | `asset_types` + `assetTypes` repository + Settings / editor dropdowns |
 | Category catalog | `categories` + `categories` repository + Settings / transaction editor / History / Statistics |
 | Jar pool & split distribute | `is_jar` pocket, `jar_distribution_rules`, `jar` repository, Jar / Jar split screens |

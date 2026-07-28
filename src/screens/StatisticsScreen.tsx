@@ -1,8 +1,9 @@
 // @ts-nocheck
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  LayoutAnimation,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,8 +15,9 @@ import { LineChart, PieChart } from 'react-native-gifted-charts';
 
 import { ModalSelectField } from '../components/ModalSelectField';
 import { ScreenWithFooter } from '../components/ScreenWithFooter';
-import { resolveTimeRange, TimeRangePickerField } from '../components/TimeRangePickerField';
+import { formatTimeRangeLabel, resolveTimeRange, TimeRangePickerField } from '../components/TimeRangePickerField';
 import * as assetTypesRepo from '../db/repositories/assetTypes';
+import * as categoriesRepo from '../db/repositories/categories';
 import * as pocketsRepo from '../db/repositories/pockets';
 import * as settingsRepo from '../db/repositories/settings';
 import {
@@ -129,9 +131,14 @@ export default function StatisticsScreen({ route, navigation }) {
   const [currency, setCurrency] = useState('HUF');
   const [jarPocket, setJarPocket] = useState(null);
   const [pockets, setPockets] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [scopeKey, setScopeKey] = useState('all');
+  const [categoryFilterKey, setCategoryFilterKey] = useState('all');
   const [rangeValue, setRangeValue] = useState({ kind: 'preset', id: '30d' });
   const [earliest, setEarliest] = useState(null);
+  /** Collapsed by default — Asset/Scope/Category/Range all have sensible defaults, so nothing
+   *  requires the user to open this before the charts render. */
+  const [settingsExpanded, setSettingsExpanded] = useState(false);
 
   const [lineLoading, setLineLoading] = useState(true);
   const [linePoints, setLinePoints] = useState([]);
@@ -141,19 +148,30 @@ export default function StatisticsScreen({ route, navigation }) {
   const [rangeMeta, setRangeMeta] = useState({ startMs: 0, endMs: 0 });
   /** Measured width of the chart row (full card content width). */
   const [chartRowWidth, setChartRowWidth] = useState(0);
+  /**
+   * Touched chart point, shown in a fixed-position readout row instead of a floating tooltip.
+   * A floating, absolutely-positioned label rendered by the chart library was getting clipped by
+   * Android's ScrollView view-flattening whenever it needed to render outside its own box, no
+   * matter what z-index/elevation/collapsable combination was tried — a fixed row in normal
+   * layout flow can't be clipped that way since nothing needs to escape its own bounds.
+   */
+  const [activePoint, setActivePoint] = useState(null);
+  const activePointRef = useRef(null);
 
   useFocusEffect(
     useCallback(() => {
       void (async () => {
         const showArchived = await settingsRepo.getShowArchivedPockets();
-        const [types, def, jar, plist, early] = await Promise.all([
+        const [types, def, jar, plist, early, cats] = await Promise.all([
           assetTypesRepo.listAssetTypes(),
           settingsRepo.getDefaultCurrency(),
           pocketsRepo.getJarPocket(),
           pocketsRepo.listPockets(showArchived),
           getEarliestOccurredAt(),
+          categoriesRepo.listCategories(),
         ]);
         setAssetTypes(types);
+        setCategories(cats);
         const raw = route.params?.initialCurrency;
         const paramCode =
           typeof raw === 'string' && raw.trim() ? raw.trim().toUpperCase() : '';
@@ -206,6 +224,37 @@ export default function StatisticsScreen({ route, navigation }) {
     return o ? `${o.title}${o.subtitle ? ` — ${o.subtitle}` : ''}` : '';
   }, [scopeOptions, scopeKey]);
 
+  const scopeShortLabel = useMemo(() => {
+    const o = scopeOptions.find((x) => x.value === scopeKey);
+    return o?.title ?? 'All pockets';
+  }, [scopeOptions, scopeKey]);
+
+  /** Categories never apply to transfers, so a category filter narrows the same charts down to
+   *  "this category's income/expense only" — transfers simply drop out of every total. */
+  const categoryFilter = useMemo(() => {
+    if (categoryFilterKey === 'uncategorized') return { mode: 'uncategorized' };
+    if (categoryFilterKey.startsWith('cat:')) {
+      return { mode: 'one', categoryId: categoryFilterKey.slice('cat:'.length) };
+    }
+    return { mode: 'all' };
+  }, [categoryFilterKey]);
+
+  const categoryFilterOptions = useMemo(
+    () => [
+      { value: 'all', title: 'All categories' },
+      { value: 'uncategorized', title: 'Uncategorized' },
+      ...categories.map((c) => ({ value: `cat:${c.id}`, title: c.name })),
+    ],
+    [categories]
+  );
+
+  const categoryFilterDisplay = useMemo(() => {
+    if (categoryFilterKey === 'all') return 'All categories';
+    if (categoryFilterKey === 'uncategorized') return 'Uncategorized';
+    const cat = categories.find((c) => `cat:${c.id}` === categoryFilterKey);
+    return cat?.name ?? 'Category';
+  }, [categoryFilterKey, categories]);
+
   const assetOptions = useMemo(
     () => assetTypes.map((a) => ({ value: a.code, title: a.code, subtitle: a.name })),
     [assetTypes]
@@ -222,8 +271,19 @@ export default function StatisticsScreen({ route, navigation }) {
     }
   }, [jarPocket, scopeKey]);
 
+  useEffect(() => {
+    if (
+      categoryFilterKey.startsWith('cat:') &&
+      !categories.some((c) => `cat:${c.id}` === categoryFilterKey)
+    ) {
+      setCategoryFilterKey('all');
+    }
+  }, [categories, categoryFilterKey]);
+
   const loadCharts = useCallback(async () => {
     setLineLoading(true);
+    activePointRef.current = null;
+    setActivePoint(null);
     try {
       const endMs = Date.now();
       const { startMs, endMs: e } = resolveTimeRange(rangeValue, endMs, earliest);
@@ -237,28 +297,37 @@ export default function StatisticsScreen({ route, navigation }) {
         return;
       }
 
-      const raw = await getBalanceTimeline(currency, statisticsScope, startMs, e);
+      const raw = await getBalanceTimeline(currency, statisticsScope, startMs, e, categoryFilter);
       const sampled = downsampleTimeline(raw, MAX_LINE_POINTS);
       setLinePoints(sampled);
 
       const showPie = statisticsScope.mode === 'all' || statisticsScope.mode === 'exclude_jar';
       if (showPie) {
-        const slices = await getPocketSlicesAt(currency, e, {
-          jarId: jarPocket?.id ?? null,
-          excludeJar: statisticsScope.mode === 'exclude_jar',
-        });
+        const slices = await getPocketSlicesAt(
+          currency,
+          e,
+          { jarId: jarPocket?.id ?? null, excludeJar: statisticsScope.mode === 'exclude_jar' },
+          categoryFilter
+        );
         setPieSlices(slices);
       } else {
         setPieSlices([]);
       }
 
-      const categorySlices = await getCategorySlices(currency, statisticsScope, startMs, e);
-      setCategoryExpenseSlices(categorySlices.expense);
-      setCategoryIncomeSlices(categorySlices.income);
+      // Breaking a single category down "by category" is trivial (one slice), so these cards
+      // are only meaningful when no category filter narrows the data first.
+      if (categoryFilter.mode === 'all') {
+        const categorySlices = await getCategorySlices(currency, statisticsScope, startMs, e);
+        setCategoryExpenseSlices(categorySlices.expense);
+        setCategoryIncomeSlices(categorySlices.income);
+      } else {
+        setCategoryExpenseSlices([]);
+        setCategoryIncomeSlices([]);
+      }
     } finally {
       setLineLoading(false);
     }
-  }, [currency, statisticsScope, rangeValue, earliest, jarPocket]);
+  }, [currency, statisticsScope, categoryFilter, rangeValue, earliest, jarPocket]);
 
   useFocusEffect(
     useCallback(() => {
@@ -322,25 +391,34 @@ export default function StatisticsScreen({ route, navigation }) {
     () => pieSlices.filter((s) => s.balance_minor > 0),
     [pieSlices]
   );
+  const negativeSlices = useMemo(
+    () => pieSlices.filter((s) => s.balance_minor < 0),
+    [pieSlices]
+  );
+
+  /** Falls back to the negative side when nothing is positive — the normal case once a category
+   *  filter narrows this down to an expense-only category, where every pocket's total is negative. */
+  const pieIsNegative = positiveSlices.length === 0 && negativeSlices.length > 0;
+  const pieDisplaySlices = pieIsNegative ? negativeSlices : positiveSlices;
 
   const pieData = useMemo(() => {
-    if (positiveSlices.length === 0) return [];
-    return positiveSlices.map((s, i) => ({
-      value: s.balance_minor,
+    if (pieDisplaySlices.length === 0) return [];
+    return pieDisplaySlices.map((s, i) => ({
+      value: Math.abs(s.balance_minor),
       color: pieSliceColors[i % pieSliceColors.length],
       text: s.name,
     }));
-  }, [positiveSlices, pieSliceColors]);
+  }, [pieDisplaySlices, pieSliceColors]);
 
-  const pieTotalPositive = useMemo(
-    () => positiveSlices.reduce((a, s) => a + s.balance_minor, 0),
-    [positiveSlices]
+  const pieTotal = useMemo(
+    () => pieDisplaySlices.reduce((a, s) => a + s.balance_minor, 0),
+    [pieDisplaySlices]
   );
 
   const showPieSection =
     (statisticsScope.mode === 'all' || statisticsScope.mode === 'exclude_jar') &&
-    positiveSlices.length > 0 &&
-    pieTotalPositive > 0;
+    pieDisplaySlices.length > 0 &&
+    pieTotal !== 0;
 
   const categoryColorFor = useCallback(
     (s) => s.color ?? (s.categoryId ? pocketChartColor(s.categoryId, pieSliceColors) : colors.textMuted),
@@ -375,53 +453,107 @@ export default function StatisticsScreen({ route, navigation }) {
     [categoryIncomeSlices]
   );
 
+  const categoryFilterSuffix =
+    categoryFilter.mode === 'all' ? '' : ` · ${categoryFilterDisplay} only`;
+
+  const toggleSettingsExpanded = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setSettingsExpanded((v) => !v);
+  };
+
+  const timeRangeShortLabel = useMemo(() => formatTimeRangeLabel(rangeValue), [rangeValue]);
+
+  const settingsChips = useMemo(
+    () => [
+      { key: 'asset', label: currency || 'Asset' },
+      { key: 'scope', label: scopeShortLabel },
+      { key: 'category', label: categoryFilterDisplay },
+      { key: 'range', label: timeRangeShortLabel },
+    ],
+    [currency, scopeShortLabel, categoryFilterDisplay, timeRangeShortLabel]
+  );
+
   return (
     <ScreenWithFooter>
     <ScrollView style={styles.scroll} contentContainerStyle={styles.inner}>
       <Text style={styles.lead}>
-        Balances over time and pocket mix for one asset at a time. Totals follow your ledger;
-        transfers do not change the &quot;All pockets&quot; total.
+        Balances over time, pocket mix, and category totals for one asset at a time. Totals follow
+        your ledger; transfers do not change the &quot;All pockets&quot; total or count toward any category.
       </Text>
-
-      <TimeRangePickerField
-        label="Time range"
-        value={rangeValue}
-        onChange={setRangeValue}
-        earliestMs={earliest}
-      />
 
       {assetTypes.length === 0 ? (
         <Text style={styles.muted}>Add asset types under Settings to use Statistics.</Text>
       ) : (
-        <>
-          <ModalSelectField
-            label="Asset"
-            displayValue={assetDisplay}
-            placeholder="Select asset"
-            modalTitle="Asset"
-            options={assetOptions}
-            onSelect={setCurrency}
-            emptyMessage="No asset types."
-          />
-          <ModalSelectField
-            label="Scope"
-            displayValue={scopeDisplay}
-            placeholder="Select scope"
-            modalTitle="Balance scope"
-            options={scopeOptions}
-            onSelect={(v) => {
-              if (v === 'exclude_jar' && !jarPocket) return;
-              setScopeKey(v);
-            }}
-            disabled={scopeOptions.length === 0}
-          />
-        </>
+        <View style={styles.settingsSection}>
+          <Pressable style={styles.settingsHeaderRow} onPress={toggleSettingsExpanded}>
+            <Text style={styles.settingsSectionTitle}>Statistics settings</Text>
+            <Text style={styles.settingsChevron}>{settingsExpanded ? '▴' : '▾'}</Text>
+          </Pressable>
+
+          {!settingsExpanded ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.settingsChipRow}
+            >
+              {settingsChips.map((chip) => (
+                <Pressable key={chip.key} style={styles.settingsChip} onPress={toggleSettingsExpanded}>
+                  <Text style={styles.settingsChipText} numberOfLines={1}>
+                    {chip.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          ) : (
+            <View style={styles.settingsFields}>
+              <ModalSelectField
+                label="Asset"
+                displayValue={assetDisplay}
+                placeholder="Select asset"
+                modalTitle="Asset"
+                options={assetOptions}
+                onSelect={setCurrency}
+                emptyMessage="No asset types."
+              />
+              <ModalSelectField
+                label="Scope"
+                displayValue={scopeDisplay}
+                placeholder="Select scope"
+                modalTitle="Balance scope"
+                options={scopeOptions}
+                onSelect={(v) => {
+                  if (v === 'exclude_jar' && !jarPocket) return;
+                  setScopeKey(v);
+                }}
+                disabled={scopeOptions.length === 0}
+              />
+              <ModalSelectField
+                label="Category"
+                displayValue={categoryFilterDisplay}
+                placeholder="Select category"
+                modalTitle="Category"
+                options={categoryFilterOptions}
+                onSelect={setCategoryFilterKey}
+                emptyMessage="No categories yet."
+              />
+              <TimeRangePickerField
+                label="Time range"
+                value={rangeValue}
+                onChange={setRangeValue}
+                earliestMs={earliest}
+              />
+            </View>
+          )}
+        </View>
       )}
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Balance over time</Text>
+        <Text style={styles.cardTitle}>
+          {categoryFilter.mode === 'all' ? 'Balance over time' : 'Category total over time'}
+        </Text>
         <Text style={styles.cardSub}>
           {axisDateLabel(rangeMeta.startMs)} → {axisDateLabel(rangeMeta.endMs)} · {currency}
+          {categoryFilterSuffix}
         </Text>
         {lineLoading ? (
           <View style={styles.chartLoading}>
@@ -439,9 +571,21 @@ export default function StatisticsScreen({ route, navigation }) {
               }
             }}
           >
-            <Text style={styles.axisHint}>
-              Tap the chart for date and balance. Y-axis: {currency} (whole units). X: start · mid · end.
-            </Text>
+            <View style={styles.readoutRow}>
+              {activePoint ? (
+                <>
+                  <Text style={styles.readoutDate}>{formatOccurredAt(activePoint.ts)}</Text>
+                  <Text style={styles.readoutAmt}>
+                    {formatMinorForDisplay(activePoint.v, currency)}
+                  </Text>
+                </>
+              ) : (
+                <Text style={styles.axisHint}>
+                  Tap the chart for date and balance. Y-axis: {currency} (whole units). X: start ·
+                  mid · end.
+                </Text>
+              )}
+            </View>
             <LineChart
               data={lineChartData}
               parentWidth={lineLayout.rowW}
@@ -483,9 +627,10 @@ export default function StatisticsScreen({ route, navigation }) {
                 activatePointersInstantlyOnTouch: true,
                 persistPointer: true,
                 resetPointerIndexOnRelease: false,
-                pointerLabelWidth: 168,
-                pointerLabelHeight: 64,
-                autoAdjustPointerLabelPosition: true,
+                // No floating label box (see `readoutRow` above the chart) — this callback only
+                // reports the touched point's data into React state. It fires during the chart
+                // library's own render pass, so the update is deferred a tick (requestAnimationFrame)
+                // rather than calling setState synchronously while a different component renders.
                 pointerLabelComponent: (items, _secondary, pointerIndex) => {
                   const it = items?.[0];
                   if (!it) return null;
@@ -497,14 +642,12 @@ export default function StatisticsScreen({ route, navigation }) {
                       : typeof lineChartData[idx]?.timestamp === 'number'
                         ? lineChartData[idx].timestamp
                         : null;
-                  return (
-                    <View style={styles.pointerBox}>
-                      {ts != null ? (
-                        <Text style={styles.pointerDate}>{formatOccurredAt(ts)}</Text>
-                      ) : null}
-                      <Text style={styles.pointerAmt}>{formatMinorForDisplay(v, currency)}</Text>
-                    </View>
-                  );
+                  if (ts != null && (activePointRef.current?.ts !== ts || activePointRef.current?.v !== v)) {
+                    const next = { ts, v };
+                    activePointRef.current = next;
+                    requestAnimationFrame(() => setActivePoint(next));
+                  }
+                  return null;
                 },
               }}
             />
@@ -514,8 +657,15 @@ export default function StatisticsScreen({ route, navigation }) {
 
       {showPieSection ? (
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Pocket mix at period end</Text>
-          <Text style={styles.cardSub}>Share of {currency} balance by pocket</Text>
+          <Text style={styles.cardTitle}>
+            {pieIsNegative ? 'Pocket mix (negative)' : 'Pocket mix at period end'}
+          </Text>
+          <Text style={styles.cardSub}>
+            {pieIsNegative
+              ? `Where the negative ${currency} balance is concentrated, by pocket`
+              : `Share of ${currency} balance by pocket`}
+            {categoryFilterSuffix}
+          </Text>
           <View style={styles.pieWrap}>
             <PieChart
               data={pieData}
@@ -527,7 +677,7 @@ export default function StatisticsScreen({ route, navigation }) {
               centerLabelComponent={() => (
                 <View style={styles.pieCenter}>
                   <Text style={styles.pieCenterLabel} numberOfLines={2}>
-                    {formatMinorToAmountString(pieTotalPositive)}
+                    {formatMinorToAmountString(pieTotal)}
                   </Text>
                   <Text style={styles.pieCenterSub}>{currency}</Text>
                 </View>
@@ -535,7 +685,7 @@ export default function StatisticsScreen({ route, navigation }) {
             />
           </View>
           <View style={styles.legend}>
-            {positiveSlices.map((s, i) => (
+            {pieDisplaySlices.map((s, i) => (
               <View key={s.pocketId} style={styles.legendRow}>
                 <View
                   style={[
@@ -556,7 +706,7 @@ export default function StatisticsScreen({ route, navigation }) {
       ) : !lineLoading && statisticsScope.mode !== 'pocket' ? (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Pocket mix</Text>
-          <Text style={styles.muted}>No positive balances to show for this asset at the end of the range.</Text>
+          <Text style={styles.muted}>No balances to show for this asset at the end of the range.</Text>
         </View>
       ) : statisticsScope.mode === 'pocket' ? (
         <View style={styles.card}>
@@ -567,7 +717,7 @@ export default function StatisticsScreen({ route, navigation }) {
         </View>
       ) : null}
 
-      {!lineLoading && currency ? (
+      {!lineLoading && currency && categoryFilter.mode === 'all' ? (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Spending by category</Text>
           <Text style={styles.cardSub}>
@@ -615,7 +765,7 @@ export default function StatisticsScreen({ route, navigation }) {
         </View>
       ) : null}
 
-      {!lineLoading && currency ? (
+      {!lineLoading && currency && categoryFilter.mode === 'all' ? (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Income by category</Text>
           <Text style={styles.cardSub}>
@@ -674,6 +824,36 @@ function createStyles(c: AppColors) {
     lead: { fontSize: 14, color: c.textMuted, lineHeight: 21, marginBottom: 16 },
     cardLabel: { fontSize: 13, fontFamily: font.semibold, color: c.textMuted, marginBottom: 8 },
     muted: { fontSize: 14, color: c.textMuted, lineHeight: 20 },
+    settingsSection: {
+      backgroundColor: c.chipBg,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: c.jarSoftBorder,
+      paddingHorizontal: 14,
+      paddingTop: 10,
+      paddingBottom: 10,
+      marginBottom: 4,
+    },
+    settingsHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 4,
+    },
+    settingsSectionTitle: { fontSize: 13, fontFamily: font.semibold, color: c.primary },
+    settingsChevron: { fontSize: 22, color: c.primary, fontFamily: font.semibold, lineHeight: 22 },
+    settingsChipRow: { flexDirection: 'row', gap: 6, marginTop: 6, paddingRight: 8 },
+    settingsChip: {
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.jarSoftBorder,
+      borderRadius: 20,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      maxWidth: 160,
+    },
+    settingsChipText: { fontSize: 12, color: c.textSecondary, fontFamily: font.semibold },
+    settingsFields: { marginTop: 8, gap: 4 },
     card: {
       marginTop: 20,
       backgroundColor: c.surface,
@@ -688,26 +868,25 @@ function createStyles(c: AppColors) {
     chartLoading: { height: 220, justifyContent: 'center', alignItems: 'center' },
     chartWrap: {
       alignSelf: 'stretch',
-      overflow: 'hidden',
       marginTop: 4,
+    },
+    /** Fixed-position readout for the touched point — normal layout flow, not an absolutely
+     *  positioned overlay, so it can't be clipped by Android's ScrollView view-flattening the
+     *  way a floating chart-library tooltip was. */
+    readoutRow: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      gap: 8,
+      minHeight: 18,
+      marginBottom: 10,
     },
     axisHint: {
       fontSize: 11,
       color: c.textMuted,
       lineHeight: 16,
-      marginBottom: 10,
     },
-    pointerBox: {
-      backgroundColor: c.surface,
-      paddingHorizontal: 10,
-      paddingVertical: 8,
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: c.border,
-      maxWidth: 168,
-    },
-    pointerDate: { fontSize: 11, color: c.textMuted, marginBottom: 4 },
-    pointerAmt: { fontSize: 13, fontFamily: font.semibold, color: c.text },
+    readoutDate: { fontSize: 11, color: c.textMuted },
+    readoutAmt: { fontSize: 14, fontFamily: font.semibold, color: c.text },
     pieWrap: { alignItems: 'center', marginVertical: 8 },
     pieCenter: { alignItems: 'center', justifyContent: 'center', maxWidth: 72 },
     pieCenterLabel: {

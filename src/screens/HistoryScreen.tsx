@@ -1,10 +1,19 @@
 // @ts-nocheck
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  FlatList,
+  LayoutAnimation,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import { ModalSelectField } from '../components/ModalSelectField';
 import { ScreenWithFooter } from '../components/ScreenWithFooter';
+import * as assetTypesRepo from '../db/repositories/assetTypes';
 import * as categoriesRepo from '../db/repositories/categories';
 import * as pocketsRepo from '../db/repositories/pockets';
 import * as settingsRepo from '../db/repositories/settings';
@@ -96,21 +105,28 @@ export default function HistoryScreen({ navigation, route }) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const chartPalette = useMemo(() => buildThemeChartPalette(colors, isDark), [colors, isDark]);
   const paramPocketId = route.params?.pocketId;
-  const [scopePocketId, setScopePocketId] = useState(paramPocketId);
   const [items, setItems] = useState([]);
   const [pocketNames, setPocketNames] = useState(() => new Map());
+  const [currencyCodes, setCurrencyCodes] = useState([]);
   const [categories, setCategories] = useState([]);
   const [categoryNames, setCategoryNames] = useState(() => new Map());
   const [jarPocketId, setJarPocketId] = useState(null);
   const [filterLabel, setFilterLabel] = useState('');
   const [filterKinds, setFilterKinds] = useState([]);
   const [filterCurrencies, setFilterCurrencies] = useState([]);
-  const [filterPocketIds, setFilterPocketIds] = useState([]);
+  const [filterPocketIds, setFilterPocketIds] = useState(() => (paramPocketId ? [paramPocketId] : []));
   const [filterCategoryIds, setFilterCategoryIds] = useState([]);
+  /** Collapsed by default — expand on demand instead of permanently occupying screen space. */
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
 
   useEffect(() => {
-    setScopePocketId(paramPocketId);
+    setFilterPocketIds(paramPocketId ? [paramPocketId] : []);
   }, [paramPocketId]);
+
+  /** A single selected pocket still scopes the SQL query itself (most-recent-N for that pocket,
+   *  not a client-side slice of the global most-recent-N) — same perf/completeness benefit the old
+   *  route-param-only "scope" had, now available whenever exactly one pocket is filtered. */
+  const scopePocketId = filterPocketIds.length === 1 ? filterPocketIds[0] : null;
 
   const load = useCallback(async () => {
     const list = await txRepo.listTransactions({
@@ -125,6 +141,9 @@ export default function HistoryScreen({ navigation, route }) {
     const cats = await categoriesRepo.listCategories();
     setCategories(cats);
     setCategoryNames(new Map(cats.map((c) => [c.id, { name: c.name, color: c.color }])));
+
+    const types = await assetTypesRepo.listAssetTypes();
+    setCurrencyCodes(types.map((t) => t.code));
 
     const showArchived = await settingsRepo.getShowArchivedPockets();
     const active = await pocketsRepo.listPockets(showArchived);
@@ -168,27 +187,24 @@ export default function HistoryScreen({ navigation, route }) {
     });
   }, [navigation, scopePocketId, filterLabel]);
 
-  const currencyOptions = useMemo(() => {
-    const s = new Set(items.map((i) => i.currency));
-    return [...s].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
-  }, [items]);
+  /** Sourced from the full asset/pocket catalogs, not from `items` — `items` can be server-scoped
+   *  down to a single pocket's transactions (see `scopePocketId` above), and deriving these options
+   *  from that narrowed batch made everything else disappear from the picker as soon as one pocket
+   *  was selected. */
+  const currencyOptions = useMemo(
+    () => [...currencyCodes].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' })),
+    [currencyCodes]
+  );
 
   const pocketFilterOptions = useMemo(() => {
-    const ids = new Set();
-    for (const tx of items) {
-      if (tx.pocket_id) ids.add(tx.pocket_id);
-      if (tx.from_pocket_id) ids.add(tx.from_pocket_id);
-      if (tx.to_pocket_id) ids.add(tx.to_pocket_id);
-    }
-    if (jarPocketId) ids.add(jarPocketId);
-    return [...ids]
-      .map((id) => ({
+    return [...pocketNames.entries()]
+      .map(([id, name]) => ({
         id,
-        name: pocketNames.get(id) ?? '…',
+        name,
         subtitle: id === jarPocketId ? 'Jar' : undefined,
       }))
       .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
-  }, [items, pocketNames, jarPocketId]);
+  }, [pocketNames, jarPocketId]);
 
   const kindModalOptions = useMemo(
     () => [
@@ -264,6 +280,50 @@ export default function HistoryScreen({ navigation, route }) {
     setFilterCategoryIds([]);
   };
 
+  /** Compact summary shown while the panel is collapsed — one removable chip per active dimension. */
+  const activeFilterChips = useMemo(() => {
+    const chips = [];
+    if (filterKinds.length) {
+      chips.push({ key: 'kind', label: `Type: ${kindDisplay}`, onClear: () => setFilterKinds([]) });
+    }
+    if (filterCurrencies.length) {
+      chips.push({
+        key: 'currency',
+        label: `Asset: ${currencyDisplay}`,
+        onClear: () => setFilterCurrencies([]),
+      });
+    }
+    if (filterPocketIds.length) {
+      chips.push({
+        key: 'pocket',
+        label: `Pocket: ${pocketDisplay}`,
+        onClear: () => setFilterPocketIds([]),
+      });
+    }
+    if (filterCategoryIds.length) {
+      chips.push({
+        key: 'category',
+        label: `Category: ${categoryDisplay}`,
+        onClear: () => setFilterCategoryIds([]),
+      });
+    }
+    return chips;
+  }, [
+    filterKinds,
+    filterCurrencies,
+    filterPocketIds,
+    filterCategoryIds,
+    kindDisplay,
+    currencyDisplay,
+    pocketDisplay,
+    categoryDisplay,
+  ]);
+
+  const toggleFiltersExpanded = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setFiltersExpanded((v) => !v);
+  };
+
   const handleKindTap = (v) => {
     setFilterKinds(v === ALL ? [] : [v]);
   };
@@ -280,22 +340,40 @@ export default function HistoryScreen({ navigation, route }) {
   return (
     <ScreenWithFooter>
     <View style={styles.container}>
-      {scopePocketId ? (
-        <Pressable style={styles.chip} onPress={() => setScopePocketId(undefined)}>
-          <Text style={styles.chipText}>Showing one pocket · Tap to show all</Text>
-        </Pressable>
-      ) : null}
-
       <View style={styles.filterSection}>
-        <View style={styles.filterHeaderRow}>
-          <Text style={styles.filterSectionTitle}>Filters</Text>
-          {hasActiveFilters ? (
-            <Pressable onPress={clearFilters} hitSlop={8}>
-              <Text style={styles.clearText}>Clear</Text>
-            </Pressable>
-          ) : null}
-        </View>
+        <Pressable style={styles.filterHeaderRow} onPress={toggleFiltersExpanded}>
+          <Text style={styles.filterSectionTitle}>
+            Filters{activeFilterChips.length ? ` · ${activeFilterChips.length}` : ''}
+          </Text>
+          <Text style={styles.filterChevron}>{filtersExpanded ? '▴' : '▾'}</Text>
+        </Pressable>
 
+        {!filtersExpanded && activeFilterChips.length > 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.summaryChipRow}
+          >
+            {activeFilterChips.map((chip) => (
+              <Pressable key={chip.key} style={styles.summaryChip} onPress={toggleFiltersExpanded}>
+                <Text style={styles.summaryChipText} numberOfLines={1}>
+                  {chip.label}
+                </Text>
+                <Pressable hitSlop={8} onPress={chip.onClear} style={styles.summaryChipRemove}>
+                  <Text style={styles.summaryChipRemoveText}>×</Text>
+                </Pressable>
+              </Pressable>
+            ))}
+          </ScrollView>
+        ) : null}
+
+        {filtersExpanded ? (
+        <>
+        {hasActiveFilters ? (
+          <Pressable onPress={clearFilters} hitSlop={8} style={styles.clearRow}>
+            <Text style={styles.clearText}>Clear all</Text>
+          </Pressable>
+        ) : null}
         <View style={styles.filterFields}>
           <View style={styles.filterCell}>
             <ModalSelectField
@@ -362,6 +440,8 @@ export default function HistoryScreen({ navigation, route }) {
             />
           </View>
         </View>
+        </>
+        ) : null}
       </View>
 
       <FlatList
@@ -428,17 +508,9 @@ function createStyles(c: AppColors) {
     categoryDot: { width: 8, height: 8, borderRadius: 4 },
     categoryLineText: { fontSize: 13, color: c.textMuted },
     meta: { color: c.textMuted, marginTop: 4, fontSize: 13 },
-    chip: {
-      marginHorizontal: 16,
-      marginTop: 10,
-      padding: 10,
-      backgroundColor: c.chipBg,
-      borderRadius: 8,
-    },
-    chipText: { color: c.chipText, textAlign: 'center', fontSize: 13 },
     filterSection: {
       paddingHorizontal: 16,
-      paddingTop: 8,
+      paddingTop: 10,
       paddingBottom: 8,
       backgroundColor: c.chipBg,
       borderBottomWidth: 1,
@@ -448,18 +520,54 @@ function createStyles(c: AppColors) {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      marginBottom: 2,
+      paddingVertical: 4,
     },
     filterSectionTitle: {
       fontSize: 13,
       fontFamily: font.semibold,
       color: c.primary,
     },
+    filterChevron: {
+      fontSize: 22,
+      color: c.primary,
+      fontFamily: font.semibold,
+      lineHeight: 22,
+    },
+    clearRow: { marginTop: 4, alignSelf: 'flex-start' },
     clearText: {
       fontSize: 13,
       fontFamily: font.semibold,
       color: c.primary,
     },
+    summaryChipRow: {
+      flexDirection: 'row',
+      gap: 6,
+      marginTop: 6,
+      paddingRight: 8,
+    },
+    summaryChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.jarSoftBorder,
+      borderRadius: 20,
+      paddingLeft: 12,
+      paddingRight: 6,
+      paddingVertical: 6,
+      maxWidth: 220,
+    },
+    summaryChipText: { fontSize: 12, color: c.textSecondary, fontFamily: font.semibold },
+    summaryChipRemove: {
+      width: 18,
+      height: 18,
+      borderRadius: 9,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: c.chipBg,
+    },
+    summaryChipRemoveText: { fontSize: 13, color: c.textMuted, lineHeight: 14 },
     filterFields: {
       flexDirection: 'row',
       flexWrap: 'wrap',

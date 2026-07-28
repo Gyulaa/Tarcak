@@ -28,9 +28,10 @@ type Props = {
   compact?: boolean;
   /** Soft warm tint on compact labels, chevron, field border, and sheet top edge (e.g. History filters). */
   accent?: boolean;
-  /** Tap picks one and closes; long-press toggles checkmarks without closing. */
+  /** Tap toggles a checkmark and keeps the sheet open so several can be picked; tapping the
+   *  designated "__all__" option clears the selection and closes. */
   multiSelect?: boolean;
-  /** Values currently toggled on (long-press); shown with a checkmark. */
+  /** Values currently toggled on; shown with a checkmark. */
   selectedValues?: string[];
   onToggleValue?: (value: string) => void;
 };
@@ -83,31 +84,27 @@ export function ModalSelectField({
           <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
             <Text style={styles.sheetTitle}>{modalTitle}</Text>
             {multiSelect ? (
-              <Text style={styles.multiHint}>Tap one · Hold to add or remove several</Text>
+              <Text style={styles.multiHint}>Tap to select several · Tap &quot;All&quot; to clear</Text>
             ) : null}
             <ScrollView style={styles.scroll} keyboardShouldPersistTaps="handled">
               {options.length === 0 ? (
                 <Text style={styles.empty}>{emptyMessage}</Text>
               ) : (
                 options.map((opt) => {
-                  const checked =
-                    multiSelect &&
-                    opt.value !== '__all__' &&
-                    selectedValues.includes(opt.value);
+                  const isAllOption = opt.value === '__all__';
+                  const checked = multiSelect && !isAllOption && selectedValues.includes(opt.value);
                   return (
                     <Pressable
                       key={opt.value}
                       style={[styles.row, checked && styles.rowChecked]}
                       onPress={() => {
+                        if (multiSelect && !isAllOption && onToggleValue) {
+                          onToggleValue(opt.value);
+                          return;
+                        }
                         onSelect(opt.value);
                         setOpen(false);
                       }}
-                      onLongPress={() => {
-                        if (multiSelect && onToggleValue) {
-                          onToggleValue(opt.value);
-                        }
-                      }}
-                      delayLongPress={380}
                     >
                       {multiSelect ? (
                         <View style={[styles.checkSlot, checked && styles.checkSlotOn]}>

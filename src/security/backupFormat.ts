@@ -30,7 +30,12 @@ export type BackupPayloadV1 = {
   payloadVersion: typeof BACKUP_PAYLOAD_VERSION;
   exportedAt: string;
   vault: BackupVaultSnapshot;
-  /** SQLCipher database bytes from `SQLiteDatabase.serializeAsync()`. */
+  /**
+   * Raw on-disk SQLCipher-encrypted file bytes (read directly, not via `serializeAsync()`, which
+   * returns decrypted in-memory pages and was the root cause of a historic import bug). Since this
+   * is the whole physical database file, every table — including ones added by later migrations
+   * (e.g. `categories`) — is captured automatically; nothing here needs updating per-table.
+   */
   databaseB64: string;
   appearance?: BackupAppearanceSnapshot;
   contents?: BackupContentsManifest;
