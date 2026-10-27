@@ -83,6 +83,8 @@ export default function AppBoot() {
   const [vaultPresent, setVaultPresent] = useState<boolean | null>(null);
   const [unlocked, setUnlocked] = useState(false);
   const [password, setPassword] = useState('');
+  /** Only on first launch: a typo in the vault password would lock the user out for good. */
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [busy, setBusy] = useState(false);
   /** Which long-running substep is active during create/unlock (`null` when idle or erase-only busy). */
   const [vaultPhaseKey, setVaultPhaseKey] = useState<VaultPhaseKey | null>(null);
@@ -119,12 +121,17 @@ export default function AppBoot() {
 
   const onCreateVault = async () => {
     setMessage(null);
+    if (password !== confirmPassword) {
+      setMessage('The passwords do not match.');
+      return;
+    }
     setBusy(true);
     try {
       setVaultPhaseKey('kdf');
       await createFirstVault(password);
       setVaultPhaseKey('db');
       setPassword('');
+      setConfirmPassword('');
       await refreshVaultFlag();
       await openMainDatabase();
       setUnlocked(true);
@@ -203,6 +210,7 @@ export default function AppBoot() {
       useLedgerStore.setState({ pockets: [], homeBalances: [], lastError: null });
       await refreshVaultFlag();
       setPassword('');
+      setConfirmPassword('');
       setMessage('Local data removed. Choose a new password and tap Create vault.');
     } catch (e) {
       setMessage(e instanceof Error ? e.message : String(e));
@@ -268,6 +276,24 @@ export default function AppBoot() {
             />
           </Pressable>
         </View>
+
+        {!vaultPresent ? (
+          <View style={[vaultStyles.inputOuter, vaultStyles.confirmInputOuter]}>
+            <TextInput
+              style={vaultStyles.input}
+              placeholder="Repeat password"
+              placeholderTextColor={vaultColors.placeholder}
+              secureTextEntry={!passwordVisible}
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!busy}
+              selectionColor={vaultColors.primary}
+              accessibilityLabel="Repeat password"
+            />
+          </View>
+        ) : null}
 
         {!vaultPresent ? (
           <Pressable
@@ -394,6 +420,9 @@ function createVaultGateStyles(c: AppColors) {
       fontSize: 16,
       color: c.inputText,
       backgroundColor: 'transparent',
+    },
+    confirmInputOuter: {
+      marginTop: 12,
     },
     eyeBtn: {
       padding: 10,
