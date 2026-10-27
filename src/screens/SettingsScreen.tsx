@@ -1,8 +1,7 @@
-// @ts-nocheck
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
 
@@ -12,7 +11,9 @@ import { ModalSelectField } from '../components/ModalSelectField';
 import { ScreenWithFooter } from '../components/ScreenWithFooter';
 import * as assetTypesRepo from '../db/repositories/assetTypes';
 import * as settingsRepo from '../db/repositories/settings';
+import type { AssetType } from '../domain/types';
 import { useLockVault } from '../navigation/LockVaultContext';
+import type { RootStackScreenProps } from '../navigation/types';
 import {
   resumeVaultLockOnBackground,
   suspendVaultLockOnBackground,
@@ -30,18 +31,19 @@ import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
 
-export default function SettingsScreen() {
-  const navigation = useNavigation();
+type BackupModalState = { mode: 'export' } | { mode: 'import'; fileUri: string };
+
+export default function SettingsScreen({ navigation }: RootStackScreenProps<'Settings'>) {
   const { colors, isDark, colorThemeId, setDarkMode, setColorTheme } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const lockVault = useLockVault();
-  const [assetTypes, setAssetTypes] = useState([]);
+  const [assetTypes, setAssetTypes] = useState<AssetType[]>([]);
   const [defaultCode, setDefaultCode] = useState('HUF');
   const [loaded, setLoaded] = useState(false);
   const [jarEnabled, setJarEnabled] = useState(true);
   const [advancedJarEnabled, setAdvancedJarEnabled] = useState(false);
   const [showArchivedPockets, setShowArchivedPockets] = useState(false);
-  const [backupModal, setBackupModal] = useState(null);
+  const [backupModal, setBackupModal] = useState<BackupModalState | null>(null);
   const [backupBusy, setBackupBusy] = useState(false);
 
   useFocusEffect(
@@ -59,7 +61,7 @@ export default function SettingsScreen() {
     }, [])
   );
 
-  const onJarToggle = async (value) => {
+  const onJarToggle = async (value: boolean) => {
     try {
       await settingsRepo.setJarEnabled(value);
       setJarEnabled(value);
@@ -68,7 +70,7 @@ export default function SettingsScreen() {
     }
   };
 
-  const onAdvancedJarToggle = async (value) => {
+  const onAdvancedJarToggle = async (value: boolean) => {
     try {
       await settingsRepo.setAdvancedJarEnabled(value);
       setAdvancedJarEnabled(value);
@@ -77,7 +79,7 @@ export default function SettingsScreen() {
     }
   };
 
-  const onShowArchivedToggle = async (value) => {
+  const onShowArchivedToggle = async (value: boolean) => {
     try {
       await settingsRepo.setShowArchivedPockets(value);
       setShowArchivedPockets(value);
@@ -86,7 +88,7 @@ export default function SettingsScreen() {
     }
   };
 
-  const onDarkToggle = async (value) => {
+  const onDarkToggle = async (value: boolean) => {
     try {
       await setDarkMode(value);
     } catch (e) {
@@ -124,7 +126,7 @@ export default function SettingsScreen() {
     [assetTypes]
   );
 
-  const onPickDefaultAsset = async (code) => {
+  const onPickDefaultAsset = async (code: string) => {
     try {
       await settingsRepo.setDefaultCurrency(code);
       setDefaultCode(code);
@@ -138,7 +140,7 @@ export default function SettingsScreen() {
     resumeVaultLockOnBackground();
   };
 
-  const runExportBackup = async (backupPassword) => {
+  const runExportBackup = async (backupPassword: string) => {
     setBackupBusy(true);
     suspendVaultLockOnBackground();
     try {
@@ -199,8 +201,9 @@ export default function SettingsScreen() {
     }
   };
 
-  const runImportBackup = (backupPassword) => {
+  const runImportBackup = (backupPassword: string) => {
     if (!backupModal || backupModal.mode !== 'import') return;
+    const { fileUri } = backupModal;
     Alert.alert(
       'Replace all data on this device?',
       'Importing replaces your vault and database with the backup. This cannot be undone unless you have another copy.',
@@ -209,13 +212,13 @@ export default function SettingsScreen() {
         {
           text: 'Import',
           style: 'destructive',
-          onPress: () => void doImportBackup(backupPassword, backupModal.fileUri),
+          onPress: () => void doImportBackup(backupPassword, fileUri),
         },
       ]
     );
   };
 
-  const doImportBackup = async (backupPassword, fileUri) => {
+  const doImportBackup = async (backupPassword: string, fileUri: string) => {
     setBackupBusy(true);
     suspendVaultLockOnBackground();
     try {
