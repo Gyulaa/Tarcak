@@ -4,7 +4,7 @@ import { describe, test } from 'node:test';
 import {
   formatMinorToAmountString,
   parseAmountStringToMinor,
-} from '../src/utils/amountMinor.ts';
+} from '../src/utils/amountMinor';
 
 const ONE = 100_000_000;
 

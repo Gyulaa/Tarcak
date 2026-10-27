@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
-import { splitAmountByBps } from '../src/domain/splitAmount.ts';
+import { splitAmountByBps } from '../src/domain/splitAmount';
 
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 

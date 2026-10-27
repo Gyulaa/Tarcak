@@ -20,7 +20,7 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "typecheck:src": "tsc --noEmit -p tsconfig.src.json",
-    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test \"tests/**/*.test.ts\"",
+    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./tests/resolve-ts.mjs --test \"tests/**/*.test.ts\"",
     "test:jar": "node scripts/jar-advanced-chart-selftest.mjs",
     "security:scan": "node scripts/security-scan.mjs"
   },
