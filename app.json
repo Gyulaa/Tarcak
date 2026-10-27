@@ -17,6 +17,7 @@
     },
     "android": {
       "package": "com.gyulaa.tarcak",
+      "allowBackup": false,
       "versionCode": 5,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
