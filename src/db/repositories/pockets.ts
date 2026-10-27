@@ -127,11 +127,32 @@ export async function renamePocket(id: string, name: string): Promise<void> {
   }
 }
 
-/** Archive or unarchive a **regular** pocket. Does not change the system Jar (use pool toggle for that). */
+/** True if the basic or any Advanced Jar split sends money to this pocket. */
+async function isJarSplitTarget(pocketId: string): Promise<boolean> {
+  const db = await openMainDatabase();
+  const r = await db.getFirstAsync<{ c: number }>(
+    `SELECT
+       (SELECT COUNT(*) FROM jar_distribution_rules WHERE target_pocket_id = ?) +
+       (SELECT COUNT(*) FROM jar_advanced_default_splits WHERE target_pocket_id = ?) +
+       (SELECT COUNT(*) FROM jar_advanced_milestone_splits WHERE target_pocket_id = ?) AS c`,
+    [pocketId, pocketId, pocketId]
+  );
+  return (r?.c ?? 0) > 0;
+}
+
+/**
+ * Archive or unarchive a **regular** pocket. Does not change the system Jar (use pool toggle for that).
+ * A pocket that a Jar split still targets cannot be archived, or distribution would move money into a hidden pocket.
+ */
 export async function setRegularPocketArchived(id: string, archived: boolean): Promise<void> {
   const p = await getPocket(id);
   if (!p || p.is_jar) {
     throw new Error('Only regular pockets can be archived this way.');
+  }
+  if (archived && (await isJarSplitTarget(id))) {
+    throw new Error(
+      'This pocket receives part of the Jar distribution. Remove it from the Jar split (and Advanced Jar rules) first.'
+    );
   }
   const db = await openMainDatabase();
   const now = Date.now();

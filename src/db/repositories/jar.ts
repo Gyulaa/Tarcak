@@ -160,6 +160,15 @@ async function distributeJarCurrencyInTransaction(
     }));
   }
 
+  for (const target of ordered) {
+    const pocket = await pocketsRepo.getPocket(target.target_pocket_id);
+    if (!pocket || pocket.archived) {
+      throw new Error(
+        `A pocket in the split is archived or missing${pocket ? ` (${pocket.name})` : ''}. Update the split first.`
+      );
+    }
+  }
+
   const bpsList = ordered.map((x) => x.percent_bps);
   const parts = splitAmountByBps(totalMinor, bpsList);
   const title = (titleParam ?? 'Jar distribution').trim() || 'Jar distribution';
