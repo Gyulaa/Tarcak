@@ -1,6 +1,7 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   FlatList,
   LayoutAnimation,
   Pressable,
@@ -195,7 +196,9 @@ export default function HistoryScreen({ navigation, route }: RootStackScreenProp
 
   useFocusEffect(
     useCallback(() => {
-      void load();
+      load().catch((e) => {
+        Alert.alert('Could not load', e instanceof Error ? e.message : String(e));
+      });
     }, [load])
   );
 

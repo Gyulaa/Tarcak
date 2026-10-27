@@ -2,6 +2,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   LayoutAnimation,
   Pressable,
   ScrollView,
@@ -337,6 +338,8 @@ export default function StatisticsScreen({ route, navigation }: RootStackScreenP
         setCategoryExpenseSlices([]);
         setCategoryIncomeSlices([]);
       }
+    } catch (e) {
+      Alert.alert('Could not load', e instanceof Error ? e.message : String(e));
     } finally {
       setLineLoading(false);
     }

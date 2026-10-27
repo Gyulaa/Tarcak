@@ -79,6 +79,8 @@ export default function JarScreen({ navigation }: RootStackScreenProps<'Jar'>) {
       setBalances(b.filter((x) => x.balance_minor > 0));
       setRuleCount(rules.length);
       setJarTransactions(txs);
+    } catch (e) {
+      Alert.alert('Could not load', e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }

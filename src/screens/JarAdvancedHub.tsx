@@ -47,6 +47,8 @@ export default function JarAdvancedHub({ navigation }: RootStackScreenProps<'Jar
       setJarOn(jar);
       setAdvancedOn(adv);
       setAssetTypes(types);
+    } catch (e) {
+      Alert.alert('Could not load', e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }

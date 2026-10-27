@@ -1,6 +1,6 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useLayoutEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ContourOnPrimaryText } from '../components/ContourOnPrimaryText';
 import { PocketEditMenu, PocketEditPencilButton } from '../components/PocketEditMenu';
@@ -49,6 +49,8 @@ export default function PocketDetailScreen({ navigation, route }: RootStackScree
       setTxnCount(n);
       setBalances(b);
       setTxs(t);
+    } catch (e) {
+      Alert.alert('Could not load', e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
