@@ -1,0 +1,11 @@
+{
+  "_comment": "Enforced by the agentic-code plugin's guard hook on every shell command Claude runs in this project. 'match' and 'unless' are Python regular expressions, searched in the whole command text. action: deny (blocked) or ask (the user confirms). EAS build/submit is deliberately not listed (see docs/decisions.md); CLAUDE.md still requires explicit permission for it.",
+  "rules": [
+    {
+      "name": "push to the default branch",
+      "match": "git\\s+push\\b[^;&|\\n]*[\\s:+](main|master)(?=[\\s;&|]|$)",
+      "action": "deny",
+      "reason": "Never push to main; everything goes through a branch and a pull request."
+    }
+  ]
+}

@@ -4,7 +4,7 @@
 
 Local-first personal finance app: **pockets** (budget segments), **multi-currency balances**, and a **unified ledger** for income, expenses, and transfers between pockets. All data stays on the device and is stored **encrypted**; unlocking the data uses a **password** you choose (not biometrics as the primary secret).
 
-**App version (native):** `1.2.2` in [`app.json`](app.json) (`android.versionCode` `3`, auto-incremented by EAS on `preview` / `production` builds — see [`eas.json`](eas.json)).
+**App version (native):** `1.2.3` in [`app.json`](app.json) (`android.versionCode` `5`, auto-incremented by EAS on `preview` / `production` builds — see [`eas.json`](eas.json)).
 
 ## Current project setup
 
@@ -79,11 +79,11 @@ First unlock after a big jump may take a few seconds. Wrong vault password still
 
 `app.json` enables the **expo-sqlite** config plugin with **`useSQLCipher: true`**. That only applies after a **native build** (`npx expo prebuild` / EAS / `expo run:*`). **Expo Go does not ship SQLCipher** — the app still runs, but the DB file is **plaintext** there (a console warning explains this). Use a **development build** to validate real encryption.
 
-**CI:** GitHub Actions runs `npm ci` and `npm run typecheck:src` on push/PR (see [.github/workflows/ci.yml](.github/workflows/ci.yml)). **Security:** [`security.yml`](.github/workflows/security.yml) runs `npm run security:scan` (npm audit + static pattern gate) and dependency review on PRs; see [SECURITY.md](SECURITY.md).
+**CI:** GitHub Actions runs `npm ci` and `npm run typecheck` on push/PR (see [.github/workflows/ci.yml](.github/workflows/ci.yml)). **Security:** [`security.yml`](.github/workflows/security.yml) runs `npm run security:scan` (npm audit + static pattern gate) and dependency review on PRs; see [SECURITY.md](SECURITY.md).
 
 **Android APK for GitHub Releases:** [docs/ANDROID_GITHUB_RELEASE.md](docs/ANDROID_GITHUB_RELEASE.md) (EAS Build `preview` profile → attach `.apk` to a Release).
 
-**Typecheck:** `npm run typecheck:src` type-checks `src/**/*.ts` (security, DB client, migrations). Full-project `tsc` can still report upstream Expo / React Native typing noise.
+**Typecheck:** `npm run typecheck` type-checks the whole project (CI). Note: most `.tsx` screens and components still start with `// @ts-nocheck`, so they are not actually checked yet; removing it file by file (fixing the errors it hides) is open work. `npm run typecheck:src` covers only `src/**/*.ts` (security, DB client, migrations).
 
 **Security disclosures:** see [SECURITY.md](SECURITY.md).
 
@@ -496,9 +496,13 @@ Keep **SQL strings and migrations** out of React components.
 | `npm run start:lan` | Dev server on LAN (physical device on same Wi‑Fi) |
 | `npm run start:localhost` | Dev server on `127.0.0.1` (often needs USB + `adb reverse`) |
 | `npm run android` / `ios` / `web` | Run native / web targets |
-| `npm run typecheck:src` | Typecheck `src/**/*.ts` (CI) |
+| `npm run typecheck` | Typecheck the whole project incl. `.tsx` (CI) |
+| `npm run typecheck:src` | Typecheck `src/**/*.ts` only |
+| `scripts/check.sh` | Local gate: full typecheck + static security patterns (offline, no `npm audit`); prints `OK` when green |
 | `npm run test:jar` | Print Advanced Jar / Balance Chart manual QA checklist |
 | `npm run security:scan` | `npm audit` + static secret-pattern gate |
+
+**Git hooks (once per clone):** `git config core.hooksPath .githooks`. The pre-commit hook runs `scripts/check.sh --staged`; the commit-msg hook strips AI attribution lines.
 
 **UI formatting:** Amounts show **spaced thousands** on the integer part (e.g. `1 000`, `54 333 234`) via `formatIntegerPartWithSpaces` in [`src/utils/amountMinor.ts`](src/utils/amountMinor.ts).
 
@@ -507,4 +511,4 @@ Keep **SQL strings and migrations** out of React components.
 
 ## License
 
-(To be chosen when you publish open source, e.g. MIT.)
+MIT, see [LICENSE](LICENSE).

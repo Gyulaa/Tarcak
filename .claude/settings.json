@@ -1,0 +1,27 @@
+{
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
+  "permissions": {
+    "allow": [
+      "Bash(scripts/check.sh*)",
+      "Bash(npm run typecheck*)",
+      "Bash(npm run security:scan*)",
+      "Bash(npm run test:jar*)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git branch*)",
+      "Bash(git fetch*)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./.tarcak/**)",
+      "Read(./**/*.tarcak)",
+      "Read(./**/*.sqlite)",
+      "Read(./**/*.db)"
+    ]
+  }
+}
