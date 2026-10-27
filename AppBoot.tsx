@@ -1,6 +1,3 @@
-// Temporary: React 19 + React Native 0.81 JSX typings disagree under `tsc` (View/Text as JSX).
-// Metro / Expo bundling is unaffected. Security code is fully checked via `npm run typecheck:src`.
-
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useState } from 'react';
