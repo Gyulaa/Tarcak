@@ -179,8 +179,14 @@ export async function exportEncryptedBackup(backupPassword: string): Promise<str
 
   const db = await openMainDatabase();
 
-  // Flush any WAL data into the main file before reading it (no-op for DELETE journal mode).
-  await db.execAsync('PRAGMA wal_checkpoint(FULL)');
+  // Flush any WAL data into the main file before reading it (no-op for DELETE journal mode, which
+  // reports log = checkpointed = -1). A busy or partial checkpoint would leave recent writes out.
+  const checkpoint = await db.getFirstAsync<{ busy: number; log: number; checkpointed: number }>(
+    'PRAGMA wal_checkpoint(FULL)'
+  );
+  if (checkpoint && (checkpoint.busy !== 0 || checkpoint.log !== checkpoint.checkpointed)) {
+    throw new VaultCryptoError('Could not flush recent changes to the database file. Try the export again.');
+  }
 
   const [dbBytes, vault, appearance] = await Promise.all([
     readMainDatabaseBytes(),
