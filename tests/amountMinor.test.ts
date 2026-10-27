@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
 import {
+  autoDisplayDecimals,
+  formatMinorRounded,
   formatMinorToAmountString,
   parseAmountStringToMinor,
 } from '../src/utils/amountMinor';
@@ -53,5 +55,51 @@ describe('formatMinorToAmountString', () => {
     for (const minor of [1, -1, ONE, 12.5 * ONE, -123_456_789, Number.MAX_SAFE_INTEGER]) {
       assert.equal(parseAmountStringToMinor(formatMinorToAmountString(minor)), minor);
     }
+  });
+});
+
+describe('autoDisplayDecimals', () => {
+  test('hundreds and up show whole units, 1–100 shows cents, below 1 three significant digits', () => {
+    assert.equal(autoDisplayDecimals(1_234_567 * ONE), 0);
+    assert.equal(autoDisplayDecimals(100 * ONE), 0);
+    assert.equal(autoDisplayDecimals(-250 * ONE), 0);
+    assert.equal(autoDisplayDecimals(99.99 * ONE), 2);
+    assert.equal(autoDisplayDecimals(ONE), 2);
+    assert.equal(autoDisplayDecimals(0.5 * ONE), 3);
+    assert.equal(autoDisplayDecimals(12_345), 6); // 0.00012345
+    assert.equal(autoDisplayDecimals(1), 8);
+    assert.equal(autoDisplayDecimals(0), 0);
+  });
+});
+
+describe('formatMinorRounded', () => {
+  test('rounds half away from zero, carrying into the whole part', () => {
+    assert.equal(formatMinorRounded(333_333_333_33, 0, false), '333');
+    assert.equal(formatMinorRounded(250_000_000, 0, false), '3');
+    assert.equal(formatMinorRounded(-250_000_000, 0, false), '-3');
+    assert.equal(formatMinorRounded(99_960_000, 3, false), '1');
+    assert.equal(formatMinorRounded(999_999_950_000_000, 0, false), '10 000 000');
+  });
+
+  test('keeps or drops trailing zeros', () => {
+    assert.equal(formatMinorRounded(12.5 * ONE, 2, true), '12.50');
+    assert.equal(formatMinorRounded(12.5 * ONE, 2, false), '12.5');
+    assert.equal(formatMinorRounded(300 * ONE, 2, true), '300.00');
+    assert.equal(formatMinorRounded(300 * ONE, 2, false), '300');
+  });
+
+  test('eight decimals is exact', () => {
+    assert.equal(formatMinorRounded(123_456_789, 8, true), '1.23456789');
+    assert.equal(formatMinorRounded(1, 8, false), '0.00000001');
+  });
+
+  test('no negative zero', () => {
+    assert.equal(formatMinorRounded(-1, 2, false), '0');
+    assert.equal(formatMinorRounded(-1, 2, true), '0.00');
+  });
+
+  test('rejects bad input', () => {
+    assert.throws(() => formatMinorRounded(1.5, 2, false));
+    assert.throws(() => formatMinorRounded(1, 9, false));
   });
 });

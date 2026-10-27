@@ -42,8 +42,8 @@ import type { RootStackScreenProps } from '../navigation/types';
 import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
-import { AMOUNT_MINOR_SCALE, formatMinorToAmountString } from '../utils/amountMinor';
-import { formatMinorForDisplay } from '../utils/formatMinor';
+import { AMOUNT_MINOR_SCALE } from '../utils/amountMinor';
+import { formatMinorAmountForDisplay, formatMinorForDisplay } from '../utils/formatMinor';
 import { formatOccurredAt } from '../utils/formatOccurredAt';
 import { pocketChartColor } from '../utils/pocketChartColors';
 
@@ -697,7 +697,7 @@ export default function StatisticsScreen({ route, navigation }: RootStackScreenP
               centerLabelComponent={() => (
                 <View style={styles.pieCenter}>
                   <Text style={styles.pieCenterLabel} numberOfLines={2}>
-                    {formatMinorToAmountString(pieTotal)}
+                    {formatMinorAmountForDisplay(pieTotal, currency)}
                   </Text>
                   <Text style={styles.pieCenterSub}>{currency}</Text>
                 </View>
@@ -758,7 +758,7 @@ export default function StatisticsScreen({ route, navigation }: RootStackScreenP
                   centerLabelComponent={() => (
                     <View style={styles.pieCenter}>
                       <Text style={styles.pieCenterLabel} numberOfLines={2}>
-                        {formatMinorToAmountString(expensePieTotal)}
+                        {formatMinorAmountForDisplay(expensePieTotal, currency)}
                       </Text>
                       <Text style={styles.pieCenterSub}>{currency}</Text>
                     </View>
@@ -806,7 +806,7 @@ export default function StatisticsScreen({ route, navigation }: RootStackScreenP
                   centerLabelComponent={() => (
                     <View style={styles.pieCenter}>
                       <Text style={styles.pieCenterLabel} numberOfLines={2}>
-                        {formatMinorToAmountString(incomePieTotal)}
+                        {formatMinorAmountForDisplay(incomePieTotal, currency)}
                       </Text>
                       <Text style={styles.pieCenterSub}>{currency}</Text>
                     </View>

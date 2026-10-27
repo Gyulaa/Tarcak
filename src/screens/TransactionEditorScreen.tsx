@@ -143,6 +143,7 @@ export default function TransactionEditorScreen({
         id: '__legacy__',
         code: currency,
         name: 'Not in catalog — add in Asset types or pick another',
+        display_decimals: null,
         sort_index: -1,
         created_at: 0,
         updated_at: 0,

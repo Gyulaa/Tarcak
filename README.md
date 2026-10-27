@@ -13,7 +13,7 @@ Local-first personal finance app: **pockets** (budget segments), **multi-currenc
 | **Runtime** | Expo SDK `~54`, React Native `0.81`, React `19`, TypeScript `strict` |
 | **Entry** | `index.ts` → `App.tsx` (fonts) → `AppBoot.tsx` (vault gate + main UI) |
 | **Architecture** | New Architecture enabled (`newArchEnabled: true` in `app.json`) |
-| **Implemented** | **Vault** (PBKDF2 + AES-GCM wrapped DEK, SQLCipher, lock on background). **Schema** migrations **`0001`–`0007`** (auto-applied on unlock). **Repositories:** `pockets`, `transactions`, `settings`, `assetTypes`, `categories`, `jar`, `jarAdvanced`, `statistics`. **UI:** Home (balances by currency, Jar shortcut), Pockets + pocket detail, **History** (collapsible multi-filter panel — Type / Asset / Pocket / **Category**, tap-to-toggle, summary chips when collapsed), **Statistics** (collapsible **settings panel** — Asset / Scope / **Category filter** / Time range — plus balance-over-time, pocket mix with a **negative-balance fallback**, **per-category income/expense breakdown**, and a fixed-position chart value readout), **Settings** (appearance, Jar toggles, archived pockets, **categories**, **encrypted backup**), asset-type catalog, **category catalog** (optional per-transaction tag), transaction editor. **Jar:** Record income, Distribute (basic or Advanced rules), Jar split screen, recent Jar transactions. **Advanced Jar:** hub + per-asset **visual editor** (Balance Chart, split preview bar, milestone knots). **`ModalSelectField`** everywhere including **multi-select** filter sheets (tap toggles a checkmark and keeps the sheet open; tapping "All" clears and closes). **Themes:** six accent palettes + dark mode; **unlock screen** uses cached appearance. **Support:** BTC donation address on Home. **Encrypted `.tarcak` backup** export/import. |
+| **Implemented** | **Vault** (PBKDF2 + AES-GCM wrapped DEK, SQLCipher, lock on background). **Schema** migrations **`0001`–`0008`** (auto-applied on unlock). **Repositories:** `pockets`, `transactions`, `settings`, `assetTypes`, `categories`, `jar`, `jarAdvanced`, `statistics`. **UI:** Home (balances by currency, Jar shortcut), Pockets + pocket detail, **History** (collapsible multi-filter panel — Type / Asset / Pocket / **Category**, tap-to-toggle, summary chips when collapsed), **Statistics** (collapsible **settings panel** — Asset / Scope / **Category filter** / Time range — plus balance-over-time, pocket mix with a **negative-balance fallback**, **per-category income/expense breakdown**, and a fixed-position chart value readout), **Settings** (appearance, Jar toggles, archived pockets, **categories**, **encrypted backup**), asset-type catalog, **category catalog** (optional per-transaction tag), transaction editor. **Jar:** Record income, Distribute (basic or Advanced rules), Jar split screen, recent Jar transactions. **Advanced Jar:** hub + per-asset **visual editor** (Balance Chart, split preview bar, milestone knots). **`ModalSelectField`** everywhere including **multi-select** filter sheets (tap toggles a checkmark and keeps the sheet open; tapping "All" clears and closes). **Themes:** six accent palettes + dark mode; **unlock screen** uses cached appearance. **Support:** BTC donation address on Home. **Encrypted `.tarcak` backup** export/import. |
 | **Still to add** | Polish (**editable** `occurred_at` in the transaction editor; pocket rename UX), automated tests beyond CI typecheck + `test:jar` checklist, optional FX / converted home total |
 
 ## Support / donations
@@ -61,7 +61,7 @@ Implementation: [`src/security/backup.ts`](src/security/backup.ts), [`src/securi
 
 ## Upgrading from an older build
 
-Safe to install over an existing vault: on unlock, [`runPendingMigrations`](src/db/migrations/runner.ts) applies any of **`0001`–`0007`** not yet recorded in `schema_migrations`. No new migration is required for recent UI-only releases if you are already at version **7**.
+Safe to install over an existing vault: on unlock, [`runPendingMigrations`](src/db/migrations/runner.ts) applies any of **`0001`–`0008`** not yet recorded in `schema_migrations`. No new migration is required for recent UI-only releases if you are already at version **8**.
 
 | Migration | What changes |
 |-----------|----------------|
@@ -72,6 +72,7 @@ Safe to install over an existing vault: on unlock, [`runPendingMigrations`](src/
 | `0005` | `pockets.archived` |
 | `0006` | Advanced Jar tables |
 | `0007` | `categories` catalog + nullable `transactions.category_id` (FK, `ON DELETE SET NULL`) |
+| `0008` | nullable `asset_types.display_decimals` (0–8; null = automatic) |
 
 First unlock after a big jump may take a few seconds. Wrong vault password still fails before migrations run. See **Forgot password** if you need a clean slate.
 
@@ -257,6 +258,7 @@ Partial unique index: at most one row with `is_jar = 1`.
 | `id` | TEXT PK | UUID |
 | `code` | TEXT NOT NULL UNIQUE | Uppercase code stored on `transactions.currency` |
 | `name` | TEXT NOT NULL | Display label |
+| `display_decimals` | INTEGER, nullable, 0–8 | Decimals shown in lists and totals (migration `0008`); null = automatic: none from 100 units, two from 1, three significant digits below 1. Display only; edit fields show the exact amount |
 | `sort_index` | INTEGER NOT NULL | UI ordering |
 | `created_at` / `updated_at` | INTEGER NOT NULL | Unix ms |
 
@@ -394,6 +396,7 @@ src/
       0005_pockets_archived.ts
       0006_jar_advanced.ts
       0007_categories.ts
+      0008_asset_display_decimals.ts
       index.ts           # re-exports
     repositories/
       pockets.ts
@@ -441,8 +444,8 @@ src/
     JarAdvancedHub.tsx
     JarAdvancedAssetEditor.tsx
   utils/
-    amountMinor.ts         # parse/format; spaced thousands on integer part
-    formatMinor.ts
+    amountMinor.ts         # parse (comma or point decimals) / exact and rounded format
+    formatMinor.ts         # display rounding per asset (display_decimals or automatic)
     formatOccurredAt.ts
     pocketChartColors.ts   # stable per-pocket chart colors (theme-aware)
 AppBoot.tsx              # vault gate (themed via appearanceCache) + SafeAreaProvider + MainNavigator when unlocked

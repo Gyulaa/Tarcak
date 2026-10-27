@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 import type { BalanceRow, Pocket } from '../domain/types';
+import * as assetTypesRepo from '../db/repositories/assetTypes';
 import * as pocketsRepo from '../db/repositories/pockets';
 import * as settingsRepo from '../db/repositories/settings';
 import * as txRepo from '../db/repositories/transactions';
@@ -28,6 +29,8 @@ export const useLedgerStore = create<LedgerState>((set, get) => ({
       const showArchived = await settingsRepo.getShowArchivedPockets();
       const pockets = await pocketsRepo.listPockets(showArchived);
       const homeBalances = await txRepo.sumBalancesAll();
+      // Loads each asset's display decimals before the balances render.
+      await assetTypesRepo.listAssetTypes();
       set({ pockets, homeBalances, loading: false });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);

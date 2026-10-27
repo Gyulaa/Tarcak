@@ -7,6 +7,7 @@ import { migration0004Jar } from './0004_jar';
 import { migration0005PocketsArchived } from './0005_pockets_archived';
 import { migration0006JarAdvanced } from './0006_jar_advanced';
 import { migration0007Categories } from './0007_categories';
+import { migration0008AssetDisplayDecimals } from './0008_asset_display_decimals';
 import type { Migration } from './types';
 
 /**
@@ -20,6 +21,7 @@ export const ALL_MIGRATIONS: readonly Migration[] = [
   migration0005PocketsArchived,
   migration0006JarAdvanced,
   migration0007Categories,
+  migration0008AssetDisplayDecimals,
 ].sort(
   (a, b) => a.version - b.version
 );

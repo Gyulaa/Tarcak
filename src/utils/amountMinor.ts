@@ -92,3 +92,56 @@ export function formatMinorToAmountString(minor: number): string {
   const fracStr = frac.toString().padStart(8, '0').replace(/0+$/, '');
   return `${neg ? '-' : ''}${wholeStr}.${fracStr}`;
 }
+
+/** Most decimals any amount can have (one minor unit = 10^-8). */
+export const MAX_AMOUNT_DECIMALS = 8;
+
+/**
+ * Decimals shown when an asset has no fixed setting: none from 100 units up (hundreds and thousands
+ * read as whole numbers), two between 1 and 100, and three significant digits below 1, so small crypto
+ * amounts stay readable (0.000123).
+ */
+export function autoDisplayDecimals(minor: number): number {
+  const abs = Math.abs(minor);
+  if (abs >= 100 * AMOUNT_MINOR_SCALE) {
+    return 0;
+  }
+  if (abs >= AMOUNT_MINOR_SCALE) {
+    return 2;
+  }
+  if (abs === 0) {
+    return 0;
+  }
+  // abs < 10^8 here, so its digit count tells how many zeros follow the decimal point.
+  const zerosAfterPoint = MAX_AMOUNT_DECIMALS - String(abs).length;
+  return Math.min(MAX_AMOUNT_DECIMALS, zerosAfterPoint + 3);
+}
+
+/**
+ * Minor units → display string rounded half away from zero to `decimals` places (exact BigInt math).
+ * `padDecimals` keeps trailing zeros (fixed-precision assets such as EUR show "12.50"); otherwise they
+ * are dropped ("12.5", "300").
+ */
+export function formatMinorRounded(minor: number, decimals: number, padDecimals: boolean): string {
+  if (!Number.isInteger(minor)) {
+    throw new Error('Internal error: amount must be an integer.');
+  }
+  if (!Number.isInteger(decimals) || decimals < 0 || decimals > MAX_AMOUNT_DECIMALS) {
+    throw new Error('Internal error: decimals must be 0–8.');
+  }
+  let bi = BigInt(minor);
+  const neg = bi < 0n;
+  if (neg) {
+    bi = -bi;
+  }
+  const step = 10n ** BigInt(MAX_AMOUNT_DECIMALS - decimals);
+  const rounded = ((bi + step / 2n) / step) * step;
+  const whole = rounded / SCALE_BI;
+  let fracStr = (rounded % SCALE_BI).toString().padStart(MAX_AMOUNT_DECIMALS, '0').slice(0, decimals);
+  if (!padDecimals) {
+    fracStr = fracStr.replace(/0+$/, '');
+  }
+  const sign = neg && rounded !== 0n ? '-' : '';
+  const wholeStr = formatIntegerPartWithSpaces(whole.toString());
+  return fracStr ? `${sign}${wholeStr}.${fracStr}` : `${sign}${wholeStr}`;
+}

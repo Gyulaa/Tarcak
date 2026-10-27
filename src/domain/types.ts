@@ -31,6 +31,8 @@ export type AssetType = {
   /** Uppercase code stored on `transactions.currency`. */
   code: string;
   name: string;
+  /** Decimals shown in lists and balances (0–8); null = automatic by size. Display only. */
+  display_decimals: number | null;
   sort_index: number;
   created_at: number;
   updated_at: number;
