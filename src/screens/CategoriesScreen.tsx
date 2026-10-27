@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useMemo, useState } from 'react';
 import {
@@ -15,6 +14,7 @@ import {
 import { ContourOnPrimaryText } from '../components/ContourOnPrimaryText';
 import { ScreenWithFooter } from '../components/ScreenWithFooter';
 import * as categoriesRepo from '../db/repositories/categories';
+import type { Category } from '../domain/types';
 import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
@@ -24,14 +24,14 @@ export default function CategoriesScreen() {
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const swatchPalette = useMemo(() => buildThemeChartPalette(colors, isDark), [colors, isDark]);
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState<Category[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState('');
-  const [newColor, setNewColor] = useState(null);
+  const [newColor, setNewColor] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
-  const [editId, setEditId] = useState(null);
+  const [editId, setEditId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
-  const [editColor, setEditColor] = useState(null);
+  const [editColor, setEditColor] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const reload = useCallback(async () => {
@@ -60,7 +60,7 @@ export default function CategoriesScreen() {
     }
   };
 
-  const openEdit = (row) => {
+  const openEdit = (row: Category) => {
     setEditId(row.id);
     setEditName(row.name);
     setEditColor(row.color);
@@ -82,7 +82,7 @@ export default function CategoriesScreen() {
     }
   };
 
-  const tryDelete = (id, name) => {
+  const tryDelete = (id: string, name: string) => {
     Alert.alert(
       'Delete category',
       `Remove "${name}"? Transactions using it will become uncategorized.`,
@@ -104,7 +104,7 @@ export default function CategoriesScreen() {
     );
   };
 
-  const renderSwatchRow = (selected, onSelect) => (
+  const renderSwatchRow = (selected: string | null, onSelect: (hex: string | null) => void) => (
     <View style={styles.swatchRow}>
       <Pressable
         style={[styles.swatchNone, !selected && styles.swatchSelected]}

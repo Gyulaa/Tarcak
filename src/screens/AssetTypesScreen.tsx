@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useMemo, useState } from 'react';
 import {
@@ -15,6 +14,7 @@ import {
 import { ContourOnPrimaryText } from '../components/ContourOnPrimaryText';
 import { ScreenWithFooter } from '../components/ScreenWithFooter';
 import * as assetTypesRepo from '../db/repositories/assetTypes';
+import type { AssetType } from '../domain/types';
 import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
@@ -22,12 +22,12 @@ import type { AppColors } from '../theme/palette';
 export default function AssetTypesScreen() {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState<AssetType[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
   const [newCode, setNewCode] = useState('');
   const [newName, setNewName] = useState('');
   const [renameOpen, setRenameOpen] = useState(false);
-  const [renameId, setRenameId] = useState(null);
+  const [renameId, setRenameId] = useState<string | null>(null);
   const [renameCode, setRenameCode] = useState('');
   const [renameValue, setRenameValue] = useState('');
   const [busy, setBusy] = useState(false);
@@ -58,7 +58,7 @@ export default function AssetTypesScreen() {
     }
   };
 
-  const openRename = (row) => {
+  const openRename = (row: AssetType) => {
     setRenameId(row.id);
     setRenameCode(row.code);
     setRenameValue(row.name);
@@ -80,7 +80,7 @@ export default function AssetTypesScreen() {
     }
   };
 
-  const tryDelete = (id, code) => {
+  const tryDelete = (id: string, code: string) => {
     Alert.alert('Delete asset type', `Remove "${code}"? Only allowed if no transactions use it.`, [
       { text: 'Cancel', style: 'cancel' },
       {
