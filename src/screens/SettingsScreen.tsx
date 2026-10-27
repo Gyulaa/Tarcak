@@ -137,9 +137,9 @@ export default function SettingsScreen({ navigation }: RootStackScreenProps<'Set
 
   const closeBackupModal = () => {
     setBackupModal(null);
-    resumeVaultLockOnBackground();
   };
 
+  /** Lock-on-background stays suspended until the share sheet returns, then resumes in `finally`. */
   const runExportBackup = async (backupPassword: string) => {
     setBackupBusy(true);
     suspendVaultLockOnBackground();
@@ -177,6 +177,8 @@ export default function SettingsScreen({ navigation }: RootStackScreenProps<'Set
       Alert.alert('Not on web', 'Import and export backups from the Android or iOS app.');
       return;
     }
+    // Suspended only while the system picker is open; the password modal that follows must not
+    // keep the vault unlocked if the user leaves the app.
     suspendVaultLockOnBackground();
     try {
       const picked = await DocumentPicker.getDocumentAsync({
@@ -184,7 +186,6 @@ export default function SettingsScreen({ navigation }: RootStackScreenProps<'Set
         copyToCacheDirectory: true,
       });
       if (picked.canceled || !picked.assets?.[0]?.uri) {
-        resumeVaultLockOnBackground();
         return;
       }
       const name = picked.assets[0].name ?? '';
@@ -196,8 +197,9 @@ export default function SettingsScreen({ navigation }: RootStackScreenProps<'Set
       }
       setBackupModal({ mode: 'import', fileUri: picked.assets[0].uri });
     } catch (e) {
-      resumeVaultLockOnBackground();
       Alert.alert('Could not open file', e instanceof Error ? e.message : String(e));
+    } finally {
+      resumeVaultLockOnBackground();
     }
   };
 
