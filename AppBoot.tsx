@@ -30,6 +30,7 @@ import {
   eraseAllLocalTarcakData,
   hasVault,
   isSessionUnlocked,
+  isVaultLockSuspended,
   lockVaultSession,
   openMainDatabase,
   registerLockOnBackground,
@@ -109,11 +110,14 @@ export default function AppBoot() {
     setUnlocked(isSessionUnlocked());
   }, [vaultPresent, busy]);
 
-  // After `inactive`/`background` lock, sync UI when the app becomes active again.
+  // Leaving the app swaps to the lock screen right away (the session locks in parallel), so the
+  // app-switcher snapshot shows no balances; becoming active syncs with the real session state.
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
         setUnlocked(isSessionUnlocked());
+      } else if (!isVaultLockSuspended()) {
+        setUnlocked(false);
       }
     });
     return () => sub.remove();
