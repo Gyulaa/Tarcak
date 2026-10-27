@@ -1,4 +1,3 @@
-// @ts-nocheck
 import * as Clipboard from 'expo-clipboard';
 import { useState } from 'react';
 import {
