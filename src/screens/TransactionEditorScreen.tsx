@@ -1,5 +1,5 @@
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Pressable,
@@ -18,7 +18,13 @@ import * as categoriesRepo from '../db/repositories/categories';
 import * as pocketsRepo from '../db/repositories/pockets';
 import * as settingsRepo from '../db/repositories/settings';
 import * as txRepo from '../db/repositories/transactions';
-import type { AssetType, Category, Pocket, TransactionKind } from '../domain/types';
+import type {
+  AssetType,
+  Category,
+  LedgerTransaction,
+  Pocket,
+  TransactionKind,
+} from '../domain/types';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
@@ -51,6 +57,9 @@ export default function TransactionEditorScreen({
   const [categoryId, setCategoryId] = useState('');
   /** Preserved when editing; ignored on create (we use time of save). */
   const [occurredAt, setOccurredAt] = useState<number | null>(null);
+  /** The ref blocks a second tap before React re-renders; the state disables the button. */
+  const savingRef = useRef(false);
+  const [saving, setSaving] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -98,7 +107,14 @@ export default function TransactionEditorScreen({
     }
     void (async () => {
       setLoading(true);
-      const row = await txRepo.getTransaction(transactionId);
+      let row: LedgerTransaction | null;
+      try {
+        row = await txRepo.getTransaction(transactionId);
+      } catch (e) {
+        Alert.alert('Could not load', e instanceof Error ? e.message : String(e));
+        navigation.goBack();
+        return;
+      }
       if (!row) {
         Alert.alert('Missing', 'Transaction not found.');
         navigation.goBack();
@@ -144,6 +160,9 @@ export default function TransactionEditorScreen({
   };
 
   const save = async () => {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
     try {
       if (!assetTypes.some((a) => a.code === currency)) {
         throw new Error(
@@ -205,6 +224,9 @@ export default function TransactionEditorScreen({
       navigation.goBack();
     } catch (e) {
       Alert.alert('Cannot save', e instanceof Error ? e.message : String(e));
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
   };
 
@@ -408,7 +430,7 @@ export default function TransactionEditorScreen({
         </>
       ) : null}
 
-      <Pressable style={styles.saveBtn} onPress={() => void save()}>
+      <Pressable style={styles.saveBtn} onPress={() => void save()} disabled={saving}>
         <ContourOnPrimaryText style={styles.saveBtnText}>
           {transactionId ? 'Save changes' : 'Save'}
         </ContourOnPrimaryText>
