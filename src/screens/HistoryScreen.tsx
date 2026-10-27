@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import {
@@ -18,6 +17,8 @@ import * as categoriesRepo from '../db/repositories/categories';
 import * as pocketsRepo from '../db/repositories/pockets';
 import * as settingsRepo from '../db/repositories/settings';
 import * as txRepo from '../db/repositories/transactions';
+import type { Category, LedgerTransaction } from '../domain/types';
+import type { RootStackScreenProps } from '../navigation/types';
 import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
@@ -29,13 +30,13 @@ const ALL = '__all__';
 const UNCATEGORIZED = '__uncategorized__';
 const HISTORY_FETCH_LIMIT = 500;
 
-const KIND_LABELS = {
+const KIND_LABELS: Record<string, string> = {
   income: 'Income',
   expense: 'Expense',
   transfer: 'Transfer',
 };
 
-function txInvolvesPocket(tx, pocketId) {
+function txInvolvesPocket(tx: LedgerTransaction, pocketId: string): boolean {
   if (!pocketId) return true;
   if (tx.kind === 'transfer') {
     return tx.from_pocket_id === pocketId || tx.to_pocket_id === pocketId;
@@ -44,7 +45,11 @@ function txInvolvesPocket(tx, pocketId) {
 }
 
 /** Income filter also includes transfers into the Jar (money pooled from other pockets). */
-function txMatchesKindFilter(tx, kinds, jarPocketId) {
+function txMatchesKindFilter(
+  tx: LedgerTransaction,
+  kinds: string[],
+  jarPocketId: string | null
+): boolean {
   if (!kinds.length) return true;
   for (const kind of kinds) {
     if (kind === 'income') {
@@ -64,12 +69,23 @@ function txMatchesKindFilter(tx, kinds, jarPocketId) {
   return false;
 }
 
-function txMatchesCategoryFilter(tx, categoryIds) {
+function txMatchesCategoryFilter(tx: LedgerTransaction, categoryIds: string[]): boolean {
   if (!categoryIds.length) return true;
   return categoryIds.some((id) => (id === UNCATEGORIZED ? !tx.category_id : tx.category_id === id));
 }
 
-function applyHistoryFilters(items, { kinds, currencies, pocketIds, categoryIds, jarPocketId }) {
+type HistoryFilters = {
+  kinds: string[];
+  currencies: string[];
+  pocketIds: string[];
+  categoryIds: string[];
+  jarPocketId: string | null;
+};
+
+function applyHistoryFilters(
+  items: LedgerTransaction[],
+  { kinds, currencies, pocketIds, categoryIds, jarPocketId }: HistoryFilters
+): LedgerTransaction[] {
   return items.filter((tx) => {
     if (!txMatchesKindFilter(tx, kinds, jarPocketId)) return false;
     if (currencies.length && !currencies.includes(tx.currency)) return false;
@@ -79,8 +95,8 @@ function applyHistoryFilters(items, { kinds, currencies, pocketIds, categoryIds,
   });
 }
 
-function pocketLineForHistory(tx, names) {
-  const n = (id) => (id ? names.get(id) ?? '…' : '…');
+function pocketLineForHistory(tx: LedgerTransaction, names: Map<string, string>): string | null {
+  const n = (id: string | null) => (id ? names.get(id) ?? '…' : '…');
   if (tx.kind === 'transfer' && tx.from_pocket_id && tx.to_pocket_id) {
     return `${n(tx.from_pocket_id)} → ${n(tx.to_pocket_id)}`;
   }
@@ -88,34 +104,36 @@ function pocketLineForHistory(tx, names) {
   return null;
 }
 
-function toggleInList(list, value, allToken = ALL) {
+function toggleInList(list: string[], value: string, allToken = ALL): string[] {
   if (value === allToken) return [];
   return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
 }
 
-function formatMultiDisplay(values, labelFor) {
+function formatMultiDisplay(values: string[], labelFor: (value: string) => string): string {
   if (!values.length) return '';
   if (values.length === 1) return labelFor(values[0]);
   if (values.length === 2) return `${labelFor(values[0])}, ${labelFor(values[1])}`;
   return `${values.length} selected`;
 }
 
-export default function HistoryScreen({ navigation, route }) {
+export default function HistoryScreen({ navigation, route }: RootStackScreenProps<'History'>) {
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const chartPalette = useMemo(() => buildThemeChartPalette(colors, isDark), [colors, isDark]);
   const paramPocketId = route.params?.pocketId;
-  const [items, setItems] = useState([]);
-  const [pocketNames, setPocketNames] = useState(() => new Map());
-  const [currencyCodes, setCurrencyCodes] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [categoryNames, setCategoryNames] = useState(() => new Map());
-  const [jarPocketId, setJarPocketId] = useState(null);
+  const [items, setItems] = useState<LedgerTransaction[]>([]);
+  const [pocketNames, setPocketNames] = useState(() => new Map<string, string>());
+  const [currencyCodes, setCurrencyCodes] = useState<string[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [categoryNames, setCategoryNames] = useState(
+    () => new Map<string, { name: string; color: string | null }>()
+  );
+  const [jarPocketId, setJarPocketId] = useState<string | null>(null);
   const [filterLabel, setFilterLabel] = useState('');
-  const [filterKinds, setFilterKinds] = useState([]);
-  const [filterCurrencies, setFilterCurrencies] = useState([]);
-  const [filterPocketIds, setFilterPocketIds] = useState(() => (paramPocketId ? [paramPocketId] : []));
-  const [filterCategoryIds, setFilterCategoryIds] = useState([]);
+  const [filterKinds, setFilterKinds] = useState<string[]>([]);
+  const [filterCurrencies, setFilterCurrencies] = useState<string[]>([]);
+  const [filterPocketIds, setFilterPocketIds] = useState<string[]>(() => (paramPocketId ? [paramPocketId] : []));
+  const [filterCategoryIds, setFilterCategoryIds] = useState<string[]>([]);
   /** Collapsed by default — expand on demand instead of permanently occupying screen space. */
   const [filtersExpanded, setFiltersExpanded] = useState(false);
 
@@ -150,7 +168,7 @@ export default function HistoryScreen({ navigation, route }) {
     const map = new Map(active.map((p) => [p.id, p.name]));
     if (jar) map.set(jar.id, jar.name);
 
-    const need = new Set();
+    const need = new Set<string>();
     for (const tx of list) {
       if (tx.pocket_id) need.add(tx.pocket_id);
       if (tx.from_pocket_id) need.add(tx.from_pocket_id);
@@ -324,16 +342,16 @@ export default function HistoryScreen({ navigation, route }) {
     setFiltersExpanded((v) => !v);
   };
 
-  const handleKindTap = (v) => {
+  const handleKindTap = (v: string) => {
     setFilterKinds(v === ALL ? [] : [v]);
   };
-  const handleCurrencyTap = (v) => {
+  const handleCurrencyTap = (v: string) => {
     setFilterCurrencies(v === ALL ? [] : [v]);
   };
-  const handlePocketTap = (v) => {
+  const handlePocketTap = (v: string) => {
     setFilterPocketIds(v === ALL ? [] : [v]);
   };
-  const handleCategoryTap = (v) => {
+  const handleCategoryTap = (v: string) => {
     setFilterCategoryIds(v === ALL ? [] : [v]);
   };
 
@@ -457,7 +475,7 @@ export default function HistoryScreen({ navigation, route }) {
           const pocketLine = pocketLineForHistory(item, pocketNames);
           const category = item.category_id ? categoryNames.get(item.category_id) : null;
           const categoryColor =
-            category?.color ?? (item.category_id ? pocketChartColor(item.category_id, chartPalette) : null);
+            category?.color ?? (item.category_id ? pocketChartColor(item.category_id, chartPalette) : undefined);
           return (
             <Pressable
               style={styles.row}
