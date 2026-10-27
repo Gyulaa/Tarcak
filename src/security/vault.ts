@@ -11,6 +11,8 @@ import {
   DATA_KEY_LENGTH_BYTES,
   PASSWORD_SALT_LENGTH_BYTES,
   PBKDF2_ITERATIONS,
+  PBKDF2_ITERATIONS_MAX,
+  PBKDF2_ITERATIONS_MIN,
 } from './constants';
 import { uint8ArrayToBase64, base64ToUint8Array } from './encoding';
 import {
@@ -46,7 +48,7 @@ async function readPbkdf2IterationsForUnlock(): Promise<number> {
     return PBKDF2_ITERATIONS;
   }
   const n = Number.parseInt(raw, 10);
-  if (!Number.isInteger(n) || n < 10_000 || n > 50_000_000) {
+  if (!Number.isInteger(n) || n < PBKDF2_ITERATIONS_MIN || n > PBKDF2_ITERATIONS_MAX) {
     throw new VaultCryptoError('Stored PBKDF2 iteration count is invalid.');
   }
   return n;
