@@ -15,7 +15,7 @@ EXTS=${EXTS-""}                         # file extensions to format, space separ
 FORMAT_CHECK=${FORMAT_CHECK-""} # gets the files as arguments, fails if unformatted
 FORMAT_FIX=${FORMAT_FIX-""}       # gets the files as arguments, formats them
 LINT=${LINT-"npm run typecheck --silent && SECURITY_SKIP_AUDIT=1 npm run security:scan --silent"}
-TEST=${TEST-""}
+TEST=${TEST-"npm test --silent"}
 TEST_ARGS_NOT_MACOS=${TEST_ARGS_NOT_MACOS-""}   # extra test arguments off macOS, e.g. --exclude-tags golden
 # ---
 

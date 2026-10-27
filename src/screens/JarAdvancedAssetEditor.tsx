@@ -44,8 +44,8 @@ import {
 import { formatMinorForDisplay } from '../utils/formatMinor';
 
 function parseCeilingMinorString(raw: string): number {
-  const t = String(raw).trim().replace(/\s/g, '').replace(/,/g, '');
-  if (t === '' || /^0+(\.0*)?$/.test(t)) {
+  const t = raw.replace(/\s/g, '');
+  if (t === '' || /^0+([.,]0*)?$/.test(t)) {
     return 0;
   }
   return parseAmountStringToMinor(t);

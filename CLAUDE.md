@@ -12,7 +12,7 @@ scripts/check.sh           # teljes típusellenőrzés + biztonsági minták; "O
 npm run security:scan      # mint a CI: npm audit is (hálózat kell); a check.sh offline, audit nélkül futtatja
 git config core.hooksPath .githooks   # klónonként egyszer
 ```
-Automatikus teszt nincs; a `npm run test:jar` csak kézi ellenőrzőlistát ír ki.
+`npm test`: egységtesztek a tiszta logikára (`tests/*.test.ts`, a Node beépített futtatójával, függőség nélkül; a `check.sh` is futtatja). A `npm run test:jar` csak kézi ellenőrzőlistát ír ki.
 
 ## Ami nem alku tárgya
 - Az összegek előjeles egészek, 1 egység = 10^8 minor (`src/utils/amountMinor.ts`). Lebegőpontos pénzszámolás nincs.

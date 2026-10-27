@@ -30,10 +30,11 @@ export const LEGACY_MINOR_TO_CURRENT_MULTIPLIER = 1_000_000;
 
 /**
  * Parse a human decimal string (optional leading minus) into minor units.
- * At most 8 digits after the decimal point.
+ * Either a comma or a point marks the decimals ("12,5" and "12.5" are both twelve and a half);
+ * spaces may group digits. At most 8 digits after the decimal separator.
  */
 export function parseAmountStringToMinor(raw: string): number {
-  const s0 = raw.trim().replace(/\s/g, '').replace(/,/g, '');
+  const s0 = raw.trim().replace(/\s/g, '');
   if (!s0) {
     throw new Error('Enter an amount.');
   }
@@ -42,11 +43,15 @@ export function parseAmountStringToMinor(raw: string): number {
   if (s.startsWith('+')) {
     s = s.slice(1);
   }
+  if (!/^[\d.,]*$/.test(s)) {
+    throw new Error('Use digits and one decimal separator.');
+  }
+  if ((s.match(/[.,]/g) ?? []).length > 1) {
+    throw new Error('Use only one decimal separator (comma or point); group digits with spaces.');
+  }
+  s = s.replace(',', '.');
   if (!s || s === '.') {
     throw new Error('Enter an amount.');
-  }
-  if (!/^\d*\.?\d*$/.test(s)) {
-    throw new Error('Use digits and at most one decimal point.');
   }
   const dot = s.indexOf('.');
   const intPart = dot === -1 ? s : s.slice(0, dot);
