@@ -21,7 +21,6 @@ import { JarAdvancedBalanceChart } from '../components/jarAdvanced/JarAdvancedBa
 import { ScreenWithFooter } from '../components/ScreenWithFooter';
 import { effectiveSplitRowsAtBalance, suggestMilestoneBalance } from '../domain/jarAdvancedChartModel';
 import {
-  splitsSumExact100,
   splitsSumValid,
   type EditorKnotId,
   type EditorMilestone,
@@ -310,20 +309,6 @@ export default function JarAdvancedAssetEditor({
     });
     if (!validated.ok) {
       Alert.alert('Cannot save', validated.message);
-      return;
-    }
-    const anyPartial =
-      !splitsSumExact100(defaultSplits) ||
-      milestonesForSave.some((m) => !splitsSumExact100(m.splits));
-    if (anyPartial) {
-      Alert.alert(
-        'Partial split',
-        'One or more splits total less than 100%. The undistributed portion will stay in the Jar when you distribute.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Save anyway', onPress: () => void doSave(validated) },
-        ]
-      );
       return;
     }
     void doSave(validated);
