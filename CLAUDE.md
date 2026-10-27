@@ -19,7 +19,7 @@ Automatikus teszt nincs; a `npm run test:jar` csak kézi ellenőrzőlistát ír 
 - Migráció csak új, következő sorszámú fájlként (`src/db/migrations/000N_*.ts`); meglévő migrációt nem módosítunk.
 - A `src/security/` (KDF, DEK-csomagolás, SQLCipher, mentésformátum) változása csak kifejezett kérésre, és a `.tarcak` mentés visszafelé kompatibilis marad, vagy verziót lép.
 - Az adat a készüléken marad: hálózati hívás, analitika, új külső szolgáltatás csak kérdés után.
-- Új fájlba nem kerül `// @ts-nocheck`; meglévőből csak úgy vesszük ki, hogy a fájl hibáit is javítjuk (`docs/bugs.md` B3).
+- `@ts-nocheck` és `@ts-ignore` nem kerül a kódba (a `security:scan` elbukik rájuk); típushibát javítunk, nem elnémítunk.
 - Új függőség csak kérdés után. Színek a `useAppTheme()`-ből, nem nyers hex a képernyőkben.
 - Valódi felhasználói adat (`.tarcak` mentés, kibontott `.sqlite`) nem kerül a projektmappába, és Claude nem olvassa.
 - Push, PR, merge, EAS build és submit csak külön engedéllyel; `main`-re push soha (`.claude/guard.json`).
