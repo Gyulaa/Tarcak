@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -19,31 +18,36 @@ import * as categoriesRepo from '../db/repositories/categories';
 import * as pocketsRepo from '../db/repositories/pockets';
 import * as settingsRepo from '../db/repositories/settings';
 import * as txRepo from '../db/repositories/transactions';
+import type { AssetType, Category, Pocket, TransactionKind } from '../domain/types';
+import type { RootStackScreenProps } from '../navigation/types';
 import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
 import { formatMinorToAmountString, parseAmountStringToMinor } from '../utils/amountMinor';
 import { formatOccurredAt } from '../utils/formatOccurredAt';
 
-const KINDS = ['income', 'expense', 'transfer'];
+const KINDS: TransactionKind[] = ['income', 'expense', 'transfer'];
 const NONE_CATEGORY = '__none__';
 
-export default function TransactionEditorScreen({ navigation, route }) {
+export default function TransactionEditorScreen({
+  navigation,
+  route,
+}: RootStackScreenProps<'TransactionEditor'>) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createTxStyles(colors), [colors]);
   const { transactionId, presetKind, pocketId, fromPocketId, toPocketId } = route.params || {};
 
   const [loading, setLoading] = useState(!!transactionId);
-  const [kind, setKind] = useState(presetKind || 'income');
+  const [kind, setKind] = useState<TransactionKind>(presetKind || 'income');
   const [title, setTitle] = useState('');
   const [amountStr, setAmountStr] = useState('');
   const [currency, setCurrency] = useState('HUF');
   const [targetPocketId, setTargetPocketId] = useState(pocketId || '');
   const [fromId, setFromId] = useState(fromPocketId || '');
   const [toId, setToId] = useState(toPocketId || '');
-  const [pockets, setPockets] = useState([]);
-  const [assetTypes, setAssetTypes] = useState([]);
-  const [categories, setCategories] = useState([]);
+  const [pockets, setPockets] = useState<Pocket[]>([]);
+  const [assetTypes, setAssetTypes] = useState<AssetType[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [categoryId, setCategoryId] = useState('');
   /** Preserved when editing; ignored on create (we use time of save). */
   const [occurredAt, setOccurredAt] = useState<number | null>(null);
