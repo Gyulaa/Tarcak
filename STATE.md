@@ -11,10 +11,10 @@ Helyi, titkosított személyes pénzügyi app (Expo / React Native). Verzió: 1.
 - Egységtesztek: `npm test` (Node beépített futtató, 28 teszt), a `check.sh` futtatja.
 
 ## Nyitott ágak és PR-ok (egymásra épülnek, a PR-ok nyitva, merge sorrendben)
-1. `chore/claude-setup` (main-ről): Claude-beállítás.
-2. `fix/ts-nocheck` (az 1-re): B3 + az átvizsgálás hibanaplója.
-3. `fix/review-findings` (a 2-re): javítások B4–B21-ből + kerekítés.
-4. `chore/dependency-updates` (a 3-ra): B12, Expo SDK 55.
+1. `chore/claude-setup` (main-ről, PR #1): Claude-beállítás.
+2. `fix/ts-nocheck` (az 1-re, PR #2): B3 + az átvizsgálás hibanaplója.
+3. `fix/review-findings` (a 2-re, PR #3): javítások B4–B21-ből + kerekítés.
+4. `chore/dependency-updates` (a 3-ra, PR #4): B12, Expo SDK 55.
 
 ## Dev build a telefonra (Linux)
 - JDK 17: `~/.jdks/temurin-17` (`JAVA_HOME`), Android SDK: `~/Android/Sdk`, adb: `~/Android/Sdk/platform-tools/adb`.
