@@ -279,8 +279,11 @@ export function TimeRangePickerField({ label, value, onChange, earliestMs }: Pro
                     style={[styles.stepperBtn, fromPrevDisabled && styles.stepperBtnDisabled]}
                     onPress={() => !fromPrevDisabled && setDraftFrom(prevFrom)}
                     disabled={fromPrevDisabled}
+                    accessibilityRole="button"
+                    accessibilityLabel="Previous month, from"
+                    accessibilityState={{ disabled: fromPrevDisabled }}
                   >
-                    <Text style={styles.stepperBtnText}>‹</Text>
+                    <Text style={styles.stepperBtnText} accessibilityElementsHidden importantForAccessibility="no">‹</Text>
                   </Pressable>
                   <Text style={styles.stepperLabel}>
                     {MONTH_SHORT[draftFrom.month]} {draftFrom.year}
@@ -289,8 +292,11 @@ export function TimeRangePickerField({ label, value, onChange, earliestMs }: Pro
                     style={[styles.stepperBtn, fromNextDisabled && styles.stepperBtnDisabled]}
                     onPress={() => !fromNextDisabled && setDraftFrom(nextFrom)}
                     disabled={fromNextDisabled}
+                    accessibilityRole="button"
+                    accessibilityLabel="Next month, from"
+                    accessibilityState={{ disabled: fromNextDisabled }}
                   >
-                    <Text style={styles.stepperBtnText}>›</Text>
+                    <Text style={styles.stepperBtnText} accessibilityElementsHidden importantForAccessibility="no">›</Text>
                   </Pressable>
                 </View>
 
@@ -300,8 +306,11 @@ export function TimeRangePickerField({ label, value, onChange, earliestMs }: Pro
                     style={[styles.stepperBtn, toPrevDisabled && styles.stepperBtnDisabled]}
                     onPress={() => !toPrevDisabled && setDraftTo(prevTo)}
                     disabled={toPrevDisabled}
+                    accessibilityRole="button"
+                    accessibilityLabel="Previous month, to"
+                    accessibilityState={{ disabled: toPrevDisabled }}
                   >
-                    <Text style={styles.stepperBtnText}>‹</Text>
+                    <Text style={styles.stepperBtnText} accessibilityElementsHidden importantForAccessibility="no">‹</Text>
                   </Pressable>
                   <Text style={styles.stepperLabel}>
                     {MONTH_SHORT[draftTo.month]} {draftTo.year}
@@ -310,8 +319,11 @@ export function TimeRangePickerField({ label, value, onChange, earliestMs }: Pro
                     style={[styles.stepperBtn, toNextDisabled && styles.stepperBtnDisabled]}
                     onPress={() => !toNextDisabled && setDraftTo(nextTo)}
                     disabled={toNextDisabled}
+                    accessibilityRole="button"
+                    accessibilityLabel="Next month, to"
+                    accessibilityState={{ disabled: toNextDisabled }}
                   >
-                    <Text style={styles.stepperBtnText}>›</Text>
+                    <Text style={styles.stepperBtnText} accessibilityElementsHidden importantForAccessibility="no">›</Text>
                   </Pressable>
                 </View>
 
@@ -422,6 +434,10 @@ function createStyles(c: AppColors) {
       marginBottom: 12,
     },
     stepperBtn: {
+      minWidth: 48,
+      minHeight: 48,
+      alignItems: 'center',
+      justifyContent: 'center',
       paddingHorizontal: 16,
       paddingVertical: 8,
       borderRadius: 8,

@@ -10,6 +10,7 @@ import {
 import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
+import { HIT_SLOP } from '../utils/hitSlop';
 
 function formatWhen(isoOrMs: string | number): string {
   const d = typeof isoOrMs === 'number' ? new Date(isoOrMs) : new Date(isoOrMs);
@@ -63,7 +64,7 @@ export function BackupRestoredBanner() {
       <Pressable
         style={styles.dismissBtn}
         onPress={() => void dismiss()}
-        hitSlop={8}
+        hitSlop={HIT_SLOP}
         accessibilityRole="button"
       >
         <Text style={styles.dismissText}>Dismiss</Text>

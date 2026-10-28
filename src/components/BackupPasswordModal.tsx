@@ -13,6 +13,7 @@ import { ContourOnPrimaryText } from './ContourOnPrimaryText';
 import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
+import { HIT_SLOP } from '../utils/hitSlop';
 
 type Props = {
   visible: boolean;
@@ -81,7 +82,9 @@ export function BackupPasswordModal({
               style={styles.eyeBtn}
               onPress={() => setVisiblePw((v) => !v)}
               disabled={busy}
-              hitSlop={10}
+              hitSlop={HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={visiblePw ? 'Hide password' : 'Show password'}
             >
               <Ionicons
                 name={visiblePw ? 'eye-off-outline' : 'eye-outline'}

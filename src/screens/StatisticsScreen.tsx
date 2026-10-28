@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  LayoutAnimation,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,8 +10,9 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { LineChart, PieChart } from 'react-native-gifted-charts';
+import { LineChart } from 'react-native-gifted-charts';
 
+import { DonutChart, type DonutSlice } from '../components/DonutChart';
 import { ModalSelectField } from '../components/ModalSelectField';
 import { ScreenWithFooter } from '../components/ScreenWithFooter';
 import {
@@ -43,9 +43,11 @@ import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
 import { AMOUNT_MINOR_SCALE } from '../utils/amountMinor';
+import { animateNextLayout } from '../utils/animateLayout';
 import { formatMinorAmountForDisplay, formatMinorForDisplay } from '../utils/formatMinor';
 import { formatOccurredAt } from '../utils/formatOccurredAt';
-import { pocketChartColor } from '../utils/pocketChartColors';
+import { formatShare } from '../utils/formatShare';
+import { assignChartColors, buildThemeChartPalette, resolveStoredColor } from '../utils/pocketChartColors';
 
 /** Must match LineChart `yAxisLabelWidth` so layout math stays consistent. */
 const Y_AXIS_LABEL_WIDTH = 52;
@@ -93,17 +95,6 @@ function computeLineChartScale(points: { balance_minor: number }[]) {
   };
 }
 
-/** Pie slice colors after the first (theme primary). Kept stable for legend consistency. */
-const PIE_SLICE_COLORS_TAIL = [
-  '#2e7d32',
-  '#1565c0',
-  '#6a1b9a',
-  '#00838f',
-  '#ef6c00',
-  '#c62828',
-  '#37474f',
-] as const;
-
 /**
  * Gifted Charts passes Y tick values in the same numeric space as `data[].value` (here: minor units).
  * Show human-readable major units (1.00 = one full coin), not raw integers.
@@ -132,14 +123,11 @@ function axisDateLabel(ts: number): string {
 }
 
 export default function StatisticsScreen({ route, navigation }: RootStackScreenProps<'Statistics'>) {
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { width: winW } = useWindowDimensions();
 
-  const pieSliceColors = useMemo(
-    () => [colors.primary, ...PIE_SLICE_COLORS_TAIL],
-    [colors.primary]
-  );
+  const chartPalette = useMemo(() => buildThemeChartPalette(colors, isDark), [colors, isDark]);
 
   const [assetTypes, setAssetTypes] = useState<AssetType[]>([]);
   const [currency, setCurrency] = useState('HUF');
@@ -403,6 +391,18 @@ export default function StatisticsScreen({ route, navigation }: RootStackScreenP
 
   const lineScale = useMemo(() => computeLineChartScale(linePoints), [linePoints]);
 
+  /** The chart is drawn, so a screen reader gets its shape as one sentence instead. */
+  const lineChartSummary = useMemo(() => {
+    if (linePoints.length === 0) return '';
+    const values = linePoints.map((p) => p.balance_minor);
+    const first = values[0]!;
+    const last = values[values.length - 1]!;
+    const lowest = values.reduce((a, v) => (v < a ? v : a), first);
+    const highest = values.reduce((a, v) => (v > a ? v : a), first);
+    const fmt = (v: number) => formatMinorForDisplay(v, currency);
+    return `Line chart, ${currency}, from ${axisDateLabel(rangeMeta.startMs)} to ${axisDateLabel(rangeMeta.endMs)}. Starts at ${fmt(first)}, ends at ${fmt(last)}, lowest ${fmt(lowest)}, highest ${fmt(highest)}.`;
+  }, [linePoints, currency, rangeMeta.startMs, rangeMeta.endMs]);
+
   const positiveSlices = useMemo(
     () => pieSlices.filter((s) => s.balance_minor > 0n),
     [pieSlices]
@@ -417,15 +417,19 @@ export default function StatisticsScreen({ route, navigation }: RootStackScreenP
   const pieIsNegative = positiveSlices.length === 0 && negativeSlices.length > 0;
   const pieDisplaySlices = pieIsNegative ? negativeSlices : positiveSlices;
 
-  const pieData = useMemo(() => {
-    if (pieDisplaySlices.length === 0) return [];
-    return pieDisplaySlices.map((s, i) => ({
+  const pocketDonutSlices = useMemo<DonutSlice[]>(() => {
+    const total = pieDisplaySlices.reduce((a, sl) => a + sl.balance_minor, 0n);
+    const colorById = assignChartColors(pieDisplaySlices.map((sl) => sl.pocketId), chartPalette);
+    return pieDisplaySlices.map((sl) => ({
+      key: sl.pocketId,
+      name: sl.name,
+      color: colorById.get(sl.pocketId)!,
       // The donut only needs the proportions, so a float is fine here.
-      value: Math.abs(Number(s.balance_minor)),
-      color: pieSliceColors[i % pieSliceColors.length],
-      text: s.name,
+      value: Math.abs(Number(sl.balance_minor)),
+      amountText: formatMinorForDisplay(sl.balance_minor, currency),
+      shareText: formatShare(sl.balance_minor, total),
     }));
-  }, [pieDisplaySlices, pieSliceColors]);
+  }, [pieDisplaySlices, chartPalette, currency]);
 
   const pieTotal = useMemo(
     () => pieDisplaySlices.reduce((a, s) => a + s.balance_minor, 0n),
@@ -437,33 +441,45 @@ export default function StatisticsScreen({ route, navigation }: RootStackScreenP
     pieDisplaySlices.length > 0 &&
     pieTotal !== 0n;
 
-  const categoryColorFor = useCallback(
-    (s: CategorySlice) => s.color ?? (s.categoryId ? pocketChartColor(s.categoryId, pieSliceColors) : colors.textMuted),
-    [pieSliceColors, colors.textMuted]
+  const categoryColors = useMemo(
+    () =>
+      assignChartColors(
+        [...categoryExpenseSlices, ...categoryIncomeSlices].flatMap((sl) => (sl.categoryId ? [sl.categoryId] : [])),
+        chartPalette
+      ),
+    [categoryExpenseSlices, categoryIncomeSlices, chartPalette]
   );
 
-  const expensePieData = useMemo(
-    () =>
-      categoryExpenseSlices.map((s) => ({
-        value: s.total_minor,
-        color: categoryColorFor(s),
-        text: s.name,
-      })),
-    [categoryExpenseSlices, categoryColorFor]
+  const categoryDonutSlices = useCallback(
+    (slices: CategorySlice[]): DonutSlice[] => {
+      const total = slices.reduce((a, sl) => a + sl.total_minor, 0);
+      return slices.map((sl) => ({
+        key: sl.categoryId ?? '__uncategorized__',
+        name: sl.name,
+        color:
+          resolveStoredColor(sl.color, chartPalette) ??
+          (sl.categoryId ? categoryColors.get(sl.categoryId) : undefined) ??
+          colors.textMuted,
+        value: sl.total_minor,
+        amountText: formatMinorForDisplay(sl.total_minor, currency),
+        shareText: formatShare(sl.total_minor, total),
+      }));
+    },
+    [chartPalette, categoryColors, colors.textMuted, currency]
+  );
+
+  const expenseDonutSlices = useMemo(
+    () => categoryDonutSlices(categoryExpenseSlices),
+    [categoryDonutSlices, categoryExpenseSlices]
   );
   const expensePieTotal = useMemo(
     () => categoryExpenseSlices.reduce((a, s) => a + s.total_minor, 0),
     [categoryExpenseSlices]
   );
 
-  const incomePieData = useMemo(
-    () =>
-      categoryIncomeSlices.map((s) => ({
-        value: s.total_minor,
-        color: categoryColorFor(s),
-        text: s.name,
-      })),
-    [categoryIncomeSlices, categoryColorFor]
+  const incomeDonutSlices = useMemo(
+    () => categoryDonutSlices(categoryIncomeSlices),
+    [categoryDonutSlices, categoryIncomeSlices]
   );
   const incomePieTotal = useMemo(
     () => categoryIncomeSlices.reduce((a, s) => a + s.total_minor, 0),
@@ -474,7 +490,7 @@ export default function StatisticsScreen({ route, navigation }: RootStackScreenP
     categoryFilter.mode === 'all' ? '' : ` · ${categoryFilterDisplay} only`;
 
   const toggleSettingsExpanded = () => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    animateNextLayout();
     setSettingsExpanded((v) => !v);
   };
 
@@ -611,75 +627,83 @@ export default function StatisticsScreen({ route, navigation }: RootStackScreenP
                 </Text>
               )}
             </View>
-            <LineChart
-              data={lineChartData}
-              parentWidth={lineLayout.rowW}
-              width={lineLayout.lineAreaW}
-              height={220}
-              spacing={lineLayout.spacing}
-              initialSpacing={CHART_INITIAL_SPACING}
-              endSpacing={CHART_END_SPACING}
-              adjustToWidth={false}
-              curved={false}
-              areaChart
-              hideDataPoints
-              thickness={2}
-              color={colors.primary}
-              startFillColor={colors.primary}
-              endFillColor={colors.primary}
-              startOpacity={0.25}
-              endOpacity={0.02}
-              yAxisThickness={0}
-              xAxisThickness={0}
-              rulesType="solid"
-              rulesColor={colors.border}
-              noOfSections={LINE_NO_OF_SECTIONS}
-              maxValue={lineScale.maxValue}
-              stepValue={lineScale.stepValue}
-              mostNegativeValue={lineScale.mostNegativeValue}
-              noOfSectionsBelowXAxis={lineScale.noOfSectionsBelowXAxis}
-              yAxisTextStyle={{ color: colors.textMuted, fontSize: 10, fontFamily: font.regular }}
-              xAxisLabelTextStyle={{ color: colors.textMuted, fontSize: 10 }}
-              yAxisLabelWidth={Y_AXIS_LABEL_WIDTH}
-              formatYLabel={formatYAxisMajorLabel}
-              xAxisTextNumberOfLines={2}
-              pointerConfig={{
-                pointerStripColor: colors.border,
-                pointerStripWidth: 1,
-                pointerColor: colors.primary,
-                radius: 5,
-                activatePointersOnLongPress: false,
-                activatePointersInstantlyOnTouch: true,
-                persistPointer: true,
-                resetPointerIndexOnRelease: false,
-                // No floating label box (see `readoutRow` above the chart) — this callback only
-                // reports the touched point's data into React state. It fires during the chart
-                // library's own render pass, so the update is deferred a tick (requestAnimationFrame)
-                // rather than calling setState synchronously while a different component renders.
-                pointerLabelComponent: (
-                  items: { value: number; timestamp?: number }[] | undefined,
-                  _secondary: unknown,
-                  pointerIndex: unknown
-                ) => {
-                  const it = items?.[0];
-                  if (!it) return null;
-                  const v = Math.round(Number(it.value));
-                  const idx = typeof pointerIndex === 'number' ? pointerIndex : 0;
-                  const ts =
-                    typeof it.timestamp === 'number'
-                      ? it.timestamp
-                      : typeof lineChartData[idx]?.timestamp === 'number'
-                        ? lineChartData[idx].timestamp
-                        : null;
-                  if (ts != null && (activePointRef.current?.ts !== ts || activePointRef.current?.v !== v)) {
-                    const next = { ts, v };
-                    activePointRef.current = next;
-                    requestAnimationFrame(() => setActivePoint(next));
-                  }
-                  return null;
-                },
-              }}
-            />
+            <View
+              accessible
+              accessibilityRole="image"
+              accessibilityLabel={lineChartSummary}
+              importantForAccessibility="no-hide-descendants"
+            >
+              <LineChart
+                data={lineChartData}
+                parentWidth={lineLayout.rowW}
+                width={lineLayout.lineAreaW}
+                height={220}
+                spacing={lineLayout.spacing}
+                initialSpacing={CHART_INITIAL_SPACING}
+                endSpacing={CHART_END_SPACING}
+                adjustToWidth={false}
+                curved={false}
+                areaChart
+                hideDataPoints
+                thickness={2}
+                color={colors.primary}
+                startFillColor={colors.primary}
+                endFillColor={colors.primary}
+                startOpacity={0.25}
+                endOpacity={0.02}
+                yAxisThickness={0}
+                xAxisThickness={1}
+                xAxisColor={colors.textMuted}
+                rulesType="solid"
+                rulesColor={colors.border}
+                noOfSections={LINE_NO_OF_SECTIONS}
+                maxValue={lineScale.maxValue}
+                stepValue={lineScale.stepValue}
+                mostNegativeValue={lineScale.mostNegativeValue}
+                noOfSectionsBelowXAxis={lineScale.noOfSectionsBelowXAxis}
+                yAxisTextStyle={{ color: colors.textMuted, fontSize: 12, fontFamily: font.regular }}
+                xAxisLabelTextStyle={{ color: colors.textMuted, fontSize: 12 }}
+                yAxisLabelWidth={Y_AXIS_LABEL_WIDTH}
+                formatYLabel={formatYAxisMajorLabel}
+                xAxisTextNumberOfLines={2}
+                pointerConfig={{
+                  pointerStripColor: colors.border,
+                  pointerStripWidth: 1,
+                  pointerColor: colors.primary,
+                  radius: 5,
+                  activatePointersOnLongPress: false,
+                  activatePointersInstantlyOnTouch: true,
+                  persistPointer: true,
+                  resetPointerIndexOnRelease: false,
+                  // No floating label box (see `readoutRow` above the chart) — this callback only
+                  // reports the touched point's data into React state. It fires during the chart
+                  // library's own render pass, so the update is deferred a tick (requestAnimationFrame)
+                  // rather than calling setState synchronously while a different component renders.
+                  pointerLabelComponent: (
+                    items: { value: number; timestamp?: number }[] | undefined,
+                    _secondary: unknown,
+                    pointerIndex: unknown
+                  ) => {
+                    const it = items?.[0];
+                    if (!it) return null;
+                    const v = Math.round(Number(it.value));
+                    const idx = typeof pointerIndex === 'number' ? pointerIndex : 0;
+                    const ts =
+                      typeof it.timestamp === 'number'
+                        ? it.timestamp
+                        : typeof lineChartData[idx]?.timestamp === 'number'
+                          ? lineChartData[idx].timestamp
+                          : null;
+                    if (ts != null && (activePointRef.current?.ts !== ts || activePointRef.current?.v !== v)) {
+                      const next = { ts, v };
+                      activePointRef.current = next;
+                      requestAnimationFrame(() => setActivePoint(next));
+                    }
+                    return null;
+                  },
+                }}
+              />
+            </View>
           </View>
         )}
       </View>
@@ -695,42 +719,11 @@ export default function StatisticsScreen({ route, navigation }: RootStackScreenP
               : `Share of ${currency} balance by pocket`}
             {categoryFilterSuffix}
           </Text>
-          <View style={styles.pieWrap}>
-            <PieChart
-              data={pieData}
-              donut
-              showText={false}
-              innerRadius={48}
-              radius={92}
-              innerCircleColor={colors.surface}
-              centerLabelComponent={() => (
-                <View style={styles.pieCenter}>
-                  <Text style={styles.pieCenterLabel} numberOfLines={2}>
-                    {formatMinorAmountForDisplay(pieTotal, currency)}
-                  </Text>
-                  <Text style={styles.pieCenterSub}>{currency}</Text>
-                </View>
-              )}
-            />
-          </View>
-          <View style={styles.legend}>
-            {pieDisplaySlices.map((s, i) => (
-              <View key={s.pocketId} style={styles.legendRow}>
-                <View
-                  style={[
-                    styles.legendSwatch,
-                    { backgroundColor: pieSliceColors[i % pieSliceColors.length] },
-                  ]}
-                />
-                <Text style={styles.legendName} numberOfLines={1}>
-                  {s.name}
-                </Text>
-                <Text style={styles.legendAmt}>
-                  {formatMinorForDisplay(s.balance_minor, currency)}
-                </Text>
-              </View>
-            ))}
-          </View>
+          <DonutChart
+            slices={pocketDonutSlices}
+            centerText={formatMinorAmountForDisplay(pieTotal, currency)}
+            centerSub={currency}
+          />
         </View>
       ) : !lineLoading && statisticsScope.mode !== 'pocket' ? (
         <View style={styles.card}>
@@ -752,44 +745,14 @@ export default function StatisticsScreen({ route, navigation }: RootStackScreenP
           <Text style={styles.cardSub}>
             {axisDateLabel(rangeMeta.startMs)} → {axisDateLabel(rangeMeta.endMs)} · {currency}
           </Text>
-          {expensePieData.length === 0 ? (
+          {expenseDonutSlices.length === 0 ? (
             <Text style={styles.muted}>No categorized expenses in this range.</Text>
           ) : (
-            <>
-              <View style={styles.pieWrap}>
-                <PieChart
-                  data={expensePieData}
-                  donut
-                  showText={false}
-                  innerRadius={48}
-                  radius={92}
-                  innerCircleColor={colors.surface}
-                  centerLabelComponent={() => (
-                    <View style={styles.pieCenter}>
-                      <Text style={styles.pieCenterLabel} numberOfLines={2}>
-                        {formatMinorAmountForDisplay(expensePieTotal, currency)}
-                      </Text>
-                      <Text style={styles.pieCenterSub}>{currency}</Text>
-                    </View>
-                  )}
-                />
-              </View>
-              <View style={styles.legend}>
-                {categoryExpenseSlices.map((s) => (
-                  <View key={s.categoryId ?? '__uncategorized__'} style={styles.legendRow}>
-                    <View
-                      style={[styles.legendSwatch, { backgroundColor: categoryColorFor(s) }]}
-                    />
-                    <Text style={styles.legendName} numberOfLines={1}>
-                      {s.name}
-                    </Text>
-                    <Text style={styles.legendAmt}>
-                      {formatMinorForDisplay(s.total_minor, currency)}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            </>
+            <DonutChart
+              slices={expenseDonutSlices}
+              centerText={formatMinorAmountForDisplay(expensePieTotal, currency)}
+              centerSub={currency}
+            />
           )}
         </View>
       ) : null}
@@ -800,44 +763,14 @@ export default function StatisticsScreen({ route, navigation }: RootStackScreenP
           <Text style={styles.cardSub}>
             {axisDateLabel(rangeMeta.startMs)} → {axisDateLabel(rangeMeta.endMs)} · {currency}
           </Text>
-          {incomePieData.length === 0 ? (
+          {incomeDonutSlices.length === 0 ? (
             <Text style={styles.muted}>No categorized income in this range.</Text>
           ) : (
-            <>
-              <View style={styles.pieWrap}>
-                <PieChart
-                  data={incomePieData}
-                  donut
-                  showText={false}
-                  innerRadius={48}
-                  radius={92}
-                  innerCircleColor={colors.surface}
-                  centerLabelComponent={() => (
-                    <View style={styles.pieCenter}>
-                      <Text style={styles.pieCenterLabel} numberOfLines={2}>
-                        {formatMinorAmountForDisplay(incomePieTotal, currency)}
-                      </Text>
-                      <Text style={styles.pieCenterSub}>{currency}</Text>
-                    </View>
-                  )}
-                />
-              </View>
-              <View style={styles.legend}>
-                {categoryIncomeSlices.map((s) => (
-                  <View key={s.categoryId ?? '__uncategorized__'} style={styles.legendRow}>
-                    <View
-                      style={[styles.legendSwatch, { backgroundColor: categoryColorFor(s) }]}
-                    />
-                    <Text style={styles.legendName} numberOfLines={1}>
-                      {s.name}
-                    </Text>
-                    <Text style={styles.legendAmt}>
-                      {formatMinorForDisplay(s.total_minor, currency)}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            </>
+            <DonutChart
+              slices={incomeDonutSlices}
+              centerText={formatMinorAmountForDisplay(incomePieTotal, currency)}
+              centerSub={currency}
+            />
           )}
         </View>
       ) : null}
@@ -849,7 +782,7 @@ export default function StatisticsScreen({ route, navigation }: RootStackScreenP
 function createStyles(c: AppColors) {
   return StyleSheet.create({
     scroll: { flex: 1, backgroundColor: c.bg },
-    inner: { paddingVertical: 16, paddingHorizontal: 12, paddingBottom: 40 },
+    inner: { paddingVertical: 16, paddingHorizontal: 16, paddingBottom: 40 },
     lead: { fontSize: 14, color: c.textMuted, lineHeight: 21, marginBottom: 16 },
     exportBtn: {
       backgroundColor: c.surface,
@@ -898,7 +831,7 @@ function createStyles(c: AppColors) {
       backgroundColor: c.surface,
       borderRadius: 14,
       paddingVertical: 12,
-      paddingHorizontal: 10,
+      paddingHorizontal: 12,
       borderWidth: 1,
       borderColor: c.border,
     },
@@ -920,25 +853,11 @@ function createStyles(c: AppColors) {
       marginBottom: 10,
     },
     axisHint: {
-      fontSize: 11,
+      fontSize: 12,
       color: c.textMuted,
       lineHeight: 16,
     },
-    readoutDate: { fontSize: 11, color: c.textMuted },
+    readoutDate: { fontSize: 12, color: c.textMuted },
     readoutAmt: { fontSize: 14, fontFamily: font.semibold, color: c.text },
-    pieWrap: { alignItems: 'center', marginVertical: 8 },
-    pieCenter: { alignItems: 'center', justifyContent: 'center', maxWidth: 72 },
-    pieCenterLabel: {
-      fontSize: 11,
-      fontFamily: font.bold,
-      color: c.text,
-      textAlign: 'center',
-    },
-    pieCenterSub: { fontSize: 10, color: c.textMuted, marginTop: 2 },
-    legend: { marginTop: 12, gap: 8 },
-    legendRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    legendSwatch: { width: 10, height: 10, borderRadius: 3 },
-    legendName: { flex: 1, fontSize: 14, color: c.textSecondary },
-    legendAmt: { fontSize: 13, color: c.textMuted, fontFamily: font.semibold },
   });
 }

@@ -25,6 +25,7 @@ import {
 import { DEFAULT_COLOR_THEME_ID } from './src/theme/colorThemes';
 import { font } from './src/theme/fonts';
 import type { AppColors } from './src/theme/palette';
+import { HIT_SLOP } from './src/utils/hitSlop';
 import { applyScreenCaptureBlock } from './src/utils/screenCapture';
 import { applyPendingBackupImportToSettings } from './src/security/backupImportMeta';
 import {
@@ -285,7 +286,7 @@ export default function AppBoot() {
             style={vaultStyles.eyeBtn}
             onPress={() => setPasswordVisible((v) => !v)}
             disabled={busy}
-            hitSlop={10}
+            hitSlop={HIT_SLOP}
             accessibilityRole="button"
             accessibilityLabel={passwordVisible ? 'Hide password' : 'Show password'}
           >

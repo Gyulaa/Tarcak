@@ -19,6 +19,7 @@ import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
 import { MAX_AMOUNT_DECIMALS } from '../utils/amountMinor';
+import { HIT_SLOP } from '../utils/hitSlop';
 
 /** `null` = automatic (whole units from 100, cents from 1, three significant digits below 1). */
 const DECIMAL_CHOICES: (number | null)[] = [
@@ -136,10 +137,20 @@ export default function AssetTypesScreen() {
               <Text style={styles.cardMeta}>Shown with: {decimalsLabel(item.display_decimals)}</Text>
             </View>
             <View style={styles.cardActions}>
-              <Pressable onPress={() => openRename(item)} hitSlop={10}>
+              <Pressable
+                onPress={() => openRename(item)}
+                hitSlop={HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={`Rename ${item.code}`}
+              >
                 <Text style={styles.link}>Edit</Text>
               </Pressable>
-              <Pressable onPress={() => tryDelete(item.id, item.code)} hitSlop={10}>
+              <Pressable
+                onPress={() => tryDelete(item.id, item.code)}
+                hitSlop={HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={`Delete ${item.code}`}
+              >
                 <Text style={styles.delete}>Delete</Text>
               </Pressable>
             </View>

@@ -23,6 +23,7 @@ import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
 import { formatMinorForDisplay } from '../utils/formatMinor';
+import { HIT_SLOP } from '../utils/hitSlop';
 
 export default function JarAdvancedHub({ navigation }: RootStackScreenProps<'JarAdvanced'>) {
   const { colors } = useAppTheme();
@@ -164,7 +165,13 @@ export default function JarAdvancedHub({ navigation }: RootStackScreenProps<'Jar
                   {s.milestoneCount} milestone{s.milestoneCount === 1 ? '' : 's'}
                 </Text>
               </Pressable>
-              <Pressable style={styles.removeHit} onPress={() => onDelete(s.currency)} hitSlop={10}>
+              <Pressable
+                style={styles.removeHit}
+                onPress={() => onDelete(s.currency)}
+                hitSlop={HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={`Remove ${s.currency} setup`}
+              >
                 <Text style={styles.removeText}>Remove</Text>
               </Pressable>
             </View>

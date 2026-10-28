@@ -232,7 +232,7 @@ function createStyles(c: AppColors) {
     jarIconGlyph: { fontSize: 20, fontFamily: font.bold },
     jarCardMain: { flex: 1 },
     jarBadge: {
-      fontSize: 11,
+      fontSize: 12,
       fontFamily: font.bold,
       color: c.primary,
       letterSpacing: 0.8,

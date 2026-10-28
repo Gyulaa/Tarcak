@@ -20,6 +20,7 @@ import { useLedgerStore } from '../stores/ledgerStore';
 import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
+import { HIT_SLOP } from '../utils/hitSlop';
 
 export type PocketEditTarget = {
   id: string;
@@ -307,7 +308,7 @@ export function PocketEditPencilButton({ onPress, colors }: { onPress: () => voi
     <Pressable
       onPress={onPress}
       style={pencilStyles.wrap}
-      hitSlop={12}
+      hitSlop={HIT_SLOP}
       accessibilityLabel="Edit pocket"
     >
       <Ionicons name="pencil" size={22} color={colors.primary} />

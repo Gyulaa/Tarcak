@@ -139,13 +139,13 @@ export default function PocketDetailScreen({ navigation, route }: RootStackScree
             >
               <View style={styles.btnRow}>
                 <View style={styles.btnQuarter}>
-                  <ContourOnPrimaryText style={styles.btnMark}>+</ContourOnPrimaryText>
+                  <ContourOnPrimaryText style={styles.btnMark} decorative>+</ContourOnPrimaryText>
                 </View>
                 <View style={styles.btnHalf}>
                   <ContourOnPrimaryText style={styles.btnLabelPrimary}>Income</ContourOnPrimaryText>
                 </View>
                 <View style={styles.btnQuarter}>
-                  <ContourOnPrimaryText style={styles.btnMark}>+</ContourOnPrimaryText>
+                  <ContourOnPrimaryText style={styles.btnMark} decorative>+</ContourOnPrimaryText>
                 </View>
               </View>
             </Pressable>
@@ -157,13 +157,13 @@ export default function PocketDetailScreen({ navigation, route }: RootStackScree
             >
               <View style={styles.btnRow}>
                 <View style={styles.btnQuarter}>
-                  <ContourOnPrimaryText style={styles.btnMark}>-</ContourOnPrimaryText>
+                  <ContourOnPrimaryText style={styles.btnMark} decorative>-</ContourOnPrimaryText>
                 </View>
                 <View style={styles.btnHalf}>
                   <ContourOnPrimaryText style={styles.btnLabelPrimary}>Expense</ContourOnPrimaryText>
                 </View>
                 <View style={styles.btnQuarter}>
-                  <ContourOnPrimaryText style={styles.btnMark}>-</ContourOnPrimaryText>
+                  <ContourOnPrimaryText style={styles.btnMark} decorative>-</ContourOnPrimaryText>
                 </View>
               </View>
             </Pressable>
@@ -175,13 +175,13 @@ export default function PocketDetailScreen({ navigation, route }: RootStackScree
             >
               <View style={styles.btnRow}>
                 <View style={styles.btnQuarter}>
-                  <ContourOnPrimaryText style={styles.btnMark}>{'<'}</ContourOnPrimaryText>
+                  <ContourOnPrimaryText style={styles.btnMark} decorative>{'<'}</ContourOnPrimaryText>
                 </View>
                 <View style={styles.btnHalf}>
                   <ContourOnPrimaryText style={styles.btnLabelPrimary}>Transfer</ContourOnPrimaryText>
                 </View>
                 <View style={styles.btnQuarter}>
-                  <ContourOnPrimaryText style={styles.btnMark}>{'>'}</ContourOnPrimaryText>
+                  <ContourOnPrimaryText style={styles.btnMark} decorative>{'>'}</ContourOnPrimaryText>
                 </View>
               </View>
             </Pressable>

@@ -26,6 +26,7 @@ import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
 import { formatMinorForDisplay } from '../utils/formatMinor';
 import { formatOccurredAt } from '../utils/formatOccurredAt';
+import { HIT_SLOP } from '../utils/hitSlop';
 
 const JAR_TX_PREVIEW_COUNT = 5;
 const JAR_TX_FETCH_LIMIT = 200;
@@ -260,13 +261,13 @@ export default function JarScreen({ navigation }: RootStackScreenProps<'Jar'>) {
       >
         <View style={styles.btnRow}>
           <View style={styles.btnQuarter}>
-            <ContourOnPrimaryText style={styles.btnMark}>/</ContourOnPrimaryText>
+            <ContourOnPrimaryText style={styles.btnMark} decorative>/</ContourOnPrimaryText>
           </View>
           <View style={styles.btnHalf}>
             <ContourOnPrimaryText style={styles.btnLabelPrimary}>Distribute</ContourOnPrimaryText>
           </View>
           <View style={styles.btnQuarter}>
-            <ContourOnPrimaryText style={styles.btnMark}>/</ContourOnPrimaryText>
+            <ContourOnPrimaryText style={styles.btnMark} decorative>/</ContourOnPrimaryText>
           </View>
         </View>
       </Pressable>
@@ -287,13 +288,13 @@ export default function JarScreen({ navigation }: RootStackScreenProps<'Jar'>) {
       >
         <View style={styles.btnRow}>
           <View style={styles.btnQuarter}>
-            <ContourOnPrimaryText style={styles.btnMark}>+</ContourOnPrimaryText>
+            <ContourOnPrimaryText style={styles.btnMark} decorative>+</ContourOnPrimaryText>
           </View>
           <View style={styles.btnHalf}>
             <ContourOnPrimaryText style={styles.btnLabelPrimary}>Record income to Jar</ContourOnPrimaryText>
           </View>
           <View style={styles.btnQuarter}>
-            <ContourOnPrimaryText style={styles.btnMark}>+</ContourOnPrimaryText>
+            <ContourOnPrimaryText style={styles.btnMark} decorative>+</ContourOnPrimaryText>
           </View>
         </View>
       </Pressable>
@@ -326,7 +327,7 @@ export default function JarScreen({ navigation }: RootStackScreenProps<'Jar'>) {
             <Pressable
               style={styles.showMoreRow}
               onPress={() => setJarTxShowAll((v) => !v)}
-              hitSlop={6}
+              hitSlop={HIT_SLOP}
             >
               <Text style={styles.showMoreText}>
                 {jarTxShowAll ? 'Show less' : 'Show more'}

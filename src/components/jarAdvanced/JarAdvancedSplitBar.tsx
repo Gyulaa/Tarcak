@@ -6,7 +6,7 @@ import { font } from '../../theme/fonts';
 import type { AppColors } from '../../theme/palette';
 import type { SplitRow } from '../../domain/jarAdvancedEditorTypes';
 import { formatMinorForDisplay } from '../../utils/formatMinor';
-import { buildThemeChartPalette, pocketChartColor } from '../../utils/pocketChartColors';
+import { assignChartColors, buildThemeChartPalette } from '../../utils/pocketChartColors';
 
 type Props = {
   caption: string;
@@ -41,7 +41,11 @@ export function JarAdvancedSplitBar({
   const styles = useMemo(() => createStyles(colors), [colors]);
   const palette = useMemo(() => buildThemeChartPalette(colors, isDark), [colors, isDark]);
 
-  const validRows = rows.filter((r) => r.percent > 0.001);
+  const validRows = useMemo(() => rows.filter((r) => r.percent > 0.001), [rows]);
+  const rowColors = useMemo(
+    () => assignChartColors(validRows.map((r) => r.pocketId), palette),
+    [validRows, palette]
+  );
 
   return (
     <View style={styles.wrap}>
@@ -54,7 +58,7 @@ export function JarAdvancedSplitBar({
               styles.segment,
               {
                 flex: r.percent,
-                backgroundColor: pocketChartColor(r.pocketId, palette),
+                backgroundColor: rowColors.get(r.pocketId),
               },
             ]}
           />
@@ -65,7 +69,7 @@ export function JarAdvancedSplitBar({
           {validRows.map((r) => (
             <View key={r.pocketId} style={styles.legendItem}>
               <View
-                style={[styles.dot, { backgroundColor: pocketChartColor(r.pocketId, palette) }]}
+                style={[styles.dot, { backgroundColor: rowColors.get(r.pocketId) }]}
               />
               <Text style={styles.legendText} numberOfLines={1}>
                 {r.name} {formatLegendValue(r, legendFormat, amountBaseMinor, currency)}
@@ -97,7 +101,7 @@ function createStyles(c: AppColors) {
     barTrack: {
       flexDirection: 'row',
       height: 22,
-      borderRadius: 6,
+      borderRadius: 8,
       overflow: 'hidden',
       backgroundColor: c.border,
     },

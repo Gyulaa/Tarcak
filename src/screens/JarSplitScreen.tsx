@@ -22,6 +22,7 @@ import type { RootStackScreenProps } from '../navigation/types';
 import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
+import { HIT_SLOP } from '../utils/hitSlop';
 
 const TOTAL_BPS = 10_000;
 
@@ -237,7 +238,12 @@ export default function JarSplitScreen({ navigation }: RootStackScreenProps<'Jar
                 <Text style={styles.rowName} numberOfLines={1}>
                   {r.name}
                 </Text>
-                <Pressable onPress={() => removeRow(r.pocketId)} hitSlop={12}>
+                <Pressable
+                  onPress={() => removeRow(r.pocketId)}
+                  hitSlop={HIT_SLOP}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove ${r.name}`}
+                >
                   <Text style={styles.remove}>Remove</Text>
                 </Pressable>
               </View>
