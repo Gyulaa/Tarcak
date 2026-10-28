@@ -14,6 +14,7 @@ import {
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import * as settingsRepo from './src/db/repositories/settings';
 import { MainNavigator } from './src/navigation/MainNavigator';
 import { AppThemeProvider, useAppTheme } from './src/theme/ThemeContext';
 import {
@@ -24,6 +25,7 @@ import {
 import { DEFAULT_COLOR_THEME_ID } from './src/theme/colorThemes';
 import { font } from './src/theme/fonts';
 import type { AppColors } from './src/theme/palette';
+import { applyScreenCaptureBlock } from './src/utils/screenCapture';
 import { applyPendingBackupImportToSettings } from './src/security/backupImportMeta';
 import {
   createFirstVault,
@@ -42,6 +44,19 @@ import { useLedgerStore } from './src/stores/ledgerStore';
 function VaultStatusBar() {
   const { isDark } = useAppTheme();
   return <StatusBar style={isDark ? 'light' : 'dark'} />;
+}
+
+/** The setting lives in the encrypted database, so it is applied once the vault is open. */
+function ScreenCaptureGuard() {
+  useEffect(() => {
+    void settingsRepo
+      .getBlockScreenCapture()
+      .then(applyScreenCaptureBlock)
+      .catch((e) => {
+        Alert.alert('Screenshot block', e instanceof Error ? e.message : String(e));
+      });
+  }, []);
+  return null;
 }
 
 type VaultPhaseKey = 'kdf' | 'db';
@@ -241,6 +256,7 @@ export default function AppBoot() {
           <AppThemeProvider>
             <MainNavigator onLockVault={handleLockFromApp} />
             <VaultStatusBar />
+            <ScreenCaptureGuard />
           </AppThemeProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>

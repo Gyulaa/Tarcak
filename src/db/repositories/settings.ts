@@ -8,6 +8,7 @@ const KEY_ADVANCED_JAR = 'advanced_jar_enabled';
 const KEY_DARK_THEME = 'dark_theme_enabled';
 const KEY_COLOR_THEME = 'color_theme_id';
 const KEY_SHOW_ARCHIVED_POCKETS = 'show_archived_pockets';
+const KEY_BLOCK_SCREEN_CAPTURE = 'block_screen_capture';
 
 export async function getSetting(key: string): Promise<string | null> {
   const db = await openMainDatabase();
@@ -104,4 +105,18 @@ export async function getShowArchivedPockets(): Promise<boolean> {
 
 export async function setShowArchivedPockets(enabled: boolean): Promise<void> {
   await setSetting(KEY_SHOW_ARCHIVED_POCKETS, enabled ? '1' : '0');
+}
+
+/** When true, screenshots, screen recording and the recent-apps preview are blocked. Default off. */
+export async function getBlockScreenCapture(): Promise<boolean> {
+  const v = await getSetting(KEY_BLOCK_SCREEN_CAPTURE);
+  if (v == null || v.trim() === '') {
+    return false;
+  }
+  const t = v.trim().toLowerCase();
+  return t === '1' || t === 'true' || t === 'yes';
+}
+
+export async function setBlockScreenCapture(enabled: boolean): Promise<void> {
+  await setSetting(KEY_BLOCK_SCREEN_CAPTURE, enabled ? '1' : '0');
 }

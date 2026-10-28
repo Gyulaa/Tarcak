@@ -32,6 +32,7 @@ import { COLOR_THEME_META, COLOR_THEME_ORDER, normalizeColorThemeId } from '../t
 import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
+import { applyScreenCaptureBlock } from '../utils/screenCapture';
 
 type BackupModalState = { mode: 'export' } | { mode: 'import'; fileUri: string };
 
@@ -45,6 +46,7 @@ export default function SettingsScreen({ navigation }: RootStackScreenProps<'Set
   const [jarEnabled, setJarEnabled] = useState(true);
   const [advancedJarEnabled, setAdvancedJarEnabled] = useState(false);
   const [showArchivedPockets, setShowArchivedPockets] = useState(false);
+  const [blockScreenCapture, setBlockScreenCapture] = useState(false);
   const [backupModal, setBackupModal] = useState<BackupModalState | null>(null);
   const [backupBusy, setBackupBusy] = useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
@@ -60,6 +62,7 @@ export default function SettingsScreen({ navigation }: RootStackScreenProps<'Set
         setJarEnabled(await settingsRepo.getJarEnabled());
         setAdvancedJarEnabled(await settingsRepo.getAdvancedJarEnabled());
         setShowArchivedPockets(await settingsRepo.getShowArchivedPockets());
+        setBlockScreenCapture(await settingsRepo.getBlockScreenCapture());
         setLoaded(true);
       })();
     }, [])
@@ -87,6 +90,16 @@ export default function SettingsScreen({ navigation }: RootStackScreenProps<'Set
     try {
       await settingsRepo.setShowArchivedPockets(value);
       setShowArchivedPockets(value);
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const onBlockScreenCaptureToggle = async (value: boolean) => {
+    try {
+      await settingsRepo.setBlockScreenCapture(value);
+      await applyScreenCaptureBlock(value);
+      setBlockScreenCapture(value);
     } catch (e) {
       Alert.alert('Error', e instanceof Error ? e.message : String(e));
     }
@@ -407,6 +420,26 @@ export default function SettingsScreen({ navigation }: RootStackScreenProps<'Set
           disabled={!loaded}
           trackColor={{ false: colors.switchTrackOff, true: colors.switchTrackOn }}
           thumbColor={showArchivedPockets ? colors.switchThumbOn : colors.switchThumbOff}
+        />
+      </View>
+
+      <View style={styles.divider} />
+
+      <Text style={styles.label}>Privacy</Text>
+      <View style={[styles.switchRow, Platform.OS === 'web' && styles.switchRowDim]}>
+        <View style={styles.switchTextCol}>
+          <Text style={styles.switchTitle}>Block screenshots</Text>
+          <Text style={styles.switchHint}>
+            Blocks screenshots and screen recording, and hides balances in the recent-apps preview.
+            Off by default.
+          </Text>
+        </View>
+        <Switch
+          value={blockScreenCapture}
+          onValueChange={(v) => void onBlockScreenCaptureToggle(v)}
+          disabled={!loaded || Platform.OS === 'web'}
+          trackColor={{ false: colors.switchTrackOff, true: colors.switchTrackOn }}
+          thumbColor={blockScreenCapture ? colors.switchThumbOn : colors.switchThumbOff}
         />
       </View>
 

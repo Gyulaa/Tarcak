@@ -47,3 +47,8 @@ Tartós döntésenként egy bejegyzés, a legújabb elöl. Változó döntést h
 - **Miért:** B12. Az `npm audit fix` 31-ből 12 találatot hagyott, az SDK 55 9-re vitte le. Az SDK 56–58 sem old meg többet. Az utolsó magas találat a `zod` 3.x az `@expo/cli`-ben (build-eszköz, nem kerül az appba), amihez nincs javított 3.x kiadás; a zod 4-gyel az `expo config` és az `expo prebuild` lefut. Az `expo-system-ui` a `userInterfaceStyle: light` beállításhoz kell. Gyula engedélyezte.
 - **Érinti:** `package.json`, `app.json`, `README.md`; ha az Expo felhoz zod 4-et, az override törölhető.
 
+## 2026-10-28 · Képernyőkép-tiltás kapcsolható beállításként
+- **Döntés:** új függőség `expo-screen-capture` (~55.0.18); Beállítások → Privacy → „Block screenshots” (`user_settings.block_screen_capture`, alapból ki). Bekapcsolva Androidon `FLAG_SECURE`: nincs képernyőkép és felvétel, az appváltóban nincs előnézet. Az érték az adatbázisban van, ezért az app a feloldás után alkalmazza; zárolt állapotban nincs rajta adat.
+- **Miért:** B10. Az appváltó-előnézetre a háttérbe lépéskori azonnali zárolás nem garancia, a `FLAG_SECURE` az; de a képernyőkép-készítést megakadályozza, ezért nem alapértelmezett. A könyvtár három fölösleges jogosultságot hozna (`READ_EXTERNAL_STORAGE`, `READ_MEDIA_IMAGES`, `DETECT_SCREEN_CAPTURE`, csak a képernyőkép-figyelőhöz kellenek), ezek az `app.json` `blockedPermissions` listájában vannak. Gyula kérte.
+- **Érinti:** `package.json`, `app.json`, `src/utils/screenCapture.ts`, `src/db/repositories/settings.ts`, `src/screens/SettingsScreen.tsx`, `AppBoot.tsx`
+
