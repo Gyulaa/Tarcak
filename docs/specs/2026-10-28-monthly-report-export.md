@@ -68,7 +68,7 @@ Minta: a repo-réteg a `src/db/repositories/statistics.ts`-t, a tiszta logika a 
 Új ág a `main`-ről (`feat/monthly-report-export`; a jelenlegi `fix/remaining-bugs` beolvadt). Mindegyik feladat külön commit; tesztet előbb, aztán kód; `scripts/check.sh` = OK.
 
 1. [x] **Tiszta logika + tesztek** (`src/domain/monthlyReport.ts`, `tests/monthlyReport.test.ts`): `monthRangeFor` (hónaphatár, év vége, DST-váltás hónapja, 240 fölötti elutasítás); `formatMinorExact` (bigint > 2^53, negatív, 0, tizedesjel `,`/`.`, záró nullák); `csvCell` (elválasztó, idézőjel, sortörés, `=`/`+`/`-`/`@`/tab injekció); `buildReportCsv` mindkét elrendezésre (üres hónap 0, `Uncategorized`, rendezés, BOM + CRLF, kihagyott pénznem, negatív bevétel, `net`).
-2. **Repo** (`src/db/repositories/report.ts`, `scopeSql` kiemelése `statistics.ts`-ből): a három hatókörre. Egységteszt nincs rá (a tesztfutónak nincs SQLite-ja), ezért a SQL-nek nincs logikája a tiszta réteg fölött; az ellenőrzés a 6. feladatban.
+2. [x] **Repo** (`src/db/repositories/report.ts`, `scopeSql` kiemelése `statistics.ts`-ből): a három hatókörre. Egységteszt nincs rá (a tesztfutónak nincs SQLite-ja), ezért a SQL-nek nincs logikája a tiszta réteg fölött; az ellenőrzés a 6. feladatban.
 3. **Fájl** (`src/utils/reportFile.ts`): írás + takarítás.
 4. **Képernyő és útvonal** (`ReportExportScreen.tsx`, navigáció, Statisztika-gomb): szűrők, előnézet, üres állapot, web letiltva, megerősítő felugró, megosztás a zárolás-felfüggesztéssel. A képernyőszövegek angolul; színek `useAppTheme()`-ből (`design` skill).
 5. **Dokumentáció**: README-szakasz, `docs/decisions.md`, `STATE.md`; `privacy-check` skill lefuttatva és az eredménye ide beírva.
