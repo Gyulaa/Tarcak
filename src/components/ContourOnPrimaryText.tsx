@@ -8,6 +8,8 @@ type Props = {
   style?: StyleProp<TextStyle>;
   /** A glyph that only decorates the control (a "+"): left out of what a screen reader reads. */
   decorative?: boolean;
+  /** Drawn on a disabled control, which is no longer filled with the primary colour. */
+  dimmed?: boolean;
   children: ReactNode;
 };
 
@@ -15,12 +17,12 @@ type Props = {
  * Label text on primary (filled) controls: white on a deep terracotta, **bold** for legibility.
  * Pass `style` with another `fontFamily` if a control needs a different weight.
  */
-export function ContourOnPrimaryText({ style, decorative, children }: Props) {
+export function ContourOnPrimaryText({ style, decorative, dimmed, children }: Props) {
   const { colors } = useAppTheme();
   const fontPad = Platform.OS === 'android' ? ({ includeFontPadding: false } as const) : {};
   return (
     <Text
-      style={[style, { fontFamily: font.bold, color: colors.onPrimary }, fontPad]}
+      style={[style, { fontFamily: font.bold, color: dimmed ? colors.textMuted : colors.onPrimary }, fontPad]}
       accessibilityElementsHidden={decorative}
       importantForAccessibility={decorative ? 'no' : 'auto'}
     >

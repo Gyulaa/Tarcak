@@ -19,12 +19,20 @@ import {
 } from '../components/PocketEditMenu';
 import { ScreenWithFooter } from '../components/ScreenWithFooter';
 import * as settingsRepo from '../db/repositories/settings';
-import type { Pocket } from '../domain/types';
+import * as transactionsRepo from '../db/repositories/transactions';
+import type { BalanceRow, Pocket } from '../domain/types';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useLedgerStore } from '../stores/ledgerStore';
 import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
+import { formatMinorForDisplay } from '../utils/formatMinor';
+
+/** "192 355 HUF · 0.5 XMR", or "Empty" for a pocket with no balance. */
+function balanceLine(rows: BalanceRow[] | undefined): string {
+  if (!rows || rows.length === 0) return 'Empty';
+  return rows.map((r) => formatMinorForDisplay(r.balance_minor, r.currency)).join(' · ');
+}
 
 export default function PocketsScreen({ navigation }: RootStackScreenProps<'Pockets'>) {
   const { colors } = useAppTheme();
@@ -42,12 +50,14 @@ export default function PocketsScreen({ navigation }: RootStackScreenProps<'Pock
   const [newName, setNewName] = useState('');
   const [busy, setBusy] = useState(false);
   const [jarEnabled, setJarEnabled] = useState(true);
+  const [balances, setBalances] = useState(() => new Map<string, BalanceRow[]>());
 
   useFocusEffect(
     useCallback(() => {
       void refresh();
       void (async () => {
         setJarEnabled(await settingsRepo.getJarEnabled());
+        setBalances(await transactionsRepo.sumBalancesByPocket());
       })();
     }, [refresh])
   );
@@ -100,9 +110,9 @@ export default function PocketsScreen({ navigation }: RootStackScreenProps<'Pock
                     <ContourOnPrimaryText style={styles.jarIconGlyph}>J</ContourOnPrimaryText>
                   </View>
                   <View style={styles.jarCardMain}>
-                    <Text style={styles.jarBadge}>Jar</Text>
+                    <Text style={styles.jarBadge}>Pool of assets</Text>
                     <Text style={styles.jarCardTitle}>{item.name}</Text>
-                    <Text style={styles.jarCardHint}>Pool · tap to distribute</Text>
+                    <Text style={styles.jarCardHint}>{balanceLine(balances.get(item.id))}</Text>
                   </View>
                 </Pressable>
                 <PocketEditPencilButton colors={colors} onPress={() => openEdit(item)} />
@@ -118,6 +128,7 @@ export default function PocketsScreen({ navigation }: RootStackScreenProps<'Pock
               >
                 <View style={styles.cardMain}>
                   <Text style={styles.cardTitle}>{item.name}</Text>
+                  <Text style={styles.cardBalance}>{balanceLine(balances.get(item.id))}</Text>
                   {isArchivedRegular ? (
                     <Text style={styles.archivedHint}>Archived · use edit to unarchive</Text>
                   ) : null}
@@ -231,6 +242,7 @@ function createStyles(c: AppColors) {
     },
     jarIconGlyph: { fontSize: 20, fontFamily: font.bold },
     jarCardMain: { flex: 1 },
+    cardBalance: { fontSize: 14, color: c.textSecondary, marginTop: 4 },
     jarBadge: {
       fontSize: 12,
       fontFamily: font.bold,

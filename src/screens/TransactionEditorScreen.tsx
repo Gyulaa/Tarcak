@@ -30,9 +30,11 @@ import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
 import { formatMinorToAmountString, parseAmountStringToMinor } from '../utils/amountMinor';
+import { assetLabel, assetSubtitle } from '../utils/assetLabel';
 import { formatOccurredAt } from '../utils/formatOccurredAt';
 
 const KINDS: TransactionKind[] = ['income', 'expense', 'transfer'];
+const KIND_LABEL: Record<TransactionKind, string> = { income: 'Income', expense: 'Expense', transfer: 'Transfer' };
 const NONE_CATEGORY = '__none__';
 
 export default function TransactionEditorScreen({
@@ -255,7 +257,7 @@ export default function TransactionEditorScreen({
       pickerAssetTypes.map((a) => ({
         value: a.code,
         title: a.code,
-        subtitle: a.name,
+        subtitle: assetSubtitle(a.code, a.name),
       })),
     [pickerAssetTypes]
   );
@@ -275,7 +277,7 @@ export default function TransactionEditorScreen({
 
   const selectedAssetLabel = useMemo(() => {
     const a = pickerAssetTypes.find((x) => x.code === currency);
-    return a ? `${a.code} — ${a.name}` : '';
+    return a ? assetLabel(a.code, a.name) : '';
   }, [pickerAssetTypes, currency]);
 
   const targetPocketLabel = useMemo(() => {
@@ -311,25 +313,55 @@ export default function TransactionEditorScreen({
   return (
     <ScreenWithFooter>
     <ScrollView style={styles.container} contentContainerStyle={styles.inner}>
-      {!transactionId ? (
-        <Text style={styles.label}>Kind</Text>
-      ) : (
-        <Text style={styles.label}>Kind (editable)</Text>
-      )}
+      <Text style={styles.label}>Kind</Text>
       <View style={styles.kindRow}>
         {KINDS.map((k) => (
           <Pressable
             key={k}
             style={[styles.kindChip, kind === k && styles.kindChipOn]}
             onPress={() => setKind(k)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: kind === k }}
           >
             {kind === k ? (
-              <ContourOnPrimaryText style={styles.kindChipTextOn}>{k}</ContourOnPrimaryText>
+              <ContourOnPrimaryText style={styles.kindChipTextOn}>{KIND_LABEL[k]}</ContourOnPrimaryText>
             ) : (
-              <Text style={styles.kindChipText}>{k}</Text>
+              <Text style={styles.kindChipText}>{KIND_LABEL[k]}</Text>
             )}
           </Pressable>
         ))}
+      </View>
+
+      <View style={styles.amountRow}>
+        <View style={styles.amountCol}>
+          <Text style={styles.label}>Amount</Text>
+          <TextInput
+            style={[styles.input, styles.amountInput]}
+            value={amountStr}
+            onChangeText={setAmountStr}
+            keyboardType="numbers-and-punctuation"
+            placeholder="0.00"
+            placeholderTextColor={colors.placeholder}
+          />
+        </View>
+        <View style={styles.assetCol}>
+          {pickerAssetTypes.length === 0 ? (
+            <>
+              <Text style={styles.label}>Asset type</Text>
+              <Text style={styles.muted}>None yet. Add one in Settings.</Text>
+            </>
+          ) : (
+            <ModalSelectField
+              label="Asset"
+              displayValue={selectedAssetLabel}
+              placeholder="Select"
+              modalTitle="Asset type"
+              options={assetSelectOptions}
+              onSelect={setCurrency}
+              emptyMessage="No asset types yet. Add some under Settings → Asset types."
+            />
+          )}
+        </View>
       </View>
 
       <Text style={styles.label}>Title</Text>
@@ -347,36 +379,6 @@ export default function TransactionEditorScreen({
           <Text style={styles.conductedText}>{formatOccurredAt(occurredAt)}</Text>
         </>
       ) : null}
-
-      <Text style={styles.label}>Amount</Text>
-      <TextInput
-        style={styles.input}
-        value={amountStr}
-        onChangeText={setAmountStr}
-        keyboardType="numbers-and-punctuation"
-        placeholder="0.00"
-        placeholderTextColor={colors.placeholder}
-      />
-
-      {pickerAssetTypes.length === 0 ? (
-        <>
-          <Text style={styles.label}>Asset type</Text>
-          <Text style={styles.muted}>No asset types yet. Add some under Settings → Asset types.</Text>
-        </>
-      ) : (
-        <ModalSelectField
-          label="Asset type"
-          displayValue={selectedAssetLabel}
-          placeholder="Select asset type"
-          modalTitle="Asset type"
-          options={assetSelectOptions}
-          onSelect={setCurrency}
-          emptyMessage="No asset types yet. Add some under Settings → Asset types."
-        />
-      )}
-      <Pressable onPress={() => navigation.navigate('AssetTypes')} style={styles.manageLink}>
-        <Text style={styles.manageLinkText}>Manage asset types…</Text>
-      </Pressable>
 
       {kind !== 'transfer' ? (
         <ModalSelectField
@@ -464,13 +466,21 @@ function createTxStyles(c: AppColors) {
       fontSize: 16,
       color: c.inputText,
     },
-    kindRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    kindRow: { flexDirection: 'row', gap: 8 },
     kindChip: {
+      flex: 1,
+      minHeight: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
       paddingHorizontal: 12,
-      paddingVertical: 8,
-      borderRadius: 20,
+      borderRadius: 22,
       backgroundColor: c.pillBg,
     },
+    amountRow: { flexDirection: 'row', gap: 12 },
+    /** As tall as the select field beside it. */
+    amountInput: { paddingVertical: 19 },
+    amountCol: { flex: 3 },
+    assetCol: { flex: 2 },
     kindChipOn: { backgroundColor: c.primary },
     kindChipText: { color: c.pillText },
     kindChipTextOn: { fontFamily: font.semibold },

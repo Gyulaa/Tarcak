@@ -44,6 +44,7 @@ import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
 import { AMOUNT_MINOR_SCALE } from '../utils/amountMinor';
 import { animateNextLayout } from '../utils/animateLayout';
+import { assetLabel, assetSubtitle } from '../utils/assetLabel';
 import { formatMinorAmountForDisplay, formatMinorForDisplay } from '../utils/formatMinor';
 import { formatOccurredAt } from '../utils/formatOccurredAt';
 import { formatShare } from '../utils/formatShare';
@@ -68,21 +69,29 @@ const LINE_NO_OF_SECTIONS = 4;
  */
 const LINE_MAX_NEG_SECTIONS = 2;
 
+/** Rounds a step up to 1, 2, 2.5 or 5 times a power of ten, so the Y ticks read as round numbers. */
+function niceStep(raw: number): number {
+  if (!(raw > 0)) return 1;
+  const pow = 10 ** Math.floor(Math.log10(raw));
+  const f = raw / pow;
+  return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * pow;
+}
+
 function computeLineChartScale(points: { balance_minor: number }[]) {
   const values = points.map((p) => p.balance_minor);
   const dataMax = values.length ? Math.max(0, ...values) : 0;
   const dataMin = values.length ? Math.min(0, ...values) : 0;
   if (dataMin >= 0) {
-    const maxValue = dataMax || 1;
+    const stepValue = niceStep(dataMax / LINE_NO_OF_SECTIONS);
     return {
-      maxValue,
-      stepValue: maxValue / LINE_NO_OF_SECTIONS,
+      maxValue: stepValue * LINE_NO_OF_SECTIONS,
+      stepValue,
       mostNegativeValue: 0,
       noOfSectionsBelowXAxis: 0,
     };
   }
   const negMagnitude = Math.abs(dataMin);
-  const stepValue = Math.max(dataMax / LINE_NO_OF_SECTIONS, negMagnitude / LINE_MAX_NEG_SECTIONS) || 1;
+  const stepValue = niceStep(Math.max(dataMax / LINE_NO_OF_SECTIONS, negMagnitude / LINE_MAX_NEG_SECTIONS));
   const noOfSectionsBelowXAxis = Math.max(
     1,
     Math.min(LINE_MAX_NEG_SECTIONS, Math.ceil(negMagnitude / stepValue))
@@ -102,10 +111,11 @@ function computeLineChartScale(points: { balance_minor: number }[]) {
 function formatYAxisMajorLabel(giftedLabel: string): string {
   const minor = Math.round(Number(giftedLabel));
   if (!Number.isFinite(minor)) return '';
+  if (minor === 0) return '0';
   const major = minor / AMOUNT_MINOR_SCALE;
   const abs = Math.abs(major);
-  if (abs >= 1_000_000) return `${(major / 1_000_000).toFixed(1)}M`;
-  if (abs >= 10_000) return `${(major / 1000).toFixed(1)}k`;
+  if (abs >= 1_000_000) return `${(major / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+  if (abs >= 10_000) return `${(major / 1000).toFixed(1).replace(/\.0$/, '')}k`;
   if (abs >= 100) return major.toFixed(0);
   if (abs >= 10) return major.toFixed(1);
   if (abs >= 1) return major.toFixed(2);
@@ -258,13 +268,13 @@ export default function StatisticsScreen({ route, navigation }: RootStackScreenP
   }, [categoryFilterKey, categories]);
 
   const assetOptions = useMemo(
-    () => assetTypes.map((a) => ({ value: a.code, title: a.code, subtitle: a.name })),
+    () => assetTypes.map((a) => ({ value: a.code, title: a.code, subtitle: assetSubtitle(a.code, a.name) })),
     [assetTypes]
   );
 
   const assetDisplay = useMemo(() => {
     const a = assetTypes.find((t) => t.code === currency);
-    return a ? `${a.code} — ${a.name}` : currency;
+    return a ? assetLabel(a.code, a.name) : currency;
   }, [assetTypes, currency]);
 
   useEffect(() => {
@@ -341,14 +351,8 @@ export default function StatisticsScreen({ route, navigation }: RootStackScreenP
 
   const lineChartData = useMemo(() => {
     if (linePoints.length === 0) return [];
-    const n = linePoints.length;
-    const labelIdx = new Set([0, n - 1]);
-    if (n > 2) {
-      labelIdx.add(Math.floor(n / 2));
-    }
-    const withLabels = linePoints.map((p, i) => ({
+    const withLabels = linePoints.map((p) => ({
       value: p.balance_minor,
-      label: labelIdx.has(i) ? axisDateLabel(p.at) : '',
       /** Carried through to pointer tooltip (library forwards the data item). */
       timestamp: p.at,
     }));
@@ -358,7 +362,6 @@ export default function StatisticsScreen({ route, navigation }: RootStackScreenP
         first,
         {
           value: first.value,
-          label: axisDateLabel(rangeMeta.endMs),
           timestamp: rangeMeta.endMs,
         },
       ];
@@ -388,6 +391,14 @@ export default function StatisticsScreen({ route, navigation }: RootStackScreenP
       rowW,
     };
   }, [chartRowWidth, winW, lineChartData.length]);
+
+  /** Start, middle and end dates, drawn under the chart as one row: the library wraps a label to the width of one data step. */
+  const xAxisDates = useMemo(() => {
+    const n = lineChartData.length;
+    if (n === 0) return [];
+    const at = (i: number) => axisDateLabel(lineChartData[i]!.timestamp);
+    return n > 2 ? [at(0), at(Math.floor(n / 2)), at(n - 1)] : [at(0), at(n - 1)];
+  }, [lineChartData]);
 
   const lineScale = useMemo(() => computeLineChartScale(linePoints), [linePoints]);
 
@@ -660,11 +671,9 @@ export default function StatisticsScreen({ route, navigation }: RootStackScreenP
                 mostNegativeValue={lineScale.mostNegativeValue}
                 noOfSectionsBelowXAxis={lineScale.noOfSectionsBelowXAxis}
                 yAxisTextStyle={{ color: colors.textMuted, fontSize: 12, fontFamily: font.regular }}
-                xAxisLabelTextStyle={{ color: colors.textMuted, fontSize: 12 }}
-                yAxisLabelWidth={Y_AXIS_LABEL_WIDTH}
+                  yAxisLabelWidth={Y_AXIS_LABEL_WIDTH}
                 formatYLabel={formatYAxisMajorLabel}
-                xAxisTextNumberOfLines={2}
-                pointerConfig={{
+                  pointerConfig={{
                   pointerStripColor: colors.border,
                   pointerStripWidth: 1,
                   pointerColor: colors.primary,
@@ -701,6 +710,27 @@ export default function StatisticsScreen({ route, navigation }: RootStackScreenP
                   },
                 }}
               />
+            </View>
+            <View
+              style={[
+                styles.xAxisRow,
+                { marginLeft: Y_AXIS_LABEL_WIDTH + CHART_INITIAL_SPACING, width: lineLayout.lineAreaW },
+              ]}
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+            >
+              {xAxisDates.map((d, i) => (
+                <Text
+                  key={i}
+                  style={[
+                    styles.xAxisLabel,
+                    i === 0 ? styles.xAxisFirst : i === xAxisDates.length - 1 ? styles.xAxisLast : null,
+                  ]}
+                  maxFontSizeMultiplier={1.2}
+                >
+                  {d}
+                </Text>
+              ))}
             </View>
           </View>
         )}
@@ -850,6 +880,10 @@ function createStyles(c: AppColors) {
       minHeight: 18,
       marginBottom: 10,
     },
+    xAxisRow: { flexDirection: 'row', marginTop: 6 },
+    xAxisLabel: { flex: 1, fontSize: 12, color: c.textMuted, textAlign: 'center' },
+    xAxisFirst: { textAlign: 'left' },
+    xAxisLast: { textAlign: 'right' },
     axisHint: {
       fontSize: 12,
       color: c.textMuted,

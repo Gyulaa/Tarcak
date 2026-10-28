@@ -5,6 +5,7 @@ import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View }
 import { ContourOnPrimaryText } from '../components/ContourOnPrimaryText';
 import { PocketEditMenu, PocketEditPencilButton } from '../components/PocketEditMenu';
 import { ScreenWithFooter } from '../components/ScreenWithFooter';
+import { TransactionRow } from '../components/TransactionRow';
 import * as pocketsRepo from '../db/repositories/pockets';
 import * as settingsRepo from '../db/repositories/settings';
 import * as txRepo from '../db/repositories/transactions';
@@ -15,7 +16,6 @@ import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
 import { formatMinorForDisplay } from '../utils/formatMinor';
-import { formatOccurredAt } from '../utils/formatOccurredAt';
 
 export default function PocketDetailScreen({ navigation, route }: RootStackScreenProps<'PocketDetail'>) {
   const { colors } = useAppTheme();
@@ -130,24 +130,14 @@ export default function PocketDetailScreen({ navigation, route }: RootStackScree
 
       <View style={styles.actions}>
         {showTxActions ? (
-          <>
+          <View style={styles.actionRow}>
             <Pressable
               style={styles.btn}
               onPress={() =>
                 navigation.navigate('TransactionEditor', { presetKind: 'income', pocketId })
               }
             >
-              <View style={styles.btnRow}>
-                <View style={styles.btnQuarter}>
-                  <ContourOnPrimaryText style={styles.btnMark} decorative>+</ContourOnPrimaryText>
-                </View>
-                <View style={styles.btnHalf}>
-                  <ContourOnPrimaryText style={styles.btnLabelPrimary}>Income</ContourOnPrimaryText>
-                </View>
-                <View style={styles.btnQuarter}>
-                  <ContourOnPrimaryText style={styles.btnMark} decorative>+</ContourOnPrimaryText>
-                </View>
-              </View>
+              <ContourOnPrimaryText style={styles.btnLabelPrimary}>Income</ContourOnPrimaryText>
             </Pressable>
             <Pressable
               style={styles.btn}
@@ -155,37 +145,17 @@ export default function PocketDetailScreen({ navigation, route }: RootStackScree
                 navigation.navigate('TransactionEditor', { presetKind: 'expense', pocketId })
               }
             >
-              <View style={styles.btnRow}>
-                <View style={styles.btnQuarter}>
-                  <ContourOnPrimaryText style={styles.btnMark} decorative>-</ContourOnPrimaryText>
-                </View>
-                <View style={styles.btnHalf}>
-                  <ContourOnPrimaryText style={styles.btnLabelPrimary}>Expense</ContourOnPrimaryText>
-                </View>
-                <View style={styles.btnQuarter}>
-                  <ContourOnPrimaryText style={styles.btnMark} decorative>-</ContourOnPrimaryText>
-                </View>
-              </View>
+              <ContourOnPrimaryText style={styles.btnLabelPrimary}>Expense</ContourOnPrimaryText>
             </Pressable>
             <Pressable
-              style={styles.btn}
+              style={styles.btnOutline}
               onPress={() =>
                 navigation.navigate('TransactionEditor', { presetKind: 'transfer', fromPocketId: pocketId })
               }
             >
-              <View style={styles.btnRow}>
-                <View style={styles.btnQuarter}>
-                  <ContourOnPrimaryText style={styles.btnMark} decorative>{'<'}</ContourOnPrimaryText>
-                </View>
-                <View style={styles.btnHalf}>
-                  <ContourOnPrimaryText style={styles.btnLabelPrimary}>Transfer</ContourOnPrimaryText>
-                </View>
-                <View style={styles.btnQuarter}>
-                  <ContourOnPrimaryText style={styles.btnMark} decorative>{'>'}</ContourOnPrimaryText>
-                </View>
-              </View>
+              <Text style={styles.btnLabelOutline}>Transfer</Text>
             </Pressable>
-          </>
+          </View>
         ) : null}
         <Pressable
           style={styles.outline}
@@ -220,16 +190,11 @@ export default function PocketDetailScreen({ navigation, route }: RootStackScree
         ListHeaderComponent={header}
         ListEmptyComponent={<Text style={styles.muted}>No transactions.</Text>}
         renderItem={({ item }) => (
-          <Pressable
-            style={styles.txRow}
+          <TransactionRow
+            item={item}
+            pocketId={pocketId}
             onPress={() => navigation.navigate('TransactionEditor', { transactionId: item.id })}
-          >
-            <Text style={styles.txDate}>{formatOccurredAt(item.occurred_at)}</Text>
-            <Text style={styles.txTitle}>{item.title}</Text>
-            <Text style={styles.txMeta}>
-              {item.kind} · {item.currency} · {formatMinorForDisplay(item.amount_minor, item.currency)}
-            </Text>
-          </Pressable>
+          />
         )}
       />
 
@@ -297,17 +262,26 @@ function createStyles(c: AppColors) {
     currency: { fontSize: 15, fontFamily: font.semibold, color: c.textSecondary },
     balanceAmt: { fontSize: 22, fontFamily: font.bold, color: c.text },
     actions: { marginVertical: 16, gap: 8 },
-    btn: { backgroundColor: c.primary, paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
-    btnRow: {
-      flexDirection: 'row',
+    actionRow: { flexDirection: 'row', gap: 8 },
+    btn: {
+      flex: 1,
+      backgroundColor: c.primary,
+      paddingVertical: 14,
+      borderRadius: 10,
       alignItems: 'center',
-      alignSelf: 'stretch',
-      width: '100%',
+      borderWidth: 1,
+      borderColor: c.primary,
     },
-    btnQuarter: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-    btnHalf: { flex: 2, alignItems: 'center', justifyContent: 'center' },
-    btnMark: { fontSize: 20, fontFamily: font.bold },
+    btnOutline: {
+      flex: 1,
+      paddingVertical: 14,
+      borderRadius: 10,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: c.primary,
+    },
     btnLabelPrimary: { fontSize: 16, fontFamily: font.semibold },
+    btnLabelOutline: { fontSize: 16, fontFamily: font.semibold, color: c.primary },
     outline: {
       borderWidth: 1,
       borderColor: c.primary,
@@ -316,16 +290,5 @@ function createStyles(c: AppColors) {
       alignItems: 'center',
     },
     outlineText: { color: c.primary, fontFamily: font.semibold },
-    txRow: {
-      padding: 12,
-      backgroundColor: c.surface,
-      borderRadius: 8,
-      marginBottom: 6,
-      borderWidth: 1,
-      borderColor: c.border,
-    },
-    txDate: { fontSize: 12, color: c.textMuted, fontFamily: font.semibold, marginBottom: 4 },
-    txTitle: { fontFamily: font.semibold, color: c.textSecondary },
-    txMeta: { color: c.textMuted, fontSize: 13, marginTop: 4 },
   });
 }

@@ -88,7 +88,7 @@ function createStyles(c: AppColors) {
     legendRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     legendSwatch: { width: 12, height: 12, borderRadius: 4 },
     legendName: { flex: 1, fontSize: 14, color: c.textSecondary },
-    legendShare: { fontSize: 13, color: c.textMuted, minWidth: 52, textAlign: 'right' },
-    legendAmt: { fontSize: 13, color: c.textMuted, fontFamily: font.semibold },
+    legendShare: { fontSize: 13, color: c.textMuted, width: 52, textAlign: 'right' },
+    legendAmt: { fontSize: 13, color: c.textMuted, fontFamily: font.semibold, minWidth: 104, textAlign: 'right' },
   });
 }

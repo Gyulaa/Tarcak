@@ -32,6 +32,7 @@ import { COLOR_THEME_META, COLOR_THEME_ORDER, normalizeColorThemeId } from '../t
 import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
+import { assetLabel, assetSubtitle } from '../utils/assetLabel';
 import { applyScreenCaptureBlock } from '../utils/screenCapture';
 
 type BackupModalState = { mode: 'export' } | { mode: 'import'; fileUri: string };
@@ -135,11 +136,11 @@ export default function SettingsScreen({ navigation }: RootStackScreenProps<'Set
 
   const defaultAssetDisplay = useMemo(() => {
     const row = assetTypes.find((a) => a.code === defaultCode);
-    return row ? `${row.code} — ${row.name}` : '';
+    return row ? assetLabel(row.code, row.name) : '';
   }, [assetTypes, defaultCode]);
 
   const defaultAssetOptions = useMemo(
-    () => assetTypes.map((a) => ({ value: a.code, title: a.code, subtitle: a.name })),
+    () => assetTypes.map((a) => ({ value: a.code, title: a.code, subtitle: assetSubtitle(a.code, a.name) })),
     [assetTypes]
   );
 
@@ -291,7 +292,6 @@ export default function SettingsScreen({ navigation }: RootStackScreenProps<'Set
     <ScreenWithFooter>
     <ScrollView style={styles.container} contentContainerStyle={styles.inner}>
       <BackupRestoredBanner />
-      <Text style={styles.p}>The asset type a new transaction starts with.</Text>
       {loaded && assetTypes.length === 0 ? (
         <>
           <Text style={styles.label}>Default asset type</Text>
@@ -318,7 +318,7 @@ export default function SettingsScreen({ navigation }: RootStackScreenProps<'Set
 
       <View style={styles.divider} />
 
-      <Text style={styles.label}>Categories</Text>
+      <Text style={styles.sectionTitle}>Categories</Text>
       <Text style={styles.p}>Tag transactions to filter History and split Statistics.</Text>
       <Pressable style={styles.secondaryBtn} onPress={() => navigation.navigate('Categories')}>
         <Text style={styles.secondaryBtnText}>Categories…</Text>
@@ -326,7 +326,7 @@ export default function SettingsScreen({ navigation }: RootStackScreenProps<'Set
 
       <View style={styles.divider} />
 
-      <Text style={styles.label}>Appearance</Text>
+      <Text style={styles.sectionTitle}>Appearance</Text>
       <ModalSelectField
         label="Color palette"
         displayValue={colorThemeDisplay}
@@ -339,7 +339,6 @@ export default function SettingsScreen({ navigation }: RootStackScreenProps<'Set
       <View style={[styles.switchRow, { marginTop: 12 }]}>
         <View style={styles.switchTextCol}>
           <Text style={styles.switchTitle}>Black theme</Text>
-          <Text style={styles.switchHint}>Dark background and light text across the app.</Text>
         </View>
         <Switch
           value={isDark}
@@ -352,7 +351,7 @@ export default function SettingsScreen({ navigation }: RootStackScreenProps<'Set
 
       <View style={styles.divider} />
 
-      <Text style={styles.label}>Jar</Text>
+      <Text style={styles.sectionTitle}>Jar</Text>
       <View style={styles.switchRow}>
         <View style={styles.switchTextCol}>
           <Text style={styles.switchTitle}>Pool & distribute</Text>
@@ -395,12 +394,12 @@ export default function SettingsScreen({ navigation }: RootStackScreenProps<'Set
 
       <View style={styles.divider} />
 
-      <Text style={styles.label}>Pockets</Text>
+      <Text style={styles.sectionTitle}>Pockets</Text>
       <View style={styles.switchRow}>
         <View style={styles.switchTextCol}>
           <Text style={styles.switchTitle}>Show archived pockets</Text>
           <Text style={styles.switchHint}>
-            Show archived pockets in lists, pickers and Statistics.
+            In lists, pickers and Statistics.
           </Text>
         </View>
         <Switch
@@ -414,7 +413,7 @@ export default function SettingsScreen({ navigation }: RootStackScreenProps<'Set
 
       <View style={styles.divider} />
 
-      <Text style={styles.label}>Privacy</Text>
+      <Text style={styles.sectionTitle}>Privacy</Text>
       <View style={[styles.switchRow, Platform.OS === 'web' && styles.switchRowDim]}>
         <View style={styles.switchTextCol}>
           <Text style={styles.switchTitle}>Block screenshots</Text>
@@ -433,7 +432,7 @@ export default function SettingsScreen({ navigation }: RootStackScreenProps<'Set
 
       <View style={styles.divider} />
 
-      <Text style={styles.label}>Backup & restore</Text>
+      <Text style={styles.sectionTitle}>Backup & restore</Text>
       <Text style={styles.backupHint}>
         An encrypted {BACKUP_EXTENSION} file of the whole vault, with its own password. Import
         replaces everything on this device.
@@ -467,9 +466,8 @@ export default function SettingsScreen({ navigation }: RootStackScreenProps<'Set
         <Text style={styles.secondaryBtnText}>Change vault password…</Text>
       </Pressable>
 
-      <Pressable style={styles.lockRow} onPress={() => void lockVault()}>
+      <Pressable style={styles.lockRow} onPress={() => void lockVault()} accessibilityRole="button">
         <Text style={styles.lockText}>Lock vault</Text>
-        <Text style={styles.lockHint}>Closes the database and clears keys from memory.</Text>
       </Pressable>
 
       <ChangePasswordModal
@@ -510,6 +508,14 @@ function createStyles(c: AppColors) {
     inner: { padding: 16, paddingBottom: 40 },
     p: { color: c.textMuted, marginBottom: 16, lineHeight: 22 },
     label: { fontFamily: font.semibold, marginBottom: 6, color: c.text },
+    sectionTitle: {
+      fontFamily: font.bold,
+      fontSize: 13,
+      letterSpacing: 1,
+      textTransform: 'uppercase',
+      color: c.primary,
+      marginBottom: 8,
+    },
     muted: { color: c.textMuted, paddingVertical: 8 },
     secondaryBtn: {
       marginTop: 12,
@@ -538,9 +544,15 @@ function createStyles(c: AppColors) {
     switchHint: { fontSize: 13, color: c.textMuted, lineHeight: 19 },
     switchRowDim: { opacity: 0.55 },
     secondaryBtnDim: { opacity: 0.45 },
-    lockRow: { paddingVertical: 8, marginTop: 16 },
-    lockText: { fontSize: 17, fontFamily: font.semibold, color: c.danger },
-    lockHint: { color: c.textMuted, marginTop: 6, fontSize: 13 },
+    lockRow: {
+      marginTop: 12,
+      paddingVertical: 12,
+      borderRadius: 10,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: c.danger,
+    },
+    lockText: { fontSize: 16, fontFamily: font.semibold, color: c.danger },
     backupHint: { fontSize: 13, color: c.textMuted, lineHeight: 19, marginBottom: 12 },
   });
 }

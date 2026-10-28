@@ -75,7 +75,7 @@ Checked contrast (WCAG 2.2 AA, 2026-10-28, guarded by `tests/colorContrast.test.
 - Light variants keep white `onPrimary` and a deep enough accent (`terracotta` `#c35311`, `forest` `#2c8646`, `yellow` `#956f08`); dark variants use a near-black `onPrimary` (`#0a0a0a`) on their lighter accent.
 - Rule for new work: a new or changed palette must reach 4.5:1 for `onPrimary` on `primary`; the contrast test fails otherwise. Labels on `primary` use `onPrimary`, never a literal white.
 
-**Chart palette** (`src/utils/pocketChartColors.ts`, guarded by `tests/chartColors.test.ts`): the theme accent plus seven fixed hues (blue, olive, purple, cyan, pink, amber, slate), one light and one dark set. Every colour reaches 3:1 (WCAG 1.4.11) on `bg`, `surface` and `surfaceMuted` of its own variant, and the hues stay apart (ΔE of 18 or more among the fixed ones, 12 or more from the accent). All charts, legends and category dots draw from it; hex literals are allowed only there and in `src/theme/`. A category keeps its colour as a hex, but it is drawn as the same slot of the current palette, so it follows light and dark.
+**Chart palette** (`src/utils/pocketChartColors.ts`, guarded by `tests/chartColors.test.ts`): the theme accent plus seven fixed hues (blue, olive, purple, cyan, pink, amber, brown), one light and one dark set. Every colour reaches 3:1 (WCAG 1.4.11) on `bg`, `surface` and `surfaceMuted` of its own variant, and the hues stay apart (ΔE of 18 or more among the fixed ones, 12 or more from the accent). All charts, legends and category dots draw from it; hex literals are allowed only there and in `src/theme/`. A category keeps its colour as a hex, but it is drawn as the same slot of the current palette, so it follows light and dark.
 
 ## Typography
 JetBrains Mono only (`@expo-google-fonts/jetbrains-mono`, SIL OFL, bundled with the app, no network fetch). `applyJetBrainsMonoDefaults()` sets Regular on every `Text` and `TextInput`; SemiBold and Bold are set explicitly with `font.semibold` / `font.bold`. The monospace face keeps amounts aligned without tabular-figure settings.
@@ -93,6 +93,10 @@ Radii in use: 8 (chips, small controls, bars), 10 (buttons, inputs, the most com
 
 ## Components
 - **Buttons:** filled `primary` with `onPrimary` text for the main action; secondary actions as bordered or text buttons. Disabled and pressed states lower opacity (0.45 is the common disabled value).
+- **Transaction rows** (`TransactionRow`, used by History, Jar and pocket detail): title and the signed amount on the first line (income `+` in `success`, expense `-`, a transfer signed only when seen from one of its pockets), category and pocket under it, the date last.
+- **Section headings** (Settings): small uppercase accent text; a field label stays plain semibold, so the two levels differ.
+- **Disabled primary buttons** turn into a muted, bordered surface with `textMuted` text, never a faded accent fill (the label has to stay readable).
+- **Primary actions side by side:** a pocket's Income, Expense and Transfer sit in one row (the first two filled, Transfer outlined). A form puts the amount first, next to its asset.
 - **`ModalSelectField`:** the one select pattern everywhere, including multi-select filter sheets (tap toggles a checkmark and keeps the sheet open; "All" clears and closes).
 - **Collapsible filter / settings panels** (History, Statistics): summary chips (`chipBg` / `chipText`) when collapsed.
 - **Pocket picker rows:** `pocketPick*` tokens; selected state uses border and text colour.

@@ -12,6 +12,7 @@ import {
 
 import { ModalSelectField } from '../components/ModalSelectField';
 import { ScreenWithFooter } from '../components/ScreenWithFooter';
+import { TransactionRow } from '../components/TransactionRow';
 import * as assetTypesRepo from '../db/repositories/assetTypes';
 import * as categoriesRepo from '../db/repositories/categories';
 import * as pocketsRepo from '../db/repositories/pockets';
@@ -24,8 +25,6 @@ import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
 import { animateNextLayout } from '../utils/animateLayout';
-import { formatMinorForDisplay } from '../utils/formatMinor';
-import { formatOccurredAt } from '../utils/formatOccurredAt';
 import { HIT_SLOP } from '../utils/hitSlop';
 import { assignChartColors, buildThemeChartPalette, resolveStoredColor } from '../utils/pocketChartColors';
 
@@ -495,23 +494,13 @@ export default function HistoryScreen({ navigation, route }: RootStackScreenProp
             ? resolveStoredColor(category?.color, chartPalette) ?? categoryFallbackColors.get(item.category_id)
             : undefined;
           return (
-            <Pressable
-              style={styles.row}
+            <TransactionRow
+              item={item}
+              category={category ? { name: category.name, color: categoryColor } : undefined}
+              pocketLine={pocketLine}
+              pocketId={filterPocketIds.length === 1 ? filterPocketIds[0] : undefined}
               onPress={() => navigation.navigate('TransactionEditor', { transactionId: item.id })}
-            >
-              <Text style={styles.dateLine}>{formatOccurredAt(item.occurred_at)}</Text>
-              <Text style={styles.title}>{item.title}</Text>
-              {pocketLine ? <Text style={styles.pocketLine}>{pocketLine}</Text> : null}
-              {category ? (
-                <View style={styles.categoryLine}>
-                  <View style={[styles.categoryDot, { backgroundColor: categoryColor }]} />
-                  <Text style={styles.categoryLineText}>{category.name}</Text>
-                </View>
-              ) : null}
-              <Text style={styles.meta}>
-                {item.kind} · {item.currency} · {formatMinorForDisplay(item.amount_minor, item.currency)}
-              </Text>
-            </Pressable>
+            />
           );
         }}
       />
@@ -525,25 +514,6 @@ function createStyles(c: AppColors) {
     container: { flex: 1, backgroundColor: c.bg },
     list: { padding: 16 },
     muted: { textAlign: 'center', color: c.textMuted, marginTop: 24 },
-    row: {
-      padding: 14,
-      backgroundColor: c.surface,
-      borderRadius: 10,
-      marginBottom: 8,
-      borderWidth: 1,
-      borderColor: c.border,
-    },
-    dateLine: { fontSize: 12, color: c.textMuted, fontFamily: font.semibold, marginBottom: 6 },
-    title: { fontFamily: font.semibold, fontSize: 16, color: c.textSecondary },
-    pocketLine: {
-      fontSize: 13,
-      color: c.textMuted,
-      marginTop: 4,
-    },
-    categoryLine: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
-    categoryDot: { width: 8, height: 8, borderRadius: 4 },
-    categoryLineText: { fontSize: 13, color: c.textMuted },
-    meta: { color: c.textMuted, marginTop: 4, fontSize: 13 },
     filterSection: {
       paddingHorizontal: 16,
       paddingTop: 10,

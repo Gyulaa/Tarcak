@@ -6,8 +6,8 @@ import type { AppColors } from '../theme/palette';
  * (WCAG 1.4.11, graphical objects) on the app surfaces in its own variant, and the hues stay
  * apart from each other; `tests/chartColors.test.ts` guards both.
  */
-const TAIL_LIGHT = ['#1565c0', '#667a00', '#7b3fa0', '#00838f', '#ad1457', '#a85f00', '#546e7a'] as const;
-const TAIL_DARK = ['#64b5f6', '#c5e063', '#ce93d8', '#4dd0e1', '#f48fb1', '#ffb74d', '#b0bec5'] as const;
+const TAIL_LIGHT = ['#1565c0', '#667a00', '#7b3fa0', '#00838f', '#ad1457', '#a85f00', '#8d5b45'] as const;
+const TAIL_DARK = ['#64b5f6', '#c5e063', '#ce93d8', '#4dd0e1', '#f48fb1', '#ffb74d', '#d4a58f'] as const;
 
 /**
  * Colours the UI offered before the palette was unified (accent first, then seven hues). A category
@@ -15,6 +15,9 @@ const TAIL_DARK = ['#64b5f6', '#c5e063', '#ce93d8', '#4dd0e1', '#f48fb1', '#ffb7
  */
 const LEGACY_LIGHT = ['#0d5658', '#268040', '#a31818', '#9a7409', '#354056', '#5c6bc0', '#7a5cad'] as const;
 const LEGACY_DARK = ['#7ec8cb', '#a8f0b8', '#ffb4a8', '#f5d878', '#b4c4e0', '#c9a0ff', '#e89890'] as const;
+
+/** Hues dropped from the fixed set (a grey read as "uncategorized"), and the slot that replaced each. */
+const RETIRED: Readonly<Record<string, number>> = { '#546e7a': 6, '#b0bec5': 6 };
 
 export function chartPaletteTail(isDark: boolean): readonly string[] {
   return isDark ? TAIL_DARK : TAIL_LIGHT;
@@ -70,6 +73,8 @@ export function resolveStoredColor(stored: string | null | undefined, palette: r
   if (!stored) return undefined;
   const hex = stored.toLowerCase();
   if (ACCENTS.has(hex)) return palette[0];
+  const retired = RETIRED[hex];
+  if (retired !== undefined) return palette[retired + 1];
   for (const list of [TAIL_LIGHT, TAIL_DARK, LEGACY_LIGHT, LEGACY_DARK] as readonly (readonly string[])[]) {
     const i = list.indexOf(hex);
     if (i >= 0) return palette[i + 1];

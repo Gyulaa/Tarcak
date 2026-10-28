@@ -113,6 +113,10 @@ describe('resolveStoredColor', () => {
     assert.equal(resolveStoredColor('#7ec8cb', light), light[1]);
   });
 
+  test('a hue that left the fixed set resolves to its replacement', () => {
+    assert.equal(resolveStoredColor('#b0bec5', light), light[7]);
+  });
+
   test('any accent follows the current accent', () => {
     assert.equal(resolveStoredColor(COLOR_THEMES.terracotta.light.primary, dark), dark[0]);
   });
