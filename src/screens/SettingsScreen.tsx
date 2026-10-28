@@ -7,6 +7,7 @@ import * as Sharing from 'expo-sharing';
 
 import { BackupPasswordModal } from '../components/BackupPasswordModal';
 import { BackupRestoredBanner } from '../components/BackupRestoredBanner';
+import { ChangePasswordModal } from '../components/ChangePasswordModal';
 import { ModalSelectField } from '../components/ModalSelectField';
 import { ScreenWithFooter } from '../components/ScreenWithFooter';
 import * as assetTypesRepo from '../db/repositories/assetTypes';
@@ -15,6 +16,7 @@ import type { AssetType } from '../domain/types';
 import { useLockVault } from '../navigation/LockVaultContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import {
+  changeVaultPassword,
   resumeVaultLockOnBackground,
   suspendVaultLockOnBackground,
   VaultCryptoError,
@@ -45,6 +47,8 @@ export default function SettingsScreen({ navigation }: RootStackScreenProps<'Set
   const [showArchivedPockets, setShowArchivedPockets] = useState(false);
   const [backupModal, setBackupModal] = useState<BackupModalState | null>(null);
   const [backupBusy, setBackupBusy] = useState(false);
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [passwordBusy, setPasswordBusy] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -247,6 +251,29 @@ export default function SettingsScreen({ navigation }: RootStackScreenProps<'Set
     }
   };
 
+  const runChangePassword = async (currentPassword: string, newPassword: string) => {
+    setPasswordBusy(true);
+    try {
+      await changeVaultPassword(currentPassword, newPassword);
+      setPasswordModalOpen(false);
+      Alert.alert(
+        'Password changed',
+        'Use the new password from the next unlock. Backup files you exported earlier still open the vault with the password you had when you exported them.'
+      );
+    } catch (e) {
+      Alert.alert(
+        'Could not change password',
+        e instanceof WrongVaultPasswordError
+          ? 'The current password is incorrect.'
+          : e instanceof Error
+            ? e.message
+            : String(e)
+      );
+    } finally {
+      setPasswordBusy(false);
+    }
+  };
+
   return (
     <ScreenWithFooter>
     <ScrollView style={styles.container} contentContainerStyle={styles.inner}>
@@ -414,10 +441,25 @@ export default function SettingsScreen({ navigation }: RootStackScreenProps<'Set
 
       <View style={styles.divider} />
 
+      <Pressable
+        style={styles.secondaryBtn}
+        onPress={() => setPasswordModalOpen(true)}
+        disabled={!loaded}
+      >
+        <Text style={styles.secondaryBtnText}>Change vault password…</Text>
+      </Pressable>
+
       <Pressable style={styles.lockRow} onPress={() => void lockVault()}>
         <Text style={styles.lockText}>Lock vault</Text>
         <Text style={styles.lockHint}>Closes the database and clears keys from memory.</Text>
       </Pressable>
+
+      <ChangePasswordModal
+        visible={passwordModalOpen}
+        busy={passwordBusy}
+        onCancel={() => !passwordBusy && setPasswordModalOpen(false)}
+        onSubmit={runChangePassword}
+      />
 
       <BackupPasswordModal
         visible={backupModal != null}
@@ -478,7 +520,7 @@ function createStyles(c: AppColors) {
     switchHint: { fontSize: 13, color: c.textMuted, lineHeight: 19 },
     switchRowDim: { opacity: 0.55 },
     secondaryBtnDim: { opacity: 0.45 },
-    lockRow: { paddingVertical: 8 },
+    lockRow: { paddingVertical: 8, marginTop: 16 },
     lockText: { fontSize: 17, fontFamily: font.semibold, color: c.danger },
     lockHint: { color: c.textMuted, marginTop: 6, fontSize: 13 },
     backupHint: { fontSize: 13, color: c.textMuted, lineHeight: 19, marginBottom: 12 },
