@@ -46,3 +46,10 @@ yarn-error.*
 # Tarcak files
 *.tarcak
 .tarcak
+# Local data exports (never commit real user data)
+*.sqlite
+*.sqlite-journal
+
+# Claude Code (personal)
+CLAUDE.local.md
+.claude/settings.local.json
