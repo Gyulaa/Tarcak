@@ -3,7 +3,7 @@ version: alpha
 name: "Tarcak"
 description: "Local-first, encrypted personal finance app for one person on their own phone: pockets, multi-currency balances and one ledger."
 colors:
-  primary: "#d45a12"
+  primary: "#c35311"
   on-primary: "#ffffff"
   secondary: "#333333"
   tertiary: "#fff3e8"
@@ -14,6 +14,7 @@ colors:
   neutral-dark: "#0a0a0a"
   on-neutral-dark: "#f0f0f0"
   primary-dark: "#e8702e"
+  on-primary-dark: "#0a0a0a"
   error-dark: "#ff8a80"
 typography:
   display:
@@ -69,10 +70,10 @@ Semantic tokens live in `AppColors` (`src/theme/palette.ts`): `bg`, `surface`, `
 
 Six user-selectable palettes (`COLOR_THEME_ORDER`): `terracotta` (default, shown as "Orange"), `ocean`, `forest`, `slate`, `red`, `yellow`. Each has a light and a dark variant; the dark variant ("Black theme") uses near-black surfaces (`#0a0a0a`, `#141414`) and a lighter accent. Derived palettes change only accent-related tokens; neutrals, text, `danger` and `success` are shared.
 
-Checked contrast (WCAG 2.2 AA, 2026-10-27):
-- Pass: `text`, `textSecondary`, `textMuted` on `bg` (≥ 5.4:1 in both themes); `danger` and `success` on `surface`; `primary` as text on `surface` in every dark variant and in light `ocean`, `slate`, `red`.
-- **Fail (known debt, `docs/bugs.md` B2):** white `onPrimary` on `primary` is below 4.5:1 in 9 of 12 variants (light: terracotta 3.98, forest 4.08, yellow 3.17; dark: all six, 1.87 to 3.44). Only light ocean, slate and red pass. Selected pocket-picker text also fails on light forest (1.85), yellow (1.91), red (2.75), ocean (2.85). `placeholder` on light inputs is 2.2:1.
-- Rule for new work: a new or changed palette must reach 4.5:1 for `onPrimary` on `primary`; in dark variants that usually means a dark `onPrimary`, not a lighter accent.
+Checked contrast (WCAG 2.2 AA, 2026-10-28, guarded by `tests/colorContrast.test.ts`):
+- Every palette, light and dark, reaches 4.5:1 for `onPrimary` on `primary`, `primary` as text on `surface`, `chipText` on `chipBg`, `pocketPickTextSelected` on `pocketPickBgSelected`, `placeholder` on `inputBg`, and `jarHint` / `jarBannerTitle` on `jarSoftBg`; `text`, `textSecondary`, `textMuted` on `bg` stay at 5.4:1 or more.
+- Light variants keep white `onPrimary` and a deep enough accent (`terracotta` `#c35311`, `forest` `#2c8646`, `yellow` `#956f08`); dark variants use a near-black `onPrimary` (`#0a0a0a`) on their lighter accent.
+- Rule for new work: a new or changed palette must reach 4.5:1 for `onPrimary` on `primary`; the contrast test fails otherwise. Labels on `primary` use `onPrimary`, never a literal white.
 
 ## Typography
 JetBrains Mono only (`@expo-google-fonts/jetbrains-mono`, SIL OFL, bundled with the app, no network fetch). `applyJetBrainsMonoDefaults()` sets Regular on every `Text` and `TextInput`; SemiBold and Bold are set explicitly with `font.semibold` / `font.bold`. The monospace face keeps amounts aligned without tabular-figure settings.

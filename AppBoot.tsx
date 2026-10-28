@@ -446,7 +446,7 @@ function createVaultGateStyles(c: AppColors) {
       opacity: 0.55,
     },
     primaryBtnText: {
-      color: '#fff',
+      color: c.onPrimary,
       fontFamily: font.semibold,
       fontSize: 17,
     },
@@ -491,7 +491,7 @@ function createVaultGateStyles(c: AppColors) {
       borderColor: c.primary,
     },
     phaseCheck: {
-      color: '#fff',
+      color: c.onPrimary,
       fontSize: 14,
       fontFamily: font.bold,
     },
