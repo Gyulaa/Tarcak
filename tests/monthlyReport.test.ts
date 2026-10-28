@@ -8,6 +8,8 @@ import {
   formatMinorExact,
   MAX_REPORT_MONTHS,
   monthRangeFor,
+  REPORT_FILE_PREFIX,
+  reportFileName,
   type ReportOptions,
   type ReportRow,
 } from '../src/domain/monthlyReport';
@@ -346,5 +348,13 @@ describe('buildReportPreview', () => {
     assert.equal(buildReportPreview(rows, hu).isEmpty, false);
     assert.equal(buildReportPreview(rows, { ...hu, currencies: [] }).isEmpty, true);
     assert.equal(buildReportPreview(rows, { ...hu, months: ['2030-01'] }).isEmpty, true);
+  });
+});
+
+describe('reportFileName', () => {
+  test('is the export day only, in local time', () => {
+    assert.equal(REPORT_FILE_PREFIX, 'tarcak-report-');
+    assert.equal(reportFileName(new Date(2026, 0, 5, 23, 59)), 'tarcak-report-2026-01-05.csv');
+    assert.equal(reportFileName(new Date(2026, 11, 31, 0, 0)), 'tarcak-report-2026-12-31.csv');
   });
 });

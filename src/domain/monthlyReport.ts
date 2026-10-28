@@ -49,6 +49,8 @@ export type ReportOptions = {
   format: CsvFormat;
 };
 
+export const REPORT_FILE_PREFIX = 'tarcak-report-';
+
 const UNCATEGORIZED = 'Uncategorized';
 const BOM = '﻿';
 const EOL = '\r\n';
@@ -59,6 +61,12 @@ function pad2(n: number): string {
 
 function monthKey(d: Date): string {
   return `${String(d.getFullYear()).padStart(4, '0')}-${pad2(d.getMonth() + 1)}`;
+}
+
+/** `tarcak-report-YYYY-MM-DD.csv`: only the export day, nothing about the data. */
+export function reportFileName(exportedAt: Date): string {
+  const day = `${monthKey(exportedAt)}-${pad2(exportedAt.getDate())}`;
+  return `${REPORT_FILE_PREFIX}${day}.csv`;
 }
 
 /**
