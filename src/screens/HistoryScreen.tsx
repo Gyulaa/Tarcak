@@ -3,7 +3,6 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import {
   Alert,
   FlatList,
-  LayoutAnimation,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,6 +12,7 @@ import {
 
 import { ModalSelectField } from '../components/ModalSelectField';
 import { ScreenWithFooter } from '../components/ScreenWithFooter';
+import { TransactionRow } from '../components/TransactionRow';
 import * as assetTypesRepo from '../db/repositories/assetTypes';
 import * as categoriesRepo from '../db/repositories/categories';
 import * as pocketsRepo from '../db/repositories/pockets';
@@ -24,9 +24,9 @@ import type { RootStackScreenProps } from '../navigation/types';
 import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
-import { formatMinorForDisplay } from '../utils/formatMinor';
-import { formatOccurredAt } from '../utils/formatOccurredAt';
-import { buildThemeChartPalette, pocketChartColor } from '../utils/pocketChartColors';
+import { animateNextLayout } from '../utils/animateLayout';
+import { HIT_SLOP } from '../utils/hitSlop';
+import { assignChartColors, buildThemeChartPalette, resolveStoredColor } from '../utils/pocketChartColors';
 
 const ALL = '__all__';
 const HISTORY_PAGE_SIZE = 100;
@@ -93,6 +93,10 @@ export default function HistoryScreen({ navigation, route }: RootStackScreenProp
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoryNames, setCategoryNames] = useState(
     () => new Map<string, { name: string; color: string | null }>()
+  );
+  const categoryFallbackColors = useMemo(
+    () => assignChartColors(categories.map((c) => c.id), chartPalette),
+    [categories, chartPalette]
   );
   const [jarPocketId, setJarPocketId] = useState<string | null>(null);
   const [filterLabel, setFilterLabel] = useState('');
@@ -329,7 +333,7 @@ export default function HistoryScreen({ navigation, route }: RootStackScreenProp
   ]);
 
   const toggleFiltersExpanded = () => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    animateNextLayout();
     setFiltersExpanded((v) => !v);
   };
 
@@ -364,12 +368,26 @@ export default function HistoryScreen({ navigation, route }: RootStackScreenProp
             contentContainerStyle={styles.summaryChipRow}
           >
             {activeFilterChips.map((chip) => (
-              <Pressable key={chip.key} style={styles.summaryChip} onPress={toggleFiltersExpanded}>
+              <Pressable
+                key={chip.key}
+                style={styles.summaryChip}
+                onPress={toggleFiltersExpanded}
+                accessibilityRole="button"
+                accessibilityLabel={`Filter: ${chip.label}. Open filters`}
+              >
                 <Text style={styles.summaryChipText} numberOfLines={1}>
                   {chip.label}
                 </Text>
-                <Pressable hitSlop={8} onPress={chip.onClear} style={styles.summaryChipRemove}>
-                  <Text style={styles.summaryChipRemoveText}>×</Text>
+                <Pressable
+                  hitSlop={HIT_SLOP}
+                  onPress={chip.onClear}
+                  style={styles.summaryChipRemove}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove filter ${chip.label}`}
+                >
+                  <Text style={styles.summaryChipRemoveText} accessibilityElementsHidden importantForAccessibility="no">
+                    ×
+                  </Text>
                 </Pressable>
               </Pressable>
             ))}
@@ -379,7 +397,12 @@ export default function HistoryScreen({ navigation, route }: RootStackScreenProp
         {filtersExpanded ? (
         <>
         {hasActiveFilters ? (
-          <Pressable onPress={clearFilters} hitSlop={8} style={styles.clearRow}>
+          <Pressable
+            onPress={clearFilters}
+            hitSlop={HIT_SLOP}
+            style={styles.clearRow}
+            accessibilityRole="button"
+          >
             <Text style={styles.clearText}>Clear all</Text>
           </Pressable>
         ) : null}
@@ -467,26 +490,17 @@ export default function HistoryScreen({ navigation, route }: RootStackScreenProp
         renderItem={({ item }) => {
           const pocketLine = pocketLineForHistory(item, pocketNames);
           const category = item.category_id ? categoryNames.get(item.category_id) : null;
-          const categoryColor =
-            category?.color ?? (item.category_id ? pocketChartColor(item.category_id, chartPalette) : undefined);
+          const categoryColor = item.category_id
+            ? resolveStoredColor(category?.color, chartPalette) ?? categoryFallbackColors.get(item.category_id)
+            : undefined;
           return (
-            <Pressable
-              style={styles.row}
+            <TransactionRow
+              item={item}
+              category={category ? { name: category.name, color: categoryColor } : undefined}
+              pocketLine={pocketLine}
+              pocketId={filterPocketIds.length === 1 ? filterPocketIds[0] : undefined}
               onPress={() => navigation.navigate('TransactionEditor', { transactionId: item.id })}
-            >
-              <Text style={styles.dateLine}>{formatOccurredAt(item.occurred_at)}</Text>
-              <Text style={styles.title}>{item.title}</Text>
-              {pocketLine ? <Text style={styles.pocketLine}>{pocketLine}</Text> : null}
-              {category ? (
-                <View style={styles.categoryLine}>
-                  <View style={[styles.categoryDot, { backgroundColor: categoryColor }]} />
-                  <Text style={styles.categoryLineText}>{category.name}</Text>
-                </View>
-              ) : null}
-              <Text style={styles.meta}>
-                {item.kind} · {item.currency} · {formatMinorForDisplay(item.amount_minor, item.currency)}
-              </Text>
-            </Pressable>
+            />
           );
         }}
       />
@@ -500,25 +514,6 @@ function createStyles(c: AppColors) {
     container: { flex: 1, backgroundColor: c.bg },
     list: { padding: 16 },
     muted: { textAlign: 'center', color: c.textMuted, marginTop: 24 },
-    row: {
-      padding: 14,
-      backgroundColor: c.surface,
-      borderRadius: 10,
-      marginBottom: 8,
-      borderWidth: 1,
-      borderColor: c.border,
-    },
-    dateLine: { fontSize: 12, color: c.textMuted, fontFamily: font.semibold, marginBottom: 6 },
-    title: { fontFamily: font.semibold, fontSize: 16, color: c.textSecondary },
-    pocketLine: {
-      fontSize: 13,
-      color: c.textMuted,
-      marginTop: 4,
-    },
-    categoryLine: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
-    categoryDot: { width: 8, height: 8, borderRadius: 4 },
-    categoryLineText: { fontSize: 13, color: c.textMuted },
-    meta: { color: c.textMuted, marginTop: 4, fontSize: 13 },
     filterSection: {
       paddingHorizontal: 16,
       paddingTop: 10,
@@ -565,15 +560,15 @@ function createStyles(c: AppColors) {
       borderColor: c.jarSoftBorder,
       borderRadius: 20,
       paddingLeft: 12,
-      paddingRight: 6,
-      paddingVertical: 6,
+      paddingRight: 4,
+      paddingVertical: 4,
       maxWidth: 220,
     },
     summaryChipText: { fontSize: 12, color: c.textSecondary, fontFamily: font.semibold },
     summaryChipRemove: {
-      width: 18,
-      height: 18,
-      borderRadius: 9,
+      width: 24,
+      height: 24,
+      borderRadius: 12,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: c.chipBg,

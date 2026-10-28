@@ -18,13 +18,18 @@ import type { Category } from '../domain/types';
 import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
-import { buildThemeChartPalette, pocketChartColor } from '../utils/pocketChartColors';
+import { HIT_SLOP } from '../utils/hitSlop';
+import { assignChartColors, buildThemeChartPalette, resolveStoredColor } from '../utils/pocketChartColors';
 
 export default function CategoriesScreen() {
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const swatchPalette = useMemo(() => buildThemeChartPalette(colors, isDark), [colors, isDark]);
   const [items, setItems] = useState<Category[]>([]);
+  const fallbackColors = useMemo(
+    () => assignChartColors(items.map((c) => c.id), swatchPalette),
+    [items, swatchPalette]
+  );
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState('');
   const [newColor, setNewColor] = useState<string | null>(null);
@@ -63,7 +68,7 @@ export default function CategoriesScreen() {
   const openEdit = (row: Category) => {
     setEditId(row.id);
     setEditName(row.name);
-    setEditColor(row.color);
+    setEditColor(resolveStoredColor(row.color, swatchPalette) ?? null);
     setEditOpen(true);
   };
 
@@ -109,14 +114,22 @@ export default function CategoriesScreen() {
       <Pressable
         style={[styles.swatchNone, !selected && styles.swatchSelected]}
         onPress={() => onSelect(null)}
+        hitSlop={HIT_SLOP}
+        accessibilityRole="button"
+        accessibilityLabel="No colour"
+        accessibilityState={{ selected: !selected }}
       >
         <Text style={styles.swatchNoneText}>None</Text>
       </Pressable>
-      {swatchPalette.map((hex) => (
+      {swatchPalette.map((hex, i) => (
         <Pressable
           key={hex}
           style={[styles.swatch, { backgroundColor: hex }, selected === hex && styles.swatchSelected]}
           onPress={() => onSelect(hex)}
+          hitSlop={HIT_SLOP}
+          accessibilityRole="button"
+          accessibilityLabel={`Colour ${i + 1} of ${swatchPalette.length}`}
+          accessibilityState={{ selected: selected === hex }}
         />
       ))}
     </View>
@@ -126,8 +139,7 @@ export default function CategoriesScreen() {
     <ScreenWithFooter>
     <View style={styles.container}>
       <Text style={styles.p}>
-        Categories help you tag income and expense transactions (e.g. Groceries, Salary). Assign
-        one when recording a transaction, then filter History or view Statistics by category.
+        Tag transactions (e.g. Groceries, Salary) to filter History and split Statistics.
       </Text>
       <Pressable style={styles.addBtn} onPress={() => setCreateOpen(true)}>
         <ContourOnPrimaryText style={styles.addBtnText}>+ New category</ContourOnPrimaryText>
@@ -140,14 +152,29 @@ export default function CategoriesScreen() {
         renderItem={({ item }) => (
           <View style={styles.card}>
             <View style={styles.cardMain}>
-              <View style={[styles.dot, { backgroundColor: item.color ?? pocketChartColor(item.id, swatchPalette) }]} />
+              <View
+                style={[
+                  styles.dot,
+                  { backgroundColor: resolveStoredColor(item.color, swatchPalette) ?? fallbackColors.get(item.id) },
+                ]}
+              />
               <Text style={styles.cardName}>{item.name}</Text>
             </View>
             <View style={styles.cardActions}>
-              <Pressable onPress={() => openEdit(item)} hitSlop={10}>
+              <Pressable
+                onPress={() => openEdit(item)}
+                hitSlop={HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={`Edit ${item.name}`}
+              >
                 <Text style={styles.link}>Edit</Text>
               </Pressable>
-              <Pressable onPress={() => tryDelete(item.id, item.name)} hitSlop={10}>
+              <Pressable
+                onPress={() => tryDelete(item.id, item.name)}
+                hitSlop={HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={`Delete ${item.name}`}
+              >
                 <Text style={styles.delete}>Delete</Text>
               </Pressable>
             </View>
@@ -242,17 +269,21 @@ function createStyles(c: AppColors) {
     },
     addBtnText: { fontFamily: font.semibold },
     card: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
       backgroundColor: c.surface,
-      padding: 14,
+      paddingVertical: 12,
+      paddingHorizontal: 14,
       borderRadius: 10,
       marginBottom: 8,
       borderWidth: 1,
       borderColor: c.border,
     },
-    cardMain: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
+    cardMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
     dot: { width: 14, height: 14, borderRadius: 7 },
-    cardName: { fontSize: 16, fontFamily: font.bold, color: c.text },
-    cardActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 16 },
+    cardName: { flexShrink: 1, fontSize: 16, fontFamily: font.bold, color: c.text },
+    cardActions: { flexDirection: 'row', gap: 16 },
     link: { color: c.primary, fontFamily: font.semibold, fontSize: 14 },
     delete: { color: c.danger, fontSize: 14 },
     modalOverlay: {

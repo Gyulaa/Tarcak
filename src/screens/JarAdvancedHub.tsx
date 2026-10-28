@@ -23,6 +23,7 @@ import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
 import { formatMinorForDisplay } from '../utils/formatMinor';
+import { HIT_SLOP } from '../utils/hitSlop';
 
 export default function JarAdvancedHub({ navigation }: RootStackScreenProps<'JarAdvanced'>) {
   const { colors } = useAppTheme();
@@ -106,8 +107,7 @@ export default function JarAdvancedHub({ navigation }: RootStackScreenProps<'Jar
       <ScreenWithFooter>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.inner}>
         <Text style={styles.lead}>
-          Advanced Jar is off. Enable it under Settings → Jar to configure per-asset ceilings and
-          milestone splits.
+          Advanced Jar is off. Turn it on in Settings → Jar.
         </Text>
         <Pressable style={styles.primaryBtn} onPress={() => navigation.navigate('Settings')}>
           <ContourOnPrimaryText style={styles.primaryBtnText}>Open Settings</ContourOnPrimaryText>
@@ -132,9 +132,7 @@ export default function JarAdvancedHub({ navigation }: RootStackScreenProps<'Jar
     <View style={styles.root}>
       <ScrollView contentContainerStyle={styles.inner}>
         <Text style={styles.lead}>
-          Each asset has a balance chart: one line per pocket, tap knots to edit milestones, slide
-          the chart to preview how splits blend as your Jar balance grows. Distribution from the
-          Jar only runs for assets you configure here.
+          Split rules per asset. Only assets set up here are distributed.
         </Text>
 
         <Pressable
@@ -164,7 +162,13 @@ export default function JarAdvancedHub({ navigation }: RootStackScreenProps<'Jar
                   {s.milestoneCount} milestone{s.milestoneCount === 1 ? '' : 's'}
                 </Text>
               </Pressable>
-              <Pressable style={styles.removeHit} onPress={() => onDelete(s.currency)} hitSlop={10}>
+              <Pressable
+                style={styles.removeHit}
+                onPress={() => onDelete(s.currency)}
+                hitSlop={HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={`Remove ${s.currency} setup`}
+              >
                 <Text style={styles.removeText}>Remove</Text>
               </Pressable>
             </View>

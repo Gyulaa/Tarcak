@@ -22,6 +22,7 @@ import type { RootStackScreenProps } from '../navigation/types';
 import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
+import { HIT_SLOP } from '../utils/hitSlop';
 
 const TOTAL_BPS = 10_000;
 
@@ -179,7 +180,7 @@ export default function JarSplitScreen({ navigation }: RootStackScreenProps<'Jar
         <View style={styles.disabledWrap}>
           <Text style={styles.disabledTitle}>Jar split is unavailable</Text>
           <Text style={styles.disabledBody}>
-            Turn on "Pool & distribute" under Settings → Jar to edit distribution percentages.
+            Turn on Pool & distribute in Settings → Jar to edit this.
           </Text>
           <Pressable style={styles.settingsBtn} onPress={() => navigation.navigate('Settings')}>
             <ContourOnPrimaryText style={styles.settingsBtnText}>Open Settings</ContourOnPrimaryText>
@@ -195,8 +196,7 @@ export default function JarSplitScreen({ navigation }: RootStackScreenProps<'Jar
     <View style={styles.root}>
       <ScrollView contentContainerStyle={styles.inner}>
         <Text style={styles.lead}>
-          When you tap Distribute, each asset in the Jar is split across these pockets unless Advanced
-          Jar overrides that asset. Percentages must add up to exactly 100%.
+          Distribute splits the Jar across these pockets. Must total 100%.
         </Text>
         {advancedJarOn ? (
           <Pressable style={styles.advLink} onPress={() => navigation.navigate('JarAdvanced')}>
@@ -237,7 +237,12 @@ export default function JarSplitScreen({ navigation }: RootStackScreenProps<'Jar
                 <Text style={styles.rowName} numberOfLines={1}>
                   {r.name}
                 </Text>
-                <Pressable onPress={() => removeRow(r.pocketId)} hitSlop={12}>
+                <Pressable
+                  onPress={() => removeRow(r.pocketId)}
+                  hitSlop={HIT_SLOP}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove ${r.name}`}
+                >
                   <Text style={styles.remove}>Remove</Text>
                 </Pressable>
               </View>

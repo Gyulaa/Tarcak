@@ -10,6 +10,7 @@ import {
 import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
+import { HIT_SLOP } from '../utils/hitSlop';
 
 function formatWhen(isoOrMs: string | number): string {
   const d = typeof isoOrMs === 'number' ? new Date(isoOrMs) : new Date(isoOrMs);
@@ -50,7 +51,7 @@ export function BackupRestoredBanner() {
     <View style={styles.wrap}>
       <Text style={styles.title}>Restored from backup</Text>
       <Text style={styles.body}>
-        Pockets, transactions, Jar rules and settings on this device came from your backup file.
+        Everything on this device came from your backup file.
       </Text>
       <View style={styles.metaRow}>
         <Text style={styles.metaLabel}>Backup made</Text>
@@ -63,7 +64,7 @@ export function BackupRestoredBanner() {
       <Pressable
         style={styles.dismissBtn}
         onPress={() => void dismiss()}
-        hitSlop={8}
+        hitSlop={HIT_SLOP}
         accessibilityRole="button"
       >
         <Text style={styles.dismissText}>Dismiss</Text>

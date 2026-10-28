@@ -22,7 +22,7 @@ import { useAppTheme } from '../../theme/ThemeContext';
 import { font } from '../../theme/fonts';
 import type { AppColors } from '../../theme/palette';
 import { formatMinorForDisplay } from '../../utils/formatMinor';
-import { buildThemeChartPalette, pocketChartColor } from '../../utils/pocketChartColors';
+import { assignChartColors, buildThemeChartPalette } from '../../utils/pocketChartColors';
 
 const CHART_HEIGHT = 248;
 const KNOT_HIT = 40;
@@ -75,6 +75,11 @@ export function JarAdvancedBalanceChart({
         a.name.localeCompare(b.name)
       ),
     [editorState, layout, pocketNames]
+  );
+
+  const seriesColors = useMemo(
+    () => assignChartColors(lineSeries.map((s) => s.pocketId), palette),
+    [lineSeries, palette]
   );
 
   const selectedKnot = useMemo(() => {
@@ -136,12 +141,18 @@ export function JarAdvancedBalanceChart({
       </View>
 
       <View style={[styles.chartBox, { height: CHART_HEIGHT + 22 }]}>
-        <Svg width={chartWidth} height={CHART_HEIGHT}>
+        <Svg
+          width={chartWidth}
+          height={CHART_HEIGHT}
+          accessible
+          accessibilityRole="image"
+          accessibilityLabel={`Chart of each pocket's share of the Jar balance, from 0 to ${formatMinorForDisplay(layout.maxMinor, currency)}, ${lineSeries.length} pockets`}
+        >
           {renderPlotBackground(plot, colors)}
           {renderGrid(plot, ticks, colors)}
           {renderKnotGuides(layout, plot, selectedKnotId, colors)}
           {lineSeries.map((series) =>
-            renderPocketLine(series, plot, palette, selectedKnot, colors)
+            renderPocketLine(series, plot, seriesColors.get(series.pocketId)!, selectedKnot, colors)
           )}
           {scrubX != null ? (
             <Line
@@ -166,8 +177,9 @@ export function JarAdvancedBalanceChart({
               key={pct}
               style={[
                 styles.yLabel,
-                { top: percentToYInPlot(pct, plot) - 7 },
+                { top: percentToYInPlot(pct, plot) - 8 },
               ]}
+              maxFontSizeMultiplier={1.2}
             >
               {pct}%
             </Text>
@@ -224,13 +236,14 @@ export function JarAdvancedBalanceChart({
         >
           {ticks.map((t) => {
             const x = balanceToXInPlot(t, plot);
-            const labelW = 60;
+            const labelW = 96;
             const clampedLeft = Math.max(0, Math.min(x - labelW / 2, chartWidth - labelW));
             return (
               <Text
                 key={`lbl-${t}`}
                 style={[styles.tickLabel, { left: clampedLeft, width: labelW }]}
                 numberOfLines={1}
+                maxFontSizeMultiplier={1.2}
               >
                 {formatMinorForDisplay(t, currency)}
               </Text>
@@ -242,7 +255,7 @@ export function JarAdvancedBalanceChart({
       {lineSeries.length > 0 ? (
         <View style={styles.legendWrap}>
           {lineSeries.map((s) => {
-            const color = pocketChartColor(s.pocketId, palette);
+            const color = seriesColors.get(s.pocketId)!;
             const active =
               selectedKnot != null &&
               selectedKnot.splits.some((r) => r.pocketId === s.pocketId && r.percent > 0);
@@ -264,7 +277,7 @@ export function JarAdvancedBalanceChart({
       )}
 
       <Text style={styles.hint}>
-        X: Jar balance · Y: share % · Tap a knot to edit · Slide the chart to preview
+        Tap a knot to edit · slide to preview
       </Text>
     </View>
   );
@@ -364,11 +377,10 @@ function renderKnotGuides(
 function renderPocketLine(
   series: PocketLineSeries,
   plot: ChartPlotArea,
-  palette: string[],
+  color: string,
   selectedKnot: ChartKnot | null,
   colors: AppColors
 ) {
-  const color = pocketChartColor(series.pocketId, palette);
   const inSelectedKnot =
     selectedKnot != null &&
     selectedKnot.splits.some((r) => r.pocketId === series.pocketId && r.percent > 0);
@@ -449,14 +461,14 @@ function createStyles(c: AppColors) {
       position: 'absolute',
       left: 0,
       top: 0,
-      width: 38,
+      width: 40,
       height: '100%',
     },
     yLabel: {
       position: 'absolute',
       right: 4,
-      width: 34,
-      fontSize: 9,
+      width: 36,
+      fontSize: 12,
       color: c.textMuted,
       textAlign: 'right',
       fontFamily: font.regular,
@@ -493,7 +505,7 @@ function createStyles(c: AppColors) {
     },
     tickLabel: {
       position: 'absolute',
-      fontSize: 9,
+      fontSize: 12,
       color: c.textMuted,
       textAlign: 'center',
       fontFamily: font.regular,
@@ -536,7 +548,7 @@ function createStyles(c: AppColors) {
     },
     hint: {
       marginTop: 8,
-      fontSize: 11,
+      fontSize: 12,
       color: c.textMuted,
       textAlign: 'center',
       lineHeight: 16,

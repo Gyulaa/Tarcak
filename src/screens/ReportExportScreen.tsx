@@ -265,9 +265,7 @@ export default function ReportExportScreen() {
     <ScreenWithFooter>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.inner}>
         <Text style={styles.lead}>
-          Income and expenses by month as a CSV file for a spreadsheet. The file has no pocket names,
-          transaction titles, exact dates or IDs. Transfers are left out, and currencies are never added
-          together.
+          Monthly income and expenses as a CSV. No pocket names, titles or exact dates.
         </Text>
 
         {Platform.OS === 'web' ? (
@@ -300,8 +298,8 @@ export default function ReportExportScreen() {
           />
         </View>
         <Text style={styles.hint}>
-          Whole calendar months{months.length > 0 ? `: ${months[0].key} to ${months[months.length - 1].key}` : ''}.
-          At most {MAX_REPORT_MONTHS} months.
+          Whole months{months.length > 0 ? `, ${months[0].key} to ${months[months.length - 1].key}` : ''}; at most{' '}
+          {MAX_REPORT_MONTHS}.
         </Text>
 
         <Text style={styles.sectionLabel}>Currencies in the file</Text>
@@ -327,8 +325,7 @@ export default function ReportExportScreen() {
           <View style={styles.switchTextCol}>
             <Text style={styles.switchTitle}>Break down by category</Text>
             <Text style={styles.switchHint}>
-              Adds category names to the file. They are text you typed, so check them before you share.
-              Off: only the monthly totals.
+              Adds the category names you typed. Check them before sharing.
             </Text>
           </View>
           <Switch
@@ -340,11 +337,7 @@ export default function ReportExportScreen() {
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Preview</Text>
-          <Text style={styles.cardSub}>
-            {breakdown
-              ? 'Monthly totals. The file lists them by category.'
-              : 'Monthly totals, exactly as written to the file.'}
-          </Text>
+          
           {loading ? (
             <View style={styles.loading}>
               <ActivityIndicator color={colors.primary} />
@@ -372,8 +365,8 @@ export default function ReportExportScreen() {
               {breakdown ? (
                 <Text style={styles.previewNote}>
                   {preview.categoryCount === 0
-                    ? 'Category rows are added, but no category names are used in this range.'
-                    : `${preview.categoryCount} category ${preview.categoryCount === 1 ? 'name is' : 'names are'} written to the file, one row per month, currency, income or expense and category.`}
+                    ? 'No category names in this range.'
+                    : `${preview.categoryCount} category ${preview.categoryCount === 1 ? 'name' : 'names'} in the file.`}
                 </Text>
               ) : null}
             </>
@@ -381,7 +374,7 @@ export default function ReportExportScreen() {
         </View>
 
         <Text style={styles.warning}>
-          The exported file is not encrypted. Anyone who gets the file can read it.
+          The file is not encrypted. Anyone who gets it can read it.
         </Text>
         <Pressable
           style={[styles.primaryBtn, !canExport && styles.btnDim]}
@@ -437,8 +430,7 @@ function createStyles(c: AppColors) {
       borderWidth: 1,
       borderColor: c.border,
     },
-    cardTitle: { fontFamily: font.bold, fontSize: 17, color: c.text },
-    cardSub: { fontSize: 13, color: c.textMuted, marginTop: 4, marginBottom: 12 },
+    cardTitle: { fontFamily: font.bold, fontSize: 17, color: c.text, marginBottom: 8 },
     loading: { height: 80, justifyContent: 'center', alignItems: 'center' },
     previewRow: { paddingVertical: 8, borderTopWidth: 1, borderTopColor: c.border },
     previewHead: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },

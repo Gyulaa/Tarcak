@@ -13,6 +13,7 @@ import {
 
 import { ContourOnPrimaryText } from '../components/ContourOnPrimaryText';
 import { ScreenWithFooter } from '../components/ScreenWithFooter';
+import { TransactionRow } from '../components/TransactionRow';
 import * as jarAdvancedRepo from '../db/repositories/jarAdvanced';
 import * as jarRepo from '../db/repositories/jar';
 import * as pocketsRepo from '../db/repositories/pockets';
@@ -25,7 +26,7 @@ import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
 import { formatMinorForDisplay } from '../utils/formatMinor';
-import { formatOccurredAt } from '../utils/formatOccurredAt';
+import { HIT_SLOP } from '../utils/hitSlop';
 
 const JAR_TX_PREVIEW_COUNT = 5;
 const JAR_TX_FETCH_LIMIT = 200;
@@ -114,6 +115,7 @@ export default function JarScreen({ navigation }: RootStackScreenProps<'Jar'>) {
   }, [balances, advancedJarOn, advancedCurrencySet]);
 
   const canDistribute = advancedJarOn ? balancesForDistribute.length > 0 : ruleCount > 0;
+  const distributeOff = busy || balances.length === 0 || !canDistribute;
 
   const onDistributePress = () => {
     if (!jarId) return;
@@ -190,9 +192,7 @@ export default function JarScreen({ navigation }: RootStackScreenProps<'Jar'>) {
         <View style={styles.disabledCard}>
           <Text style={styles.disabledTitle}>Jar features are off</Text>
           <Text style={styles.disabledBody}>
-            Distribution and the pool shortcut are hidden. The Jar pocket is archived (hidden from
-            pocket lists and new transactions). Turn Pool & distribute back on in Settings to restore
-            it, or open it here to view balances and history.
+            The Jar is off. Turn on Pool & distribute in Settings to restore it.
           </Text>
           <Pressable style={styles.primaryBtn} onPress={() => navigation.navigate('Settings')}>
             <ContourOnPrimaryText style={styles.primaryBtnText}>Open Settings</ContourOnPrimaryText>
@@ -213,10 +213,9 @@ export default function JarScreen({ navigation }: RootStackScreenProps<'Jar'>) {
     <ScreenWithFooter>
     <ScrollView style={styles.scroll} contentContainerStyle={styles.inner}>
       <View style={styles.hero}>
-        <Text style={styles.heroKicker}>Hold & allocate</Text>
         <Text style={styles.heroTitle}>{jarName}</Text>
         <Text style={styles.heroSub}>
-          Pool income here, then distribute to your pockets on your schedule.
+          Pool income, then distribute it to your pockets.
         </Text>
       </View>
 
@@ -239,36 +238,26 @@ export default function JarScreen({ navigation }: RootStackScreenProps<'Jar'>) {
       <Text style={styles.splitHint}>
         {advancedJarOn
           ? advancedAssetCount === 0
-            ? 'Advanced Jar: add at least one asset and define its split.'
-            : balances.length === 0
-              ? `Advanced Jar: ${advancedAssetCount} asset${advancedAssetCount === 1 ? '' : 's'} configured.`
-              : balances.every((b) => advancedCurrencySet.has(b.currency))
-                ? `Advanced Jar: all Jar balances have rules (${advancedAssetCount} asset${advancedAssetCount === 1 ? '' : 's'}).`
-                : `Advanced Jar: add rules for every asset in the Jar (missing: ${balances
-                    .filter((b) => !advancedCurrencySet.has(b.currency))
-                    .map((b) => b.currency)
-                    .join(', ')}).`
+            ? 'Add an asset and its split in Advanced Jar.'
+            : balances.every((b) => advancedCurrencySet.has(b.currency))
+              ? `Advanced Jar: ${advancedAssetCount} asset${advancedAssetCount === 1 ? '' : 's'} set up.`
+              : `Advanced Jar: no rules yet for ${balances
+                  .filter((b) => !advancedCurrencySet.has(b.currency))
+                  .map((b) => b.currency)
+                  .join(', ')}.`
           : ruleCount === 0
-            ? 'No basic split configured yet.'
+            ? 'No split set up yet.'
             : `${ruleCount} pocket${ruleCount === 1 ? '' : 's'} in your split.`}
       </Text>
 
       <Pressable
-        style={[styles.primaryBtn, (busy || balances.length === 0 || !canDistribute) && styles.btnDisabled]}
+        style={[styles.primaryBtn, distributeOff && styles.btnDisabled]}
         onPress={onDistributePress}
         disabled={busy || !canDistribute}
       >
-        <View style={styles.btnRow}>
-          <View style={styles.btnQuarter}>
-            <ContourOnPrimaryText style={styles.btnMark}>/</ContourOnPrimaryText>
-          </View>
-          <View style={styles.btnHalf}>
-            <ContourOnPrimaryText style={styles.btnLabelPrimary}>Distribute</ContourOnPrimaryText>
-          </View>
-          <View style={styles.btnQuarter}>
-            <ContourOnPrimaryText style={styles.btnMark}>/</ContourOnPrimaryText>
-          </View>
-        </View>
+        <ContourOnPrimaryText style={styles.btnLabelPrimary} dimmed={distributeOff}>
+          Distribute
+        </ContourOnPrimaryText>
       </Pressable>
 
       {advancedJarOn ? (
@@ -285,17 +274,7 @@ export default function JarScreen({ navigation }: RootStackScreenProps<'Jar'>) {
         style={[styles.primaryBtn, styles.recordIncomeBtn]}
         onPress={() => navigation.navigate('TransactionEditor', { presetKind: 'income', pocketId: jarId })}
       >
-        <View style={styles.btnRow}>
-          <View style={styles.btnQuarter}>
-            <ContourOnPrimaryText style={styles.btnMark}>+</ContourOnPrimaryText>
-          </View>
-          <View style={styles.btnHalf}>
-            <ContourOnPrimaryText style={styles.btnLabelPrimary}>Record income to Jar</ContourOnPrimaryText>
-          </View>
-          <View style={styles.btnQuarter}>
-            <ContourOnPrimaryText style={styles.btnMark}>+</ContourOnPrimaryText>
-          </View>
-        </View>
+        <ContourOnPrimaryText style={styles.btnLabelPrimary}>Record income to Jar</ContourOnPrimaryText>
       </Pressable>
 
       <View style={styles.sectionDivider} />
@@ -306,27 +285,18 @@ export default function JarScreen({ navigation }: RootStackScreenProps<'Jar'>) {
         <>
           {(jarTxShowAll ? jarTransactions : jarTransactions.slice(0, JAR_TX_PREVIEW_COUNT)).map(
             (item) => (
-              <Pressable
+              <TransactionRow
                 key={item.id}
-                style={styles.txRow}
+                item={item}
                 onPress={() => navigation.navigate('TransactionEditor', { transactionId: item.id })}
-              >
-                <Text style={styles.txDate}>{formatOccurredAt(item.occurred_at)}</Text>
-                <Text style={styles.txTitle} numberOfLines={1}>
-                  {item.title}
-                </Text>
-                <Text style={styles.txMeta}>
-                  {item.kind} · {item.currency} ·{' '}
-                  {formatMinorForDisplay(item.amount_minor, item.currency)}
-                </Text>
-              </Pressable>
+              />
             )
           )}
           {jarTransactions.length > JAR_TX_PREVIEW_COUNT ? (
             <Pressable
               style={styles.showMoreRow}
               onPress={() => setJarTxShowAll((v) => !v)}
-              hitSlop={6}
+              hitSlop={HIT_SLOP}
             >
               <Text style={styles.showMoreText}>
                 {jarTxShowAll ? 'Show less' : 'Show more'}
@@ -388,7 +358,7 @@ function createJarStyles(c: AppColors) {
     hero: {
       backgroundColor: c.surface,
       borderRadius: 16,
-      padding: 20,
+      padding: 16,
       marginBottom: 16,
       borderWidth: 1,
       borderColor: c.jarSoftBorder,
@@ -398,9 +368,8 @@ function createJarStyles(c: AppColors) {
       shadowOffset: { width: 0, height: 4 },
       elevation: 2,
     },
-    heroKicker: { fontSize: 12, fontFamily: font.semibold, color: c.primary, letterSpacing: 0.5 },
-    heroTitle: { fontSize: 26, fontFamily: font.bold, color: c.text, marginTop: 6 },
-    heroSub: { fontSize: 15, color: c.textMuted, marginTop: 10, lineHeight: 22 },
+    heroTitle: { fontSize: 26, fontFamily: font.bold, color: c.text },
+    heroSub: { fontSize: 14, color: c.textMuted, marginTop: 4, lineHeight: 20 },
     card: {
       backgroundColor: c.surface,
       borderRadius: 14,
@@ -428,17 +397,8 @@ function createJarStyles(c: AppColors) {
       borderRadius: 14,
       alignItems: 'center',
     },
-    btnDisabled: { opacity: 0.45 },
+    btnDisabled: { backgroundColor: c.surfaceMuted, borderWidth: 1, borderColor: c.border },
     primaryBtnText: { fontFamily: font.bold, fontSize: 17 },
-    btnRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      alignSelf: 'stretch',
-      width: '100%',
-    },
-    btnQuarter: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-    btnHalf: { flex: 2, alignItems: 'center', justifyContent: 'center' },
-    btnMark: { fontSize: 20, fontFamily: font.bold },
     btnLabelPrimary: { fontSize: 16, fontFamily: font.semibold },
     ghostBtn: {
       marginTop: 12,
@@ -463,17 +423,6 @@ function createJarStyles(c: AppColors) {
       marginBottom: 12,
     },
     txEmpty: { fontSize: 15, color: c.textMuted, lineHeight: 22 },
-    txRow: {
-      padding: 14,
-      backgroundColor: c.surface,
-      borderRadius: 12,
-      marginBottom: 8,
-      borderWidth: 1,
-      borderColor: c.border,
-    },
-    txDate: { fontSize: 12, color: c.textMuted, fontFamily: font.semibold, marginBottom: 6 },
-    txTitle: { fontFamily: font.semibold, fontSize: 16, color: c.textSecondary },
-    txMeta: { color: c.textMuted, marginTop: 4, fontSize: 13 },
     showMoreRow: { alignItems: 'center', paddingVertical: 10, marginTop: 4 },
     showMoreText: { color: c.primary, fontFamily: font.semibold, fontSize: 15 },
     modalOverlay: {

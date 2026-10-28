@@ -9,6 +9,7 @@ import {
   splitsSumExact100,
   type SplitRow,
 } from '../../domain/jarAdvancedEditorTypes';
+import { HIT_SLOP } from '../../utils/hitSlop';
 
 type Props = {
   rows: SplitRow[];
@@ -112,7 +113,12 @@ export function JarAdvancedSplitEditor({
                 {r.name}
               </Text>
               {!readOnly ? (
-                <Pressable onPress={() => removePocket(r.pocketId)} hitSlop={8}>
+                <Pressable
+                  onPress={() => removePocket(r.pocketId)}
+                  hitSlop={HIT_SLOP}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove ${r.name}`}
+                >
                   <Text style={styles.remove}>Remove</Text>
                 </Pressable>
               ) : null}

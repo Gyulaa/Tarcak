@@ -13,6 +13,7 @@ import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
 import { formatMinorForDisplay } from '../utils/formatMinor';
+import { HIT_SLOP } from '../utils/hitSlop';
 
 export default function HomeScreen({ navigation }: RootStackScreenProps<'Home'>) {
   const { colors } = useAppTheme();
@@ -39,7 +40,12 @@ export default function HomeScreen({ navigation }: RootStackScreenProps<'Home'>)
   useLayoutEffect(() => {
     navigation.setOptions({
       headerRight: () => (
-        <Pressable onPress={() => void lockVault()} style={styles.headerBtn} hitSlop={8}>
+        <Pressable
+          onPress={() => void lockVault()}
+          style={styles.headerBtn}
+          hitSlop={HIT_SLOP}
+          accessibilityRole="button"
+        >
           <Text style={styles.headerBtnText}>Lock</Text>
         </Pressable>
       ),
@@ -133,7 +139,7 @@ function createStyles(c: AppColors) {
       elevation: 2,
     },
     jarCardText: { flex: 1 },
-    jarKicker: { fontSize: 11, fontFamily: font.semibold, color: c.primary, letterSpacing: 0.6 },
+    jarKicker: { fontSize: 12, fontFamily: font.semibold, color: c.primary, letterSpacing: 0.6 },
     jarTitle: { fontSize: 18, fontFamily: font.bold, color: c.jarTitle, marginTop: 4 },
     jarSub: { fontSize: 13, color: c.textMuted, marginTop: 4 },
     jarChevron: { fontSize: 28, color: c.primary, fontWeight: '300', marginLeft: 8 },

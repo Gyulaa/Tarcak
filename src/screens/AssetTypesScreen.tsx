@@ -19,6 +19,7 @@ import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
 import { MAX_AMOUNT_DECIMALS } from '../utils/amountMinor';
+import { HIT_SLOP } from '../utils/hitSlop';
 
 /** `null` = automatic (whole units from 100, cents from 1, three significant digits below 1). */
 const DECIMAL_CHOICES: (number | null)[] = [
@@ -117,8 +118,7 @@ export default function AssetTypesScreen() {
     <ScreenWithFooter>
     <View style={styles.container}>
       <Text style={styles.p}>
-        Codes (e.g. HUF, USD, XMR) are stored on each transaction. Add types here, then pick them when
-        recording a transaction or setting the default currency.
+        Currencies and coins you can record, e.g. HUF, USD, XMR.
       </Text>
       <Pressable style={styles.addBtn} onPress={() => setCreateOpen(true)}>
         <ContourOnPrimaryText style={styles.addBtnText}>+ New asset type</ContourOnPrimaryText>
@@ -136,10 +136,20 @@ export default function AssetTypesScreen() {
               <Text style={styles.cardMeta}>Shown with: {decimalsLabel(item.display_decimals)}</Text>
             </View>
             <View style={styles.cardActions}>
-              <Pressable onPress={() => openRename(item)} hitSlop={10}>
+              <Pressable
+                onPress={() => openRename(item)}
+                hitSlop={HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={`Rename ${item.code}`}
+              >
                 <Text style={styles.link}>Edit</Text>
               </Pressable>
-              <Pressable onPress={() => tryDelete(item.id, item.code)} hitSlop={10}>
+              <Pressable
+                onPress={() => tryDelete(item.id, item.code)}
+                hitSlop={HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={`Delete ${item.code}`}
+              >
                 <Text style={styles.delete}>Delete</Text>
               </Pressable>
             </View>
@@ -225,8 +235,7 @@ export default function AssetTypesScreen() {
               })}
             </View>
             <Text style={styles.hint}>
-              Rounds amounts in lists and totals only; editing a transaction shows the exact value.
-              Auto: whole units from 100, two decimals from 1, three significant digits below 1.
+              Display only; the exact value is kept. Auto: whole units from 100, two decimals from 1.
             </Text>
             <View style={styles.modalActions}>
               <Pressable

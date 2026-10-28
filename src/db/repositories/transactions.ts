@@ -371,6 +371,31 @@ ORDER BY currency COLLATE NOCASE ASC
   return toBalanceRows(rows);
 }
 
+/** Every pocket's non-zero balances in one query: pocket id to one row per currency. */
+export async function sumBalancesByPocket(): Promise<Map<string, BalanceRow[]>> {
+  const db = await openMainDatabase();
+  const rows = await db.getAllAsync<{ pocket_id: string; currency: string; balance_text: string }>(`
+SELECT pid AS pocket_id, currency, CAST(SUM(delta) AS TEXT) AS balance_text FROM (
+  SELECT pocket_id AS pid, currency, amount_minor AS delta FROM transactions WHERE kind = 'income'
+  UNION ALL
+  SELECT pocket_id AS pid, currency, -amount_minor AS delta FROM transactions WHERE kind = 'expense'
+  UNION ALL
+  SELECT from_pocket_id AS pid, currency, -amount_minor AS delta FROM transactions WHERE kind = 'transfer'
+  UNION ALL
+  SELECT to_pocket_id AS pid, currency, amount_minor AS delta FROM transactions WHERE kind = 'transfer'
+) WHERE pid IS NOT NULL GROUP BY pid, currency
+HAVING SUM(delta) != 0
+ORDER BY currency COLLATE NOCASE ASC
+  `);
+  const out = new Map<string, BalanceRow[]>();
+  for (const r of rows) {
+    const list = out.get(r.pocket_id) ?? [];
+    list.push({ currency: r.currency, balance_minor: BigInt(r.balance_text) });
+    out.set(r.pocket_id, list);
+  }
+  return out;
+}
+
 /** True if this pocket has any currency with a non-zero net balance. */
 export async function pocketHasNonZeroBalance(pocketId: string): Promise<boolean> {
   const db = await openMainDatabase();
