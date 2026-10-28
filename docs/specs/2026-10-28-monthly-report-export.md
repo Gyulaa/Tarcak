@@ -91,6 +91,10 @@ Minta: a repo-réteg a `src/db/repositories/statistics.ts`-t, a tiszta logika a 
 
 Eltérés a közzétett szövegektől: a repóban nincs külön jogi/adatvédelmi dokumentum. A `README.md` 5. sora („All data stays on the device and is stored **encrypted**”) az új, titkosítatlan exporttal kiegészítést kérhet, pl.: „… (an optional report export you start yourself writes an unencrypted CSV)”. A szöveget Gyula jóváhagyására hagytam, nem írtam át.
 
+## Review a spec ellen (2026-10-28, független, csak olvasó subagens)
+
+Nem talált súlyos hibát; négy kisebbet jelzett, mind javítva: dupla koppintás az „Export CSV”-n (a `busy` most a megerősítő felugróra is él), üres kategóriabontás (a fájl csak nem nulla sorokat ír, ezért az előnézet `isEmpty`-je ezt figyeli, teszttel), az előnézet felirata bontásnál, és a kikapcsolt pénznem, amely kiesett a tartományból, visszatérve újra be van kapcsolva. Nem ellenőrizhető gépen: maga az SQL, a `File.write(Uint8Array)` BOM-megőrzése, a megosztás Androidon/iOS-en, a táblázatkezelős megjelenés (6. feladat).
+
 ## Nyitott pont
 
 - A vágólapos opció (lásd „Hatókörön kívül”): kell-e, és ha igen, külön-e vagy ebben a változatban.

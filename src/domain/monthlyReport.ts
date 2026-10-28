@@ -232,7 +232,7 @@ export function buildReportCsv(rows: ReportRow[], options: ReportOptions): strin
 }
 
 export type ReportPreview = {
-  /** No income or expense for the chosen months and currencies: nothing worth exporting. */
+  /** Nothing the file would list for the chosen months, currencies and layout: not worth exporting. */
   isEmpty: boolean;
   /** The monthly summary, as the same text the summary file would hold. */
   summary: { month: string; currency: string; income: string; expense: string; net: string }[];
@@ -244,14 +244,14 @@ export type ReportPreview = {
 export function buildReportPreview(rows: ReportRow[], options: ReportOptions): ReportPreview {
   const { decimalMark } = CSV_FORMATS[options.format];
   const scoped = inScope(rows, options);
+  const lines = options.breakdown ? breakDown(scoped) : [];
   const names = new Set<string>();
-  if (options.breakdown) {
-    for (const l of breakDown(scoped)) {
-      if (l.category !== null) names.add(l.category);
-    }
+  for (const l of lines) {
+    if (l.category !== null) names.add(l.category);
   }
   return {
-    isEmpty: scoped.length === 0,
+    // The breakdown file lists non-zero sums only, so it can be empty although rows exist.
+    isEmpty: options.breakdown ? lines.length === 0 : scoped.length === 0,
     summary: summarize(scoped, options).map((l) => ({
       month: l.month,
       currency: l.currency,

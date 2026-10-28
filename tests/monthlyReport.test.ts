@@ -349,6 +349,16 @@ describe('buildReportPreview', () => {
     assert.equal(buildReportPreview(rows, { ...hu, currencies: [] }).isEmpty, true);
     assert.equal(buildReportPreview(rows, { ...hu, months: ['2030-01'] }).isEmpty, true);
   });
+
+  test('a breakdown that nets to nothing is empty too, the summary still has its zero rows', () => {
+    const zero = [
+      row('2026-01', 'HUF', 'income', 'Refund', major(5)),
+      row('2026-01', 'HUF', 'income', 'Refund', -major(5)),
+    ];
+    assert.equal(buildReportPreview(zero, { ...hu, breakdown: true }).isEmpty, true);
+    assert.equal(buildReportPreview(zero, { ...hu, breakdown: false }).isEmpty, false);
+    assert.equal(buildReportPreview(rows, { ...hu, breakdown: true }).isEmpty, false);
+  });
 });
 
 describe('reportFileName', () => {

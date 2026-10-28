@@ -190,6 +190,14 @@ export default function ReportExportScreen() {
   );
   const preview = useMemo(() => buildReportPreview(rows, options), [rows, options]);
 
+  // A currency that dropped out of the range and comes back starts switched on again.
+  useEffect(() => {
+    setSkipped((prev) => {
+      const kept = prev.filter((c) => availableCurrencies.includes(c));
+      return kept.length === prev.length ? prev : kept;
+    });
+  }, [availableCurrencies]);
+
   const toggleCurrency = (code: string, on: boolean) => {
     setSkipped((prev) => (on ? prev.filter((c) => c !== code) : [...prev, code]));
   };
@@ -200,8 +208,10 @@ export default function ReportExportScreen() {
       ? 'No income or expenses in this time range and scope, so there is nothing to export.'
       : selectedCurrencies.length === 0
         ? 'Switch on at least one currency.'
-        : null;
-  const canExport = Platform.OS !== 'web' && !loading && !loadError && !busy && !emptyReason && !preview.isEmpty;
+        : preview.isEmpty
+          ? 'The category breakdown has nothing to list: every category nets to zero.'
+          : null;
+  const canExport = Platform.OS !== 'web' && !loading && !loadError && !busy && !emptyReason;
 
   /** Lock-on-background stays suspended until the share sheet returns, then resumes in `finally`. */
   const runExport = async () => {
@@ -231,14 +241,17 @@ export default function ReportExportScreen() {
     }
   };
 
+  /** `busy` covers the dialog too, so a double tap cannot open two exports. */
   const confirmExport = () => {
+    setBusy(true);
     Alert.alert(
       'Share an unencrypted file?',
       'This file is not encrypted. After you share it, the app you share it with keeps it.',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel', onPress: () => setBusy(false) },
         { text: 'Share', onPress: () => void runExport() },
-      ]
+      ],
+      { cancelable: false }
     );
   };
 
@@ -327,7 +340,11 @@ export default function ReportExportScreen() {
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Preview</Text>
-          <Text style={styles.cardSub}>Monthly totals, exactly as written to the file.</Text>
+          <Text style={styles.cardSub}>
+            {breakdown
+              ? 'Monthly totals. The file lists them by category.'
+              : 'Monthly totals, exactly as written to the file.'}
+          </Text>
           {loading ? (
             <View style={styles.loading}>
               <ActivityIndicator color={colors.primary} />
