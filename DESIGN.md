@@ -75,36 +75,39 @@ Checked contrast (WCAG 2.2 AA, 2026-10-28, guarded by `tests/colorContrast.test.
 - Light variants keep white `onPrimary` and a deep enough accent (`terracotta` `#c35311`, `forest` `#2c8646`, `yellow` `#956f08`); dark variants use a near-black `onPrimary` (`#0a0a0a`) on their lighter accent.
 - Rule for new work: a new or changed palette must reach 4.5:1 for `onPrimary` on `primary`; the contrast test fails otherwise. Labels on `primary` use `onPrimary`, never a literal white.
 
+**Chart palette** (`src/utils/pocketChartColors.ts`, guarded by `tests/chartColors.test.ts`): the theme accent plus seven fixed hues (blue, olive, purple, cyan, pink, amber, slate), one light and one dark set. Every colour reaches 3:1 (WCAG 1.4.11) on `bg`, `surface` and `surfaceMuted` of its own variant, and the hues stay apart (ΔE of 18 or more among the fixed ones, 12 or more from the accent). All charts, legends and category dots draw from it; hex literals are allowed only there and in `src/theme/`. A category keeps its colour as a hex, but it is drawn as the same slot of the current palette, so it follows light and dark.
+
 ## Typography
 JetBrains Mono only (`@expo-google-fonts/jetbrains-mono`, SIL OFL, bundled with the app, no network fetch). `applyJetBrainsMonoDefaults()` sets Regular on every `Text` and `TextInput`; SemiBold and Bold are set explicitly with `font.semibold` / `font.bold`. The monospace face keeps amounts aligned without tabular-figure settings.
 
-Scale in use (most to least frequent): 16 (body, inputs), 13 and 14 (labels, secondary rows), 15, 18, 12 (captions), 17, 20 to 22 (screen and section titles), 24 to 28 (balance totals). Line height is mostly the React Native default; where set, multi-line body text uses 22 (on 16) and 20 for smaller text. Amounts are formatted with spaced thousands (`formatIntegerPartWithSpaces`).
+Scale in use (most to least frequent): 16 (body, inputs), 13 and 14 (labels, secondary rows), 15, 18, 12 (captions, chart axes and legends; the smallest size allowed, `style-scan` fails below it), 17, 20 to 22 (screen and section titles), 24 to 28 (balance totals). Text drawn inside a fixed-size chart caps its scaling with `maxFontSizeMultiplier`. Line height is mostly the React Native default; where set, multi-line body text uses 22 (on 16) and 20 for smaller text. Amounts are formatted with spaced thousands (`formatIntegerPartWithSpaces`).
 
 ## Layout
-Single column, portrait only, screens inside `ScreenWithFooter`. Spacing steps in use: 4, 6, 8, 10, 12, 14, 16, 20, 24; the common rhythm is 16 screen and card padding, 8 to 12 between rows, 6 to 10 inside groups. New code picks from the token steps above (4, 8, 12, 16, 24) unless it sits next to an existing odd value.
+Single column, portrait only, screens inside `ScreenWithFooter`. Touch targets are 48 dp: small text links and glyph buttons get `hitSlop={HIT_SLOP}` (`src/utils/hitSlop.ts`), icon-only controls an `accessibilityLabel`, controls that repeat in a list one that names the item ("Edit Groceries"). Spacing steps in use: 4, 6, 8, 10, 12, 14, 16, 20, 24; the common rhythm is 16 screen and card padding, 8 to 12 between rows, 6 to 10 inside groups. New code picks from the token steps above (4, 8, 12, 16, 24) unless it sits next to an existing odd value.
 
 ## Elevation & Depth
 Hierarchy comes from surface steps (`bg` → `surface` → `surfaceMuted`) and 1px `border` / `borderStrong` lines. Shadow is rare (three places, `elevation: 2`), mainly the Jar card tinted with `shadowJar`. Modals dim the screen with `modalOverlay`.
 
 ## Shapes
-Radii in use: 8 (chips, small controls), 10 (buttons, inputs, the most common), 12 and 14 (cards, sheets), 16 to 20 (pills, large cards). Nested elements use a smaller radius than their container.
+Radii in use: 8 (chips, small controls, bars), 10 (buttons, inputs, the most common), 12 and 14 (cards, sheets), 16 and 20 (large cards). Circles and pills use half of their size (dots, swatches, chips). Nested elements use a smaller radius than their container.
 
 ## Components
 - **Buttons:** filled `primary` with `onPrimary` text for the main action; secondary actions as bordered or text buttons. Disabled and pressed states lower opacity (0.45 is the common disabled value).
 - **`ModalSelectField`:** the one select pattern everywhere, including multi-select filter sheets (tap toggles a checkmark and keeps the sheet open; "All" clears and closes).
 - **Collapsible filter / settings panels** (History, Statistics): summary chips (`chipBg` / `chipText`) when collapsed.
 - **Pocket picker rows:** `pocketPick*` tokens; selected state uses border and text colour.
-- **Charts:** `react-native-gifted-charts`, value readout in a fixed row above the chart (no floating tooltip; Android ScrollView clips overflow).
+- **Charts:** `react-native-gifted-charts` (line, and the donut in `DonutChart`) and the Jar's own SVG chart; value readout in a fixed row above the chart (no floating tooltip; Android ScrollView clips overflow). A drawn chart is an `image` for screen readers with a one-sentence summary; the donut's legend (name, share, amount) is the readable version. The line chart draws the zero line so negative stretches are visible without colour.
 - **Switches:** `switchTrack*` / `switchThumb*` tokens, never the platform default colours.
 
 ## Do's and Don'ts
 - Do: take every colour from `useAppTheme()`; add a new token to `AppColors` and to all six palettes in both variants in the same change, and list it here.
 - Do: show amounts in the monospace face with spaced thousands and an explicit sign or kind label.
 - Don't: add a second typeface, gradients on content, or decorative motion.
-- Don't: ship a palette or token pair below AA contrast (see Colors).
+- Don't: ship a palette or token pair below AA contrast (see Colors), or a chart colour below 3:1.
+- `scripts/style-scan.mjs` (part of `scripts/check.sh`) enforces: no raw hex or colour literal outside the theme and chart palette, no literal font family, no font size under 12, no `LayoutAnimation`, no numeric `hitSlop`. A justified line carries `// style-ok: <reason>`.
 
 ## Motion
-Almost none, by intent. The collapsible filter and settings panels animate with `LayoutAnimation.Presets.easeInEaseOut`; everything else changes instantly. Native-stack navigation uses the platform transitions. Reduced-motion handling is not implemented yet; new motion must respect it (`AccessibilityInfo.isReduceMotionEnabled`).
+Almost none, by intent. The collapsible filter and settings panels animate with `LayoutAnimation.Presets.easeInEaseOut`; everything else changes instantly. Native-stack navigation uses the platform transitions. Panels animate only through `animateNextLayout()` (`src/utils/animateLayout.ts`), which skips the animation when the system asks for reduced motion; new motion must do the same.
 
 ## Platforms
 Expo / React Native, Android first (also iOS). Navigation, back gesture and stack transitions follow the platform (`@react-navigation/native-stack`); colours, type and shapes are the app's own. Theme code: `src/theme/palette.ts` (token type), `colorThemes.ts` (palettes), `ThemeContext.tsx` (`useAppTheme()`), `appearanceCache.ts` (palette mirrored to SecureStore for the unlock screen), `fonts.ts` and `applyGlobalFont.ts`.

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One command for "is it green": typecheck + static security patterns (no formatter, no tests yet). Short output, "OK" on success.
+# One command for "is it green": typecheck + static security and style patterns (no formatter, no tests yet). Short output, "OK" on success.
 # Usage: scripts/check.sh [--staged] [base]
 #   --staged  check only (no rewrite), on the staged files; the pre-commit hook uses this
 #   base      what counts as changed (default: HEAD)
@@ -14,7 +14,7 @@ cd "$(git rev-parse --show-toplevel)" || exit 1
 EXTS=${EXTS-""}                         # file extensions to format, space separated
 FORMAT_CHECK=${FORMAT_CHECK-""} # gets the files as arguments, fails if unformatted
 FORMAT_FIX=${FORMAT_FIX-""}       # gets the files as arguments, formats them
-LINT=${LINT-"npm run typecheck --silent && SECURITY_SKIP_AUDIT=1 npm run security:scan --silent"}
+LINT=${LINT-"npm run typecheck --silent && SECURITY_SKIP_AUDIT=1 npm run security:scan --silent && npm run style:scan --silent"}
 TEST=${TEST-"npm test --silent"}
 TEST_ARGS_NOT_MACOS=${TEST_ARGS_NOT_MACOS-""}   # extra test arguments off macOS, e.g. --exclude-tags golden
 # ---
