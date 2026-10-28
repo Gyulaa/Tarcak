@@ -71,7 +71,7 @@ Minta: a repo-réteg a `src/db/repositories/statistics.ts`-t, a tiszta logika a 
 2. [x] **Repo** (`src/db/repositories/report.ts`, `scopeSql` kiemelése `statistics.ts`-ből): a három hatókörre. Egységteszt nincs rá (a tesztfutónak nincs SQLite-ja), ezért a SQL-nek nincs logikája a tiszta réteg fölött; az ellenőrzés a 6. feladatban.
 3. [x] **Fájl** (`src/utils/reportFile.ts`): írás + takarítás.
 4. [x] **Képernyő és útvonal** (`ReportExportScreen.tsx`, navigáció, Statisztika-gomb): szűrők, előnézet, üres állapot, web letiltva, megerősítő felugró, megosztás a zárolás-felfüggesztéssel. A képernyőszövegek angolul; színek `useAppTheme()`-ből (`design` skill).
-5. **Dokumentáció**: README-szakasz, `docs/decisions.md`, `STATE.md`; `privacy-check` skill lefuttatva és az eredménye ide beírva.
+5. [x] **Dokumentáció**: README-szakasz, `docs/decisions.md`, `STATE.md`; `privacy-check` skill lefuttatva és az eredménye ide beírva.
 6. **Ellenőrzés eszközön** (lásd lent), hibák a `docs/bugs.md`-be.
 
 ## Ellenőrzés
@@ -81,6 +81,15 @@ Minta: a repo-réteg a `src/db/repositories/statistics.ts`-t, a tiszta logika a 
 - A kapott CSV-t LibreOffice-ban megnyitni mindkét előbeállítással: ékezetek, oszlopok, a képlet-kategórianév szövegként látszik, a havi összegek egyeznek a Statisztika kategóriakártyáival ugyanarra a hónapra és szűrőre.
 - Adatvédelem: a fájlban `grep` a teszt-zsebnevekre és tranzakciócímekre → nincs találat; kategóriabontás nélkül a fájlban nincs kategórianév; repülő üzemmódban is működik (nincs hálózat); a `security:scan` zöld; a megosztás alatt nem zár az app, utána a háttérbe tétel zár.
 - `privacy-check`: az új adatút (titkosítatlan fájl az eszközről) a README-ben és a felületen is ki van mondva; a mentés/`.tarcak` formátum érintetlen.
+
+## Privacy-check eredménye (2026-10-28, az 5. feladatnál)
+
+1. **Mit gyűjtünk:** semmi új: nincs új mező, napló, analitika vagy azonosító. A CSV a meglévő főkönyvből származtatott összesítő; zsebnév, tranzakciócím, pontos dátum, azonosító nincs benne. Egyedül a kategóriabontás viszi ki szabad szöveget (kategórianevek), ez alapból ki van kapcsolva, és a kapcsoló mellett szöveg figyelmeztet.
+2. **Meddig őrizzük:** új tároló: a `tarcak-report-*.csv` az app cache-ében marad a következő exportig vagy a képernyő következő megnyitásáig (nincs azonnali törlés, mert a fogadó app aszinkron olvashat). Megosztás után a fogadó app saját másolatot tarthat; ezt a felület és a README kimondja.
+3. **Ki fér hozzá:** új kimenő adatút: titkosítatlan fájl hagyhatja el az appot, a felhasználó indítására. A megerősítő felugró és a README kimondja, hogy a fájl nincs titkosítva; a `.tarcak` mentés és a séma érintetlen.
+4. **Harmadik fél:** nincs új SDK, szolgáltató vagy hálózati hívás; a megosztás célját a felhasználó választja a rendszer megosztás-lapján.
+
+Eltérés a közzétett szövegektől: a repóban nincs külön jogi/adatvédelmi dokumentum. A `README.md` 5. sora („All data stays on the device and is stored **encrypted**”) az új, titkosítatlan exporttal kiegészítést kérhet, pl.: „… (an optional report export you start yourself writes an unencrypted CSV)”. A szöveget Gyula jóváhagyására hagytam, nem írtam át.
 
 ## Nyitott pont
 
