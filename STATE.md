@@ -3,7 +3,7 @@
 Frissítve: 2026-10-28. Egy oldal: a `/agentic-code:save-work` írja újra, a `/agentic-code:resume-work` olvassa először.
 
 ## Mi ez
-Helyi, titkosított személyes pénzügyi app (Expo / React Native). Verzió: 1.2.3 (Android versionCode 5), az utolsó kiadás óta sok változás (SDK 55, havi export, képernyőkép-tiltás, jelszócsere, stílus/UX-kör).
+Helyi, titkosított személyes pénzügyi app (Expo / React Native). Verzió: 1.3.0 (Android versionCode: az EAS `production` build emeli), az 1.2.3 óta sok változás (SDK 55, havi export, képernyőkép-tiltás, jelszócsere, stílus/UX-kör).
 
 ## Most
 - A `main`-en van: a teljes átvizsgálás javításai (B1–B21), SDK 55, a havi kimutatás exportja (PR #1–#6).
@@ -21,13 +21,14 @@ Helyi, titkosított személyes pénzügyi app (Expo / React Native). Verzió: 1.
 - Natív modul hozzáadása után elég az `android/`-ban `./gradlew assembleDebug -PreactNativeArchitectures=arm64-v8a` (prebuild nélkül, ~1 perc cache-sel), majd `adb install -r android/app/build/outputs/apk/debug/app-debug.apk`. JS-változásnál csak Metro kell: a telefon az `adb reverse` után a `localhost:8081`-ről tölt, a képernyők `adb exec-out screencap -p`-vel nézhetők (teszt-vaulttal, valódi adat nélkül).
 
 ## Blokkol / várunk
-- Play Store kiadás: az EAS `production` profil (AAB) buildje; verzió-/versionCode-emelés külön commitban, az EAS az `app.json`-ba visszaírja a versionCode-ot. Lásd `docs/ANDROID_GITHUB_RELEASE.md`.
+- Az 1.3.0 `production` (AAB) build az EAS-en fut vagy kész; a versionCode-emelést az `app.json`-ba vissza kell commitolni (`docs/ANDROID_GITHUB_RELEASE.md`).
 
 ## Következő lépés
-1. A `chore/style-audit` PR merge-e, utána kiadás (verzióemelés, EAS `production` build, feltöltés Play Console-ba, a versionCode-változás commitolása).
-2. Havi export: a 6. feladat (eszközön, teszt-vaulttal); hibák a `docs/bugs.md`-be. A README 5. sora kiegészítést kérhet az exportról.
-3. B22 (alacsony): a History szűrőchipjén a „×” iOS VoiceOverrel nem érhető el.
-4. README „Still to add”: szerkeszthető `occurred_at`, zseb átnevezés UX. Ha kell: a statisztika idősora és kategóriaösszegei is `bigint` (B11).
+1. **Tétel nevének automatikus kiegészítése:** a tranzakcióűrlap Title mezőjében gépelés közben ajánljon korábbi tételneveket (kezdőbetűk alapján, a már használtak közül), egy koppintással kitöltve a nevet; érdemes a kategóriát és a zsebet is felajánlani az utolsó ilyen nevű tételből. A `spec` skill szerint kezdd tervvel (adatforrás: a `transactions.title` különböző értékei, gyakoriság/utolsó használat szerint; nincs új függőség, nincs hálózat; a javaslatlista az eszközön marad, egyetlen helyen sem naplózódik).
+2. A PR #7 merge-e; az 1.3.0 AAB feltöltése a Play Console-ba (a build az EAS-en: expo.dev → Builds).
+3. Havi export: a 6. feladat (eszközön, teszt-vaulttal); hibák a `docs/bugs.md`-be. A README 5. sora kiegészítést kérhet az exportról.
+4. B22 (alacsony): a History szűrőchipjén a „×” iOS VoiceOverrel nem érhető el.
+5. README „Still to add”: szerkeszthető `occurred_at`, zseb átnevezés UX. Ha kell: a statisztika idősora és kategóriaösszegei is `bigint` (B11).
 
 ## Súrlódás
 - A pre-commit check a teljes munkafát típusellenőrzi, nem csak a stage-elt fájlokat: fájlonkénti `@ts-nocheck`-kivezetésnél a többi fájlba vissza kellett tenni a direktívát (egyszer, kb. 2 perc).
