@@ -510,8 +510,7 @@ export default function StatisticsScreen({ route, navigation }: RootStackScreenP
     <ScreenWithFooter>
     <ScrollView style={styles.scroll} contentContainerStyle={styles.inner}>
       <Text style={styles.lead}>
-        Balances over time, pocket mix, and category totals for one asset at a time. Totals follow
-        your ledger; transfers do not change the &quot;All pockets&quot; total or count toward any category.
+        One asset at a time. Transfers are not counted in totals or categories.
       </Text>
 
       <Pressable
@@ -622,8 +621,7 @@ export default function StatisticsScreen({ route, navigation }: RootStackScreenP
                 </>
               ) : (
                 <Text style={styles.axisHint}>
-                  Tap the chart for date and balance. Y-axis: {currency} (whole units). X: start ·
-                  mid · end.
+                  Tap the chart for date and balance.
                 </Text>
               )}
             </View>
@@ -715,8 +713,8 @@ export default function StatisticsScreen({ route, navigation }: RootStackScreenP
           </Text>
           <Text style={styles.cardSub}>
             {pieIsNegative
-              ? `Where the negative ${currency} balance is concentrated, by pocket`
-              : `Share of ${currency} balance by pocket`}
+              ? `Negative ${currency} balance by pocket`
+              : `${currency} balance by pocket`}
             {categoryFilterSuffix}
           </Text>
           <DonutChart
@@ -734,7 +732,7 @@ export default function StatisticsScreen({ route, navigation }: RootStackScreenP
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Pocket mix</Text>
           <Text style={styles.muted}>
-            Switch scope to &quot;All pockets&quot; or &quot;Outside Jar&quot; to see a split chart.
+            Choose All pockets or Outside Jar to see this chart.
           </Text>
         </View>
       ) : null}

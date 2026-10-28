@@ -32,7 +32,7 @@ export function DonationFooter() {
     <>
       <Pressable style={styles.wrap} onPress={() => setOpen(true)} accessibilityRole="button">
         <Text style={[styles.hint, { color: colors.textMuted }]}>
-          If Tarcak helps you, you can support development with a donation (tap for addresses).
+          Support development with a donation.
         </Text>
       </Pressable>
 
@@ -44,7 +44,7 @@ export function DonationFooter() {
           >
             <Text style={[styles.title, { color: colors.text }]}>Support Tarcak</Text>
             <Text style={[styles.body, { color: colors.textMuted }]}>
-              Thank you for considering a donation. Copy an address below and send from your wallet.
+              Copy an address and send from your wallet.
             </Text>
 
             <ScrollView style={styles.scroll} keyboardShouldPersistTaps="handled">

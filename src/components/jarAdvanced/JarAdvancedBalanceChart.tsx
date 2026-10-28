@@ -277,7 +277,7 @@ export function JarAdvancedBalanceChart({
       )}
 
       <Text style={styles.hint}>
-        X: Jar balance · Y: share % · Tap a knot to edit · Slide the chart to preview
+        Tap a knot to edit · slide to preview
       </Text>
     </View>
   );

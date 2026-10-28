@@ -191,9 +191,7 @@ export default function JarScreen({ navigation }: RootStackScreenProps<'Jar'>) {
         <View style={styles.disabledCard}>
           <Text style={styles.disabledTitle}>Jar features are off</Text>
           <Text style={styles.disabledBody}>
-            Distribution and the pool shortcut are hidden. The Jar pocket is archived (hidden from
-            pocket lists and new transactions). Turn Pool & distribute back on in Settings to restore
-            it, or open it here to view balances and history.
+            The Jar is off. Turn on Pool & distribute in Settings to restore it.
           </Text>
           <Pressable style={styles.primaryBtn} onPress={() => navigation.navigate('Settings')}>
             <ContourOnPrimaryText style={styles.primaryBtnText}>Open Settings</ContourOnPrimaryText>
@@ -217,7 +215,7 @@ export default function JarScreen({ navigation }: RootStackScreenProps<'Jar'>) {
         <Text style={styles.heroKicker}>Hold & allocate</Text>
         <Text style={styles.heroTitle}>{jarName}</Text>
         <Text style={styles.heroSub}>
-          Pool income here, then distribute to your pockets on your schedule.
+          Pool income, then distribute it to your pockets.
         </Text>
       </View>
 
@@ -240,17 +238,15 @@ export default function JarScreen({ navigation }: RootStackScreenProps<'Jar'>) {
       <Text style={styles.splitHint}>
         {advancedJarOn
           ? advancedAssetCount === 0
-            ? 'Advanced Jar: add at least one asset and define its split.'
-            : balances.length === 0
-              ? `Advanced Jar: ${advancedAssetCount} asset${advancedAssetCount === 1 ? '' : 's'} configured.`
-              : balances.every((b) => advancedCurrencySet.has(b.currency))
-                ? `Advanced Jar: all Jar balances have rules (${advancedAssetCount} asset${advancedAssetCount === 1 ? '' : 's'}).`
-                : `Advanced Jar: add rules for every asset in the Jar (missing: ${balances
-                    .filter((b) => !advancedCurrencySet.has(b.currency))
-                    .map((b) => b.currency)
-                    .join(', ')}).`
+            ? 'Add an asset and its split in Advanced Jar.'
+            : balances.every((b) => advancedCurrencySet.has(b.currency))
+              ? `Advanced Jar: ${advancedAssetCount} asset${advancedAssetCount === 1 ? '' : 's'} set up.`
+              : `Advanced Jar: no rules yet for ${balances
+                  .filter((b) => !advancedCurrencySet.has(b.currency))
+                  .map((b) => b.currency)
+                  .join(', ')}.`
           : ruleCount === 0
-            ? 'No basic split configured yet.'
+            ? 'No split set up yet.'
             : `${ruleCount} pocket${ruleCount === 1 ? '' : 's'} in your split.`}
       </Text>
 

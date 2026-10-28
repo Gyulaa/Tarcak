@@ -101,8 +101,8 @@ export default function PocketDetailScreen({ navigation, route }: RootStackScree
           <Text style={styles.archivedTitle}>Archived</Text>
           <Text style={styles.archivedSub}>
             {isJar
-              ? 'Hidden from pocket lists and new transactions. Enable Pool & distribute under Settings to restore the Jar.'
-              : 'Hidden from Pockets and pickers unless you enable Show archived pockets in Settings. History is unchanged.'}
+              ? 'Hidden. Turn on Pool & distribute in Settings to restore it.'
+              : 'Hidden from lists. History is unchanged.'}
           </Text>
         </View>
       ) : null}

@@ -372,8 +372,7 @@ export default function JarAdvancedAssetEditor({
               <>
                 <Text style={styles.panelTitle}>Automatic blend</Text>
                 <Text style={styles.panelHint}>
-                  Between milestones, Tarcak adjusts the split smoothly. You are only previewing
-                  here — nothing changes until you add or edit a milestone.
+                  Preview only. Add or edit a milestone to change the split.
                 </Text>
                 <JarAdvancedSplitEditor rows={displayRows} onChange={() => {}} readOnly />
                 <Pressable style={styles.secondaryBtn} onPress={createMilestoneFromPreview}>
@@ -384,7 +383,7 @@ export default function JarAdvancedAssetEditor({
               <>
                 <Text style={styles.panelTitle}>Default zone</Text>
                 <Text style={styles.panelHint}>
-                  While the Jar balance is at or below the ceiling, this split applies.
+                  Applies up to the ceiling.
                 </Text>
                 <Text style={styles.fieldLabel}>Ceiling amount ({currency})</Text>
                 <TextInput

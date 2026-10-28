@@ -139,8 +139,7 @@ export default function CategoriesScreen() {
     <ScreenWithFooter>
     <View style={styles.container}>
       <Text style={styles.p}>
-        Categories help you tag income and expense transactions (e.g. Groceries, Salary). Assign
-        one when recording a transaction, then filter History or view Statistics by category.
+        Tag transactions (e.g. Groceries, Salary) to filter History and split Statistics.
       </Text>
       <Pressable style={styles.addBtn} onPress={() => setCreateOpen(true)}>
         <ContourOnPrimaryText style={styles.addBtnText}>+ New category</ContourOnPrimaryText>

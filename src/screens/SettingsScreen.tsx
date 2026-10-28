@@ -291,15 +291,12 @@ export default function SettingsScreen({ navigation }: RootStackScreenProps<'Set
     <ScreenWithFooter>
     <ScrollView style={styles.container} contentContainerStyle={styles.inner}>
       <BackupRestoredBanner />
-      <Text style={styles.p}>
-        Default asset type is applied when you open a new transaction. Create types under Asset
-        types, then choose one below.
-      </Text>
+      <Text style={styles.p}>The asset type a new transaction starts with.</Text>
       {loaded && assetTypes.length === 0 ? (
         <>
           <Text style={styles.label}>Default asset type</Text>
           <Text style={styles.muted}>
-            No asset types yet. Open Asset types below and add at least one (e.g. HUF).
+            No asset types yet. Add one below (e.g. HUF).
           </Text>
         </>
       ) : (
@@ -322,10 +319,7 @@ export default function SettingsScreen({ navigation }: RootStackScreenProps<'Set
       <View style={styles.divider} />
 
       <Text style={styles.label}>Categories</Text>
-      <Text style={styles.p}>
-        Tag income and expense transactions with categories so you can filter History and see
-        per-category totals in Statistics.
-      </Text>
+      <Text style={styles.p}>Tag transactions to filter History and split Statistics.</Text>
       <Pressable style={styles.secondaryBtn} onPress={() => navigation.navigate('Categories')}>
         <Text style={styles.secondaryBtnText}>Categories…</Text>
       </Pressable>
@@ -363,9 +357,7 @@ export default function SettingsScreen({ navigation }: RootStackScreenProps<'Set
         <View style={styles.switchTextCol}>
           <Text style={styles.switchTitle}>Pool & distribute</Text>
           <Text style={styles.switchHint}>
-            Home shortcut, distribution, and the highlighted Jar row in Pockets. When off, the Jar
-            pocket is archived: hidden from lists and from new transaction pickers until you turn this
-            back on.
+            Jar shortcut on Home and income distribution. Off hides the Jar pocket.
           </Text>
         </View>
         <Switch
@@ -381,9 +373,7 @@ export default function SettingsScreen({ navigation }: RootStackScreenProps<'Set
         <View style={styles.switchTextCol}>
           <Text style={styles.switchTitle}>Advanced Jar</Text>
           <Text style={styles.switchHint}>
-            Per-asset default ceiling and milestone splits (linear blend between steps). When on,
-            Jar distribution uses only these rules—add every asset you keep in the Jar under Advanced
-            Jar. Off by default.
+            Split rules per asset, with a ceiling and milestones. Replaces the basic split.
           </Text>
         </View>
         <Switch
@@ -410,8 +400,7 @@ export default function SettingsScreen({ navigation }: RootStackScreenProps<'Set
         <View style={styles.switchTextCol}>
           <Text style={styles.switchTitle}>Show archived pockets</Text>
           <Text style={styles.switchHint}>
-            Lists pockets you archived (zero balance, with history). Turn on to see them in Pockets,
-            pickers, and Statistics; open a pocket and tap Unarchive to use it again.
+            Show archived pockets in lists, pickers and Statistics.
           </Text>
         </View>
         <Switch
@@ -430,8 +419,7 @@ export default function SettingsScreen({ navigation }: RootStackScreenProps<'Set
         <View style={styles.switchTextCol}>
           <Text style={styles.switchTitle}>Block screenshots</Text>
           <Text style={styles.switchHint}>
-            Blocks screenshots and screen recording, and hides balances in the recent-apps preview.
-            Off by default.
+            Blocks screenshots, recording and the recent-apps preview.
           </Text>
         </View>
         <Switch
@@ -447,11 +435,8 @@ export default function SettingsScreen({ navigation }: RootStackScreenProps<'Set
 
       <Text style={styles.label}>Backup & restore</Text>
       <Text style={styles.backupHint}>
-        Export creates an encrypted {BACKUP_EXTENSION} file with your full vault:{' '}
-        {BACKUP_INCLUDES.join('; ')}. You choose a backup password for the file; your vault password
-        stays the same. Import replaces everything on this device — the file picker will not lock
-        you out mid-import. After a successful import, unlock and look for the “Restored from backup”
-        banner on Home.
+        An encrypted {BACKUP_EXTENSION} file of the whole vault, with its own password. Import
+        replaces everything on this device.
       </Text>
       <Pressable
         style={styles.secondaryBtn}
@@ -499,7 +484,7 @@ export default function SettingsScreen({ navigation }: RootStackScreenProps<'Set
         title={backupModal?.mode === 'export' ? 'Export backup' : 'Import backup'}
         subtitle={
           backupModal?.mode === 'export'
-            ? 'Choose a strong backup password. You will need it to open this file on another device. Your vault password stays the same.'
+            ? 'You need this password to open the file. Your vault password stays the same.'
             : 'Enter the backup password for the file you selected.'
         }
         confirmPassword={backupModal?.mode === 'export'}

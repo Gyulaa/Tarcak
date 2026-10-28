@@ -51,7 +51,7 @@ export function BackupRestoredBanner() {
     <View style={styles.wrap}>
       <Text style={styles.title}>Restored from backup</Text>
       <Text style={styles.body}>
-        Pockets, transactions, Jar rules and settings on this device came from your backup file.
+        Everything on this device came from your backup file.
       </Text>
       <View style={styles.metaRow}>
         <Text style={styles.metaLabel}>Backup made</Text>
