@@ -41,3 +41,9 @@ Tartós döntésenként egy bejegyzés, a legújabb elöl. Változó döntést h
 - **Döntés:** a `.claude/guard.json` csak a `main`-re pusholást tiltja; az EAS parancsokra a `CLAUDE.md` szabálya vonatkozik (csak külön engedéllyel).
 - **Miért:** Gyula kérése.
 - **Érinti:** `.claude/guard.json`, `CLAUDE.md`
+
+## 2026-10-28 · Expo SDK 55 és a `zod` felülírása
+- **Döntés:** Expo SDK 54 → 55 (React Native 0.83, React 19.2); a `package.json` `overrides` a `zod`-ot `^4.6.7`-re emeli; új függőség: `expo-system-ui`; az `app.json`-ból kikerült az `android.edgeToEdgeEnabled` (az SDK 55-ben mindig be van kapcsolva).
+- **Miért:** B12. Az `npm audit fix` 31-ből 12 találatot hagyott, az SDK 55 9-re vitte le. Az SDK 56–58 sem old meg többet. Az utolsó magas találat a `zod` 3.x az `@expo/cli`-ben (build-eszköz, nem kerül az appba), amihez nincs javított 3.x kiadás; a zod 4-gyel az `expo config` és az `expo prebuild` lefut. Az `expo-system-ui` a `userInterfaceStyle: light` beállításhoz kell. Gyula engedélyezte.
+- **Érinti:** `package.json`, `app.json`, `README.md`; ha az Expo felhoz zod 4-et, az override törölhető.
+
