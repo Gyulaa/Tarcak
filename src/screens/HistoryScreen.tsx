@@ -1,5 +1,5 @@
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -18,6 +18,7 @@ import * as categoriesRepo from '../db/repositories/categories';
 import * as pocketsRepo from '../db/repositories/pockets';
 import * as settingsRepo from '../db/repositories/settings';
 import * as txRepo from '../db/repositories/transactions';
+import { UNCATEGORIZED_FILTER } from '../domain/transactionFilter';
 import type { Category, LedgerTransaction } from '../domain/types';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useAppTheme } from '../theme/ThemeContext';
@@ -28,73 +29,13 @@ import { formatOccurredAt } from '../utils/formatOccurredAt';
 import { buildThemeChartPalette, pocketChartColor } from '../utils/pocketChartColors';
 
 const ALL = '__all__';
-const UNCATEGORIZED = '__uncategorized__';
-const HISTORY_FETCH_LIMIT = 500;
+const HISTORY_PAGE_SIZE = 100;
 
 const KIND_LABELS: Record<string, string> = {
   income: 'Income',
   expense: 'Expense',
   transfer: 'Transfer',
 };
-
-function txInvolvesPocket(tx: LedgerTransaction, pocketId: string): boolean {
-  if (!pocketId) return true;
-  if (tx.kind === 'transfer') {
-    return tx.from_pocket_id === pocketId || tx.to_pocket_id === pocketId;
-  }
-  return tx.pocket_id === pocketId;
-}
-
-/** Income filter also includes transfers into the Jar (money pooled from other pockets). */
-function txMatchesKindFilter(
-  tx: LedgerTransaction,
-  kinds: string[],
-  jarPocketId: string | null
-): boolean {
-  if (!kinds.length) return true;
-  for (const kind of kinds) {
-    if (kind === 'income') {
-      if (tx.kind === 'income') return true;
-      if (
-        jarPocketId &&
-        tx.kind === 'transfer' &&
-        tx.to_pocket_id === jarPocketId &&
-        tx.from_pocket_id !== jarPocketId
-      ) {
-        return true;
-      }
-    } else if (tx.kind === kind) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function txMatchesCategoryFilter(tx: LedgerTransaction, categoryIds: string[]): boolean {
-  if (!categoryIds.length) return true;
-  return categoryIds.some((id) => (id === UNCATEGORIZED ? !tx.category_id : tx.category_id === id));
-}
-
-type HistoryFilters = {
-  kinds: string[];
-  currencies: string[];
-  pocketIds: string[];
-  categoryIds: string[];
-  jarPocketId: string | null;
-};
-
-function applyHistoryFilters(
-  items: LedgerTransaction[],
-  { kinds, currencies, pocketIds, categoryIds, jarPocketId }: HistoryFilters
-): LedgerTransaction[] {
-  return items.filter((tx) => {
-    if (!txMatchesKindFilter(tx, kinds, jarPocketId)) return false;
-    if (currencies.length && !currencies.includes(tx.currency)) return false;
-    if (pocketIds.length && !pocketIds.some((id) => txInvolvesPocket(tx, id))) return false;
-    if (!txMatchesCategoryFilter(tx, categoryIds)) return false;
-    return true;
-  });
-}
 
 function pocketLineForHistory(tx: LedgerTransaction, names: Map<string, string>): string | null {
   const n = (id: string | null) => (id ? names.get(id) ?? '…' : '…');
@@ -103,6 +44,29 @@ function pocketLineForHistory(tx: LedgerTransaction, names: Map<string, string>)
   }
   if (tx.pocket_id) return n(tx.pocket_id);
   return null;
+}
+
+/** Fills in the names of pockets a page of transactions refers to that the pocket list does not show. */
+async function addMissingPocketNames(
+  names: Map<string, string>,
+  txs: LedgerTransaction[],
+  jarId: string | null
+): Promise<void> {
+  const need = new Set<string>();
+  for (const tx of txs) {
+    if (tx.pocket_id) need.add(tx.pocket_id);
+    if (tx.from_pocket_id) need.add(tx.from_pocket_id);
+    if (tx.to_pocket_id) need.add(tx.to_pocket_id);
+  }
+  if (jarId) need.add(jarId);
+  await Promise.all(
+    [...need]
+      .filter((id) => !names.has(id))
+      .map(async (id) => {
+        const p = await pocketsRepo.getPocket(id);
+        names.set(id, p?.name ?? 'Unknown');
+      })
+  );
 }
 
 function toggleInList(list: string[], value: string, allToken = ALL): string[] {
@@ -123,6 +87,7 @@ export default function HistoryScreen({ navigation, route }: RootStackScreenProp
   const chartPalette = useMemo(() => buildThemeChartPalette(colors, isDark), [colors, isDark]);
   const paramPocketId = route.params?.pocketId;
   const [items, setItems] = useState<LedgerTransaction[]>([]);
+  const [hasMore, setHasMore] = useState(false);
   const [pocketNames, setPocketNames] = useState(() => new Map<string, string>());
   const [currencyCodes, setCurrencyCodes] = useState<string[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -142,19 +107,29 @@ export default function HistoryScreen({ navigation, route }: RootStackScreenProp
     setFilterPocketIds(paramPocketId ? [paramPocketId] : []);
   }, [paramPocketId]);
 
-  /** A single selected pocket still scopes the SQL query itself (most-recent-N for that pocket,
-   *  not a client-side slice of the global most-recent-N) — same perf/completeness benefit the old
-   *  route-param-only "scope" had, now available whenever exactly one pocket is filtered. */
+  /** A single selected pocket names the screen. */
   const scopePocketId = filterPocketIds.length === 1 ? filterPocketIds[0] : null;
 
-  const load = useCallback(async () => {
-    const list = await txRepo.listTransactions({
-      pocketId: scopePocketId ?? null,
-      limit: HISTORY_FETCH_LIMIT,
-    });
-    setItems(list);
+  /** The database filters and pages; a newer load or filter change makes an older reply stale. */
+  const loadSeq = useRef(0);
+  const loadingMore = useRef(false);
 
+  const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
     const jar = await pocketsRepo.getJarPocket();
+    const list = await txRepo.listTransactions({
+      filter: {
+        kinds: filterKinds,
+        currencies: filterCurrencies,
+        pocketIds: filterPocketIds,
+        categoryIds: filterCategoryIds,
+        jarPocketId: jar?.id ?? null,
+      },
+      limit: HISTORY_PAGE_SIZE,
+    });
+    if (seq !== loadSeq.current) return;
+    setItems(list);
+    setHasMore(list.length === HISTORY_PAGE_SIZE);
     setJarPocketId(jar?.id ?? null);
 
     const cats = await categoriesRepo.listCategories();
@@ -169,21 +144,8 @@ export default function HistoryScreen({ navigation, route }: RootStackScreenProp
     const map = new Map(active.map((p) => [p.id, p.name]));
     if (jar) map.set(jar.id, jar.name);
 
-    const need = new Set<string>();
-    for (const tx of list) {
-      if (tx.pocket_id) need.add(tx.pocket_id);
-      if (tx.from_pocket_id) need.add(tx.from_pocket_id);
-      if (tx.to_pocket_id) need.add(tx.to_pocket_id);
-    }
-    if (jar) need.add(jar.id);
-
-    const missing = [...need].filter((id) => !map.has(id));
-    await Promise.all(
-      missing.map(async (id) => {
-        const p = await pocketsRepo.getPocket(id);
-        map.set(id, p?.name ?? 'Unknown');
-      })
-    );
+    await addMissingPocketNames(map, list, jar?.id ?? null);
+    if (seq !== loadSeq.current) return;
     setPocketNames(map);
 
     if (scopePocketId) {
@@ -192,7 +154,45 @@ export default function HistoryScreen({ navigation, route }: RootStackScreenProp
     } else {
       setFilterLabel('');
     }
-  }, [scopePocketId]);
+  }, [scopePocketId, filterKinds, filterCurrencies, filterPocketIds, filterCategoryIds]);
+
+  const loadMore = useCallback(async () => {
+    if (!hasMore || loadingMore.current) return;
+    loadingMore.current = true;
+    const seq = loadSeq.current;
+    try {
+      const page = await txRepo.listTransactions({
+        filter: {
+          kinds: filterKinds,
+          currencies: filterCurrencies,
+          pocketIds: filterPocketIds,
+          categoryIds: filterCategoryIds,
+          jarPocketId,
+        },
+        limit: HISTORY_PAGE_SIZE,
+        offset: items.length,
+      });
+      const names = new Map(pocketNames);
+      await addMissingPocketNames(names, page, null);
+      if (seq !== loadSeq.current) return;
+      setItems((prev) => [...prev, ...page]);
+      setHasMore(page.length === HISTORY_PAGE_SIZE);
+      setPocketNames(names);
+    } catch (e) {
+      Alert.alert('Could not load', e instanceof Error ? e.message : String(e));
+    } finally {
+      loadingMore.current = false;
+    }
+  }, [
+    hasMore,
+    items.length,
+    jarPocketId,
+    pocketNames,
+    filterKinds,
+    filterCurrencies,
+    filterPocketIds,
+    filterCategoryIds,
+  ]);
 
   useFocusEffect(
     useCallback(() => {
@@ -260,7 +260,7 @@ export default function HistoryScreen({ navigation, route }: RootStackScreenProp
   const categoryModalOptions = useMemo(
     () => [
       { value: ALL, title: 'All categories' },
-      { value: UNCATEGORIZED, title: 'Uncategorized' },
+      { value: UNCATEGORIZED_FILTER, title: 'Uncategorized' },
       ...categories.map((c) => ({ value: c.id, title: c.name })),
     ],
     [categories]
@@ -273,19 +273,7 @@ export default function HistoryScreen({ navigation, route }: RootStackScreenProp
     (id) => pocketNames.get(id) ?? 'Pocket'
   );
   const categoryDisplay = formatMultiDisplay(filterCategoryIds, (id) =>
-    id === UNCATEGORIZED ? 'Uncategorized' : (categoryNames.get(id)?.name ?? 'Category')
-  );
-
-  const displayItems = useMemo(
-    () =>
-      applyHistoryFilters(items, {
-        kinds: filterKinds,
-        currencies: filterCurrencies,
-        pocketIds: filterPocketIds,
-        categoryIds: filterCategoryIds,
-        jarPocketId,
-      }),
-    [items, filterKinds, filterCurrencies, filterPocketIds, filterCategoryIds, jarPocketId]
+    id === UNCATEGORIZED_FILTER ? 'Uncategorized' : (categoryNames.get(id)?.name ?? 'Category')
   );
 
   const hasActiveFilters =
@@ -466,12 +454,14 @@ export default function HistoryScreen({ navigation, route }: RootStackScreenProp
       </View>
 
       <FlatList
-        data={displayItems}
+        data={items}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         ListEmptyComponent={
           <Text style={styles.muted}>
-            {items.length === 0 ? 'No transactions yet.' : 'No transactions match these filters.'}
+            {hasActiveFilters ? 'No transactions match these filters.' : 'No transactions yet.'}
           </Text>
         }
         renderItem={({ item }) => {

@@ -1,5 +1,6 @@
 import * as Crypto from 'expo-crypto';
 
+import { buildTransactionFilter, type TransactionFilter } from '../../domain/transactionFilter';
 import type { BalanceRow, LedgerTransaction, TransactionKind } from '../../domain/types';
 import { openMainDatabase } from '../client';
 import * as assetTypesRepo from './assetTypes';
@@ -297,26 +298,23 @@ export async function deleteTransaction(id: string): Promise<void> {
 
 export async function listTransactions(options: {
   pocketId?: string | null;
+  filter?: TransactionFilter;
   limit?: number;
   offset?: number;
 }): Promise<LedgerTransaction[]> {
   const limit = options.limit ?? 200;
   const offset = options.offset ?? 0;
-  const db = await openMainDatabase();
+  const { clauses, params } = buildTransactionFilter(options.filter ?? {});
   if (options.pocketId) {
     const pid = options.pocketId;
-    const rows = await db.getAllAsync<TxRow>(
-      `${SELECT_LIST}
-       WHERE pocket_id = ? OR from_pocket_id = ? OR to_pocket_id = ?
-       ORDER BY occurred_at DESC, id DESC
-       LIMIT ? OFFSET ?`,
-      [pid, pid, pid, limit, offset]
-    );
-    return rows.map(mapRow);
+    clauses.push('(pocket_id = ? OR from_pocket_id = ? OR to_pocket_id = ?)');
+    params.push(pid, pid, pid);
   }
+  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  const db = await openMainDatabase();
   const rows = await db.getAllAsync<TxRow>(
-    `${SELECT_LIST} ORDER BY occurred_at DESC, id DESC LIMIT ? OFFSET ?`,
-    [limit, offset]
+    `${SELECT_LIST} ${where} ORDER BY occurred_at DESC, id DESC LIMIT ? OFFSET ?`,
+    [...params, limit, offset]
   );
   return rows.map(mapRow);
 }
