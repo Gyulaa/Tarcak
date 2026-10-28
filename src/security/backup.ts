@@ -172,6 +172,24 @@ function parsePayloadV1(json: string): BackupPayloadV1 {
 }
 
 /**
+ * Earlier exports and the files copied in by the import picker are encrypted but have no reason to
+ * stay in the cache. Best effort: a failed cleanup must not block the export.
+ */
+async function purgeBackupCacheCopies(): Promise<void> {
+  const cache = FileSystem.cacheDirectory;
+  if (!cache) {
+    return;
+  }
+  const names = await FileSystem.readDirectoryAsync(cache);
+  await Promise.all([
+    ...names
+      .filter((n) => n.startsWith('tarcak-backup-') || n.startsWith('tarcak-import-'))
+      .map((n) => FileSystem.deleteAsync(`${cache}${n}`, { idempotent: true })),
+    FileSystem.deleteAsync(`${cache}DocumentPicker/`, { idempotent: true }),
+  ]);
+}
+
+/**
  * Create an encrypted `.tarcak` file in the cache directory and return its URI for sharing.
  */
 export async function exportEncryptedBackup(backupPassword: string): Promise<string> {
@@ -212,6 +230,7 @@ export async function exportEncryptedBackup(backupPassword: string): Promise<str
   const payloadUtf8 = new TextEncoder().encode(JSON.stringify(payload));
   const encrypted = await encryptBackupPayloadUtf8(backupPassword, payloadUtf8);
 
+  await purgeBackupCacheCopies().catch(() => {});
   const outfile = new File(Paths.cache, buildExportFilename());
   outfile.write(backupBytesToBase64(encrypted), { encoding: 'base64' });
   return outfile.uri;
