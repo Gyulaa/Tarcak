@@ -2,7 +2,7 @@ import * as Crypto from 'expo-crypto';
 
 import type { JarDistributionRule, Pocket } from '../../domain/types';
 import { JAR_ADV_TOTAL_BPS } from '../../domain/jarAdvancedMath';
-import { splitAmountByBps } from '../../domain/splitAmount';
+import { chunkSafeAmount, splitBigAmountByBps } from '../../domain/splitAmount';
 import { openMainDatabase } from '../client';
 import * as jarAdvancedRepo from './jarAdvanced';
 import * as pocketsRepo from './pockets';
@@ -121,8 +121,8 @@ async function distributeJarCurrencyInTransaction(
 ): Promise<number> {
   const balances = await txRepo.sumBalancesForPocket(jar.id);
   const row = balances.find((b) => b.currency === currency);
-  const totalMinor = row?.balance_minor ?? 0;
-  if (totalMinor <= 0) {
+  const totalMinor = row?.balance_minor ?? 0n;
+  if (totalMinor <= 0n) {
     throw new Error('No balance to distribute for this asset in the Jar.');
   }
 
@@ -138,7 +138,7 @@ async function distributeJarCurrencyInTransaction(
         `No Advanced Jar rules for ${currency}. Open Advanced Jar from the Jar screen and add this asset, or turn off Advanced Jar in Settings to use the basic split.`
       );
     }
-    const bpsMap = jarAdvancedRepo.resolveAdvancedEffectiveBps(totalMinor, advCfg);
+    const bpsMap = jarAdvancedRepo.resolveAdvancedEffectiveBps(Number(totalMinor), advCfg);
     let sum = 0;
     for (const v of bpsMap.values()) {
       sum += v;
@@ -170,24 +170,23 @@ async function distributeJarCurrencyInTransaction(
   }
 
   const bpsList = ordered.map((x) => x.percent_bps);
-  const parts = splitAmountByBps(totalMinor, bpsList);
+  const parts = splitBigAmountByBps(totalMinor, bpsList);
   const title = (titleParam ?? 'Jar distribution').trim() || 'Jar distribution';
   const occurred_at = Date.now();
   let count = 0;
   for (let i = 0; i < ordered.length; i++) {
-    const amt = parts[i];
-    if (amt <= 0) {
-      continue;
+    // A share beyond 2^53 minor is booked as several transfers, as one row holds a JS number.
+    for (const amt of chunkSafeAmount(parts[i])) {
+      await txRepo.insertTransfer({
+        title,
+        amount_minor: amt,
+        currency,
+        occurred_at,
+        from_pocket_id: jar.id,
+        to_pocket_id: ordered[i].target_pocket_id,
+      });
+      count += 1;
     }
-    await txRepo.insertTransfer({
-      title,
-      amount_minor: amt,
-      currency,
-      occurred_at,
-      from_pocket_id: jar.id,
-      to_pocket_id: ordered[i].target_pocket_id,
-    });
-    count += 1;
   }
   if (count === 0) {
     throw new Error('Nothing to transfer (amounts rounded to zero). Try adjusting the split.');

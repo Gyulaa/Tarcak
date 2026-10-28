@@ -69,6 +69,6 @@ export type LedgerTransaction = {
 
 export type BalanceRow = {
   currency: string;
-  /** Sum of signed minor deltas (same scale as `amount_minor`). */
-  balance_minor: number;
+  /** Sum of signed minor deltas (same scale as `amount_minor`); a bigint, as a sum can pass 2^53. */
+  balance_minor: bigint;
 };

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
-import { splitAmountByBps } from '../src/domain/splitAmount';
+import { chunkSafeAmount, splitAmountByBps, splitBigAmountByBps } from '../src/domain/splitAmount';
 
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 
@@ -31,5 +31,56 @@ describe('splitAmountByBps', () => {
     assert.throws(() => splitAmountByBps(5, [6000, 5000]), /exceed 100%/);
     assert.throws(() => splitAmountByBps(-5, [10_000]), /non-negative/);
     assert.throws(() => splitAmountByBps(1.5, [10_000]), /non-negative/);
+  });
+});
+
+describe('splitBigAmountByBps', () => {
+  test('stays exact beyond 2^53 and distributes every unit', () => {
+    const total = 9_007_199_254_740_993n * 1000n;
+    const parts = splitBigAmountByBps(total, [3333, 3333, 3334]);
+    assert.equal(
+      parts.reduce((a, b) => a + b, 0n),
+      total
+    );
+    assert.equal(parts[0], (total * 3333n) / 10_000n);
+  });
+
+  test('matches the number version for safe totals', () => {
+    assert.deepEqual(
+      splitBigAmountByBps(100n, [3333, 3333, 3334]).map(Number),
+      splitAmountByBps(100, [3333, 3333, 3334])
+    );
+  });
+
+  test('edge cases', () => {
+    assert.deepEqual(splitBigAmountByBps(0n, [10_000]), [0n]);
+    assert.deepEqual(splitBigAmountByBps(5n, []), []);
+    assert.throws(() => splitBigAmountByBps(5n, [6000, 5000]), /exceed 100%/);
+    assert.throws(() => splitBigAmountByBps(-5n, [10_000]), /non-negative/);
+  });
+});
+
+describe('chunkSafeAmount', () => {
+  const MAX = BigInt(Number.MAX_SAFE_INTEGER);
+
+  test('a safe amount is one chunk', () => {
+    assert.deepEqual(chunkSafeAmount(0n), []);
+    assert.deepEqual(chunkSafeAmount(42n), [42]);
+    assert.deepEqual(chunkSafeAmount(MAX), [Number.MAX_SAFE_INTEGER]);
+  });
+
+  test('a larger amount is cut into safe chunks that add up exactly', () => {
+    const amount = MAX * 2n + 7n;
+    const chunks = chunkSafeAmount(amount);
+    assert.equal(chunks.length, 3);
+    assert.ok(chunks.every((c) => Number.isSafeInteger(c) && c > 0));
+    assert.equal(
+      chunks.reduce((a, c) => a + BigInt(c), 0n),
+      amount
+    );
+  });
+
+  test('rejects negative amounts', () => {
+    assert.throws(() => chunkSafeAmount(-1n), /non-negative/);
   });
 });

@@ -103,3 +103,27 @@ describe('formatMinorRounded', () => {
     assert.throws(() => formatMinorRounded(1, 9, false));
   });
 });
+
+describe('bigint amounts (balances beyond 2^53 minor)', () => {
+  // 2^53 + 1 minor: the first value a float cannot hold
+  const BEYOND = 9_007_199_254_740_993n;
+
+  test('formatMinorRounded stays exact', () => {
+    assert.equal(formatMinorRounded(BEYOND, 8, true), '90 071 992.54740993');
+    assert.equal(formatMinorRounded(-BEYOND, 8, true), '-90 071 992.54740993');
+    assert.equal(formatMinorRounded(BEYOND, 0, false), '90 071 993');
+    assert.equal(formatMinorRounded(5n, 2, true), '0.00');
+  });
+
+  test('a bigint and a number of the same value format the same', () => {
+    assert.equal(formatMinorRounded(12.5 * ONE, 2, true), formatMinorRounded(BigInt(12.5 * ONE), 2, true));
+  });
+
+  test('autoDisplayDecimals matches the number rules', () => {
+    assert.equal(autoDisplayDecimals(BEYOND), 0);
+    assert.equal(autoDisplayDecimals(-BEYOND), 0);
+    assert.equal(autoDisplayDecimals(BigInt(ONE)), 2);
+    assert.equal(autoDisplayDecimals(12_345n), 6);
+    assert.equal(autoDisplayDecimals(0n), 0);
+  });
+});

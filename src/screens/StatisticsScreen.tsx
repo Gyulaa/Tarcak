@@ -404,11 +404,11 @@ export default function StatisticsScreen({ route, navigation }: RootStackScreenP
   const lineScale = useMemo(() => computeLineChartScale(linePoints), [linePoints]);
 
   const positiveSlices = useMemo(
-    () => pieSlices.filter((s) => s.balance_minor > 0),
+    () => pieSlices.filter((s) => s.balance_minor > 0n),
     [pieSlices]
   );
   const negativeSlices = useMemo(
-    () => pieSlices.filter((s) => s.balance_minor < 0),
+    () => pieSlices.filter((s) => s.balance_minor < 0n),
     [pieSlices]
   );
 
@@ -420,21 +420,22 @@ export default function StatisticsScreen({ route, navigation }: RootStackScreenP
   const pieData = useMemo(() => {
     if (pieDisplaySlices.length === 0) return [];
     return pieDisplaySlices.map((s, i) => ({
-      value: Math.abs(s.balance_minor),
+      // The donut only needs the proportions, so a float is fine here.
+      value: Math.abs(Number(s.balance_minor)),
       color: pieSliceColors[i % pieSliceColors.length],
       text: s.name,
     }));
   }, [pieDisplaySlices, pieSliceColors]);
 
   const pieTotal = useMemo(
-    () => pieDisplaySlices.reduce((a, s) => a + s.balance_minor, 0),
+    () => pieDisplaySlices.reduce((a, s) => a + s.balance_minor, 0n),
     [pieDisplaySlices]
   );
 
   const showPieSection =
     (statisticsScope.mode === 'all' || statisticsScope.mode === 'exclude_jar') &&
     pieDisplaySlices.length > 0 &&
-    pieTotal !== 0;
+    pieTotal !== 0n;
 
   const categoryColorFor = useCallback(
     (s: CategorySlice) => s.color ?? (s.categoryId ? pocketChartColor(s.categoryId, pieSliceColors) : colors.textMuted),

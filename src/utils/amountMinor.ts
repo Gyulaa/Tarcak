@@ -101,15 +101,16 @@ export const MAX_AMOUNT_DECIMALS = 8;
  * read as whole numbers), two between 1 and 100, and three significant digits below 1, so small crypto
  * amounts stay readable (0.000123).
  */
-export function autoDisplayDecimals(minor: number): number {
-  const abs = Math.abs(minor);
-  if (abs >= 100 * AMOUNT_MINOR_SCALE) {
+export function autoDisplayDecimals(minor: number | bigint): number {
+  const signed = BigInt(minor);
+  const abs = signed < 0n ? -signed : signed;
+  if (abs >= 100n * SCALE_BI) {
     return 0;
   }
-  if (abs >= AMOUNT_MINOR_SCALE) {
+  if (abs >= SCALE_BI) {
     return 2;
   }
-  if (abs === 0) {
+  if (abs === 0n) {
     return 0;
   }
   // abs < 10^8 here, so its digit count tells how many zeros follow the decimal point.
@@ -122,8 +123,12 @@ export function autoDisplayDecimals(minor: number): number {
  * `padDecimals` keeps trailing zeros (fixed-precision assets such as EUR show "12.50"); otherwise they
  * are dropped ("12.5", "300").
  */
-export function formatMinorRounded(minor: number, decimals: number, padDecimals: boolean): string {
-  if (!Number.isInteger(minor)) {
+export function formatMinorRounded(
+  minor: number | bigint,
+  decimals: number,
+  padDecimals: boolean
+): string {
+  if (typeof minor === 'number' && !Number.isInteger(minor)) {
     throw new Error('Internal error: amount must be an integer.');
   }
   if (!Number.isInteger(decimals) || decimals < 0 || decimals > MAX_AMOUNT_DECIMALS) {

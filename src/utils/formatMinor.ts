@@ -27,7 +27,7 @@ export function setAssetDisplayDecimals(
 }
 
 /** Rounded amount without the currency code (e.g. chart centers that show the code elsewhere). */
-export function formatMinorAmountForDisplay(minor: number, currency: string): string {
+export function formatMinorAmountForDisplay(minor: number | bigint, currency: string): string {
   const fixed = displayDecimalsByCurrency.get(currency.toUpperCase());
   if (fixed !== undefined) {
     return formatMinorRounded(minor, fixed, true);
@@ -35,7 +35,7 @@ export function formatMinorAmountForDisplay(minor: number, currency: string): st
   return formatMinorRounded(minor, autoDisplayDecimals(minor), false);
 }
 
-export function formatMinorForDisplay(minor: number, currency: string): string {
+export function formatMinorForDisplay(minor: number | bigint, currency: string): string {
   const c = currency.toUpperCase();
   return `${formatMinorAmountForDisplay(minor, c)} ${c}`;
 }

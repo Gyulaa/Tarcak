@@ -76,7 +76,7 @@ export default function JarScreen({ navigation }: RootStackScreenProps<'Jar'>) {
         jarRepo.listJarDistributionRules(),
         txRepo.listTransactions({ pocketId: jar.id, limit: JAR_TX_FETCH_LIMIT }),
       ]);
-      setBalances(b.filter((x) => x.balance_minor > 0));
+      setBalances(b.filter((x) => x.balance_minor > 0n));
       setRuleCount(rules.length);
       setJarTransactions(txs);
     } catch (e) {

@@ -319,11 +319,19 @@ export async function listTransactions(options: {
   return rows.map(mapRow);
 }
 
+/**
+ * SQLite sums in 64-bit integers, but the driver hands them over as JS numbers, which are exact
+ * only up to 2^53. The sum is read as text and parsed to a bigint instead.
+ */
+function toBalanceRows(rows: { currency: string; balance_text: string }[]): BalanceRow[] {
+  return rows.map((r) => ({ currency: r.currency, balance_minor: BigInt(r.balance_text) }));
+}
+
 /** All pockets combined: one row per currency. */
 export async function sumBalancesAll(): Promise<BalanceRow[]> {
   const db = await openMainDatabase();
-  const rows = await db.getAllAsync<{ currency: string; balance_minor: number }>(`
-SELECT currency, SUM(delta) AS balance_minor FROM (
+  const rows = await db.getAllAsync<{ currency: string; balance_text: string }>(`
+SELECT currency, CAST(SUM(delta) AS TEXT) AS balance_text FROM (
   SELECT currency, amount_minor AS delta FROM transactions WHERE kind = 'income'
   UNION ALL
   SELECT currency, -amount_minor AS delta FROM transactions WHERE kind = 'expense'
@@ -334,15 +342,15 @@ SELECT currency, SUM(delta) AS balance_minor FROM (
 ) GROUP BY currency
 ORDER BY currency COLLATE NOCASE ASC
   `);
-  return rows;
+  return toBalanceRows(rows);
 }
 
 /** Single pocket: one row per currency that has a non-zero effect (may omit zero balances). */
 export async function sumBalancesForPocket(pocketId: string): Promise<BalanceRow[]> {
   const db = await openMainDatabase();
-  const rows = await db.getAllAsync<{ currency: string; balance_minor: number }>(
+  const rows = await db.getAllAsync<{ currency: string; balance_text: string }>(
     `
-SELECT currency, SUM(delta) AS balance_minor FROM (
+SELECT currency, CAST(SUM(delta) AS TEXT) AS balance_text FROM (
   SELECT currency, amount_minor AS delta FROM transactions
     WHERE kind = 'income' AND pocket_id = ?
   UNION ALL
@@ -360,7 +368,7 @@ ORDER BY currency COLLATE NOCASE ASC
   `,
     [pocketId, pocketId, pocketId, pocketId]
   );
-  return rows;
+  return toBalanceRows(rows);
 }
 
 /** True if this pocket has any currency with a non-zero net balance. */
