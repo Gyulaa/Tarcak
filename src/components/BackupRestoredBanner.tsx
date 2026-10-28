@@ -22,13 +22,9 @@ function formatWhen(isoOrMs: string | number): string {
   });
 }
 
-type Props = {
-  compact?: boolean;
-};
-
-export function BackupRestoredBanner({ compact = false }: Props) {
+export function BackupRestoredBanner() {
   const { colors } = useAppTheme();
-  const styles = useMemo(() => createStyles(colors, compact), [colors, compact]);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [info, setInfo] = useState<BackupRestoreInfo | null>(null);
 
   const reload = useCallback(() => {
@@ -54,27 +50,32 @@ export function BackupRestoredBanner({ compact = false }: Props) {
     <View style={styles.wrap}>
       <Text style={styles.title}>Restored from backup</Text>
       <Text style={styles.body}>
-        Everything on this device — pockets, transactions, Jar rules, and settings — came from your
-        imported file.
+        Pockets, transactions, Jar rules and settings on this device came from your backup file.
       </Text>
-      <Text style={styles.meta}>
-        Backup created: {formatWhen(info.sourceExportedAt)}
-        {'\n'}
-        Imported here: {formatWhen(info.restoredAt)}
-      </Text>
-      <Pressable style={styles.dismissBtn} onPress={() => void dismiss()} hitSlop={8}>
+      <View style={styles.metaRow}>
+        <Text style={styles.metaLabel}>Backup made</Text>
+        <Text style={styles.metaValue}>{formatWhen(info.sourceExportedAt)}</Text>
+      </View>
+      <View style={styles.metaRow}>
+        <Text style={styles.metaLabel}>Restored</Text>
+        <Text style={styles.metaValue}>{formatWhen(info.restoredAt)}</Text>
+      </View>
+      <Pressable
+        style={styles.dismissBtn}
+        onPress={() => void dismiss()}
+        hitSlop={8}
+        accessibilityRole="button"
+      >
         <Text style={styles.dismissText}>Dismiss</Text>
       </Pressable>
     </View>
   );
 }
 
-function createStyles(c: AppColors, compact: boolean) {
+function createStyles(c: AppColors) {
   return StyleSheet.create({
     wrap: {
-      marginHorizontal: compact ? 0 : 16,
-      marginBottom: compact ? 12 : 0,
-      marginTop: compact ? 0 : 10,
+      marginBottom: 12,
       padding: 14,
       borderRadius: 12,
       backgroundColor: c.chipBg,
@@ -93,15 +94,24 @@ function createStyles(c: AppColors, compact: boolean) {
       color: c.textSecondary,
       marginBottom: 8,
     },
-    meta: {
+    metaRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'baseline',
+      gap: 12,
+      paddingVertical: 2,
+    },
+    metaLabel: { fontSize: 12, lineHeight: 18, color: c.textMuted },
+    metaValue: {
+      flexShrink: 1,
       fontSize: 12,
       lineHeight: 18,
-      color: c.textMuted,
-      fontFamily: font.regular,
+      color: c.textSecondary,
+      textAlign: 'right',
     },
     dismissBtn: {
-      alignSelf: 'flex-start',
-      marginTop: 10,
+      alignSelf: 'flex-end',
+      marginTop: 8,
       paddingVertical: 6,
       paddingHorizontal: 4,
     },

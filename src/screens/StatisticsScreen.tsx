@@ -498,6 +498,14 @@ export default function StatisticsScreen({ route, navigation }: RootStackScreenP
         your ledger; transfers do not change the &quot;All pockets&quot; total or count toward any category.
       </Text>
 
+      <Pressable
+        style={styles.exportBtn}
+        onPress={() => navigation.navigate('ReportExport')}
+        accessibilityRole="button"
+      >
+        <Text style={styles.exportBtnText}>Export report…</Text>
+      </Pressable>
+
       {assetTypes.length === 0 ? (
         <Text style={styles.muted}>Add asset types under Settings to use Statistics.</Text>
       ) : (
@@ -843,6 +851,16 @@ function createStyles(c: AppColors) {
     scroll: { flex: 1, backgroundColor: c.bg },
     inner: { paddingVertical: 16, paddingHorizontal: 12, paddingBottom: 40 },
     lead: { fontSize: 14, color: c.textMuted, lineHeight: 21, marginBottom: 16 },
+    exportBtn: {
+      backgroundColor: c.surface,
+      paddingVertical: 12,
+      borderRadius: 10,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: c.borderStrong,
+      marginBottom: 16,
+    },
+    exportBtnText: { color: c.primary, fontFamily: font.semibold, fontSize: 15 },
     cardLabel: { fontSize: 13, fontFamily: font.semibold, color: c.textMuted, marginBottom: 8 },
     muted: { fontSize: 14, color: c.textMuted, lineHeight: 20 },
     settingsSection: {

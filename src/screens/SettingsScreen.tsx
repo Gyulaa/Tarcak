@@ -290,7 +290,7 @@ export default function SettingsScreen({ navigation }: RootStackScreenProps<'Set
   return (
     <ScreenWithFooter>
     <ScrollView style={styles.container} contentContainerStyle={styles.inner}>
-      <BackupRestoredBanner compact />
+      <BackupRestoredBanner />
       <Text style={styles.p}>
         Default asset type is applied when you open a new transaction. Create types under Asset
         types, then choose one below.

@@ -11,6 +11,7 @@ import JarScreen from '../screens/JarScreen';
 import JarSplitScreen from '../screens/JarSplitScreen';
 import PocketDetailScreen from '../screens/PocketDetailScreen';
 import PocketsScreen from '../screens/PocketsScreen';
+import ReportExportScreen from '../screens/ReportExportScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import StatisticsScreen from '../screens/StatisticsScreen';
 import TransactionEditorScreen from '../screens/TransactionEditorScreen';
@@ -69,6 +70,11 @@ function MainStack() {
         />
         <Stack.Screen name="History" component={HistoryScreen} options={{ title: 'History' }} />
         <Stack.Screen name="Statistics" component={StatisticsScreen} options={{ title: 'Statistics' }} />
+        <Stack.Screen
+          name="ReportExport"
+          component={ReportExportScreen}
+          options={{ title: 'Export report' }}
+        />
         <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
         <Stack.Screen
           name="AssetTypes"

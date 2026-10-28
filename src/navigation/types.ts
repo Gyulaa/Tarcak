@@ -13,6 +13,7 @@ export type RootStackParamList = {
   };
   History: { pocketId?: string } | undefined;
   Statistics: { initialCurrency?: string } | undefined;
+  ReportExport: undefined;
   Settings: undefined;
   AssetTypes: undefined;
   Categories: undefined;

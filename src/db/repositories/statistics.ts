@@ -254,6 +254,17 @@ export async function getPocketSlicesAt(
   return slices;
 }
 
+/** Pocket restriction for income/expense queries over `transactions t` (transfers are filtered out by `kind`). */
+export function scopeSql(scope: StatisticsScope): { sql: string; params: string[] } {
+  if (scope.mode === 'pocket') {
+    return { sql: 'AND t.pocket_id = ?', params: [scope.pocketId] };
+  }
+  if (scope.mode === 'exclude_jar') {
+    return { sql: 'AND t.pocket_id != ?', params: [scope.jarId] };
+  }
+  return { sql: '', params: [] };
+}
+
 export type CategorySlice = {
   categoryId: string | null;
   name: string;
@@ -274,15 +285,7 @@ export async function getCategorySlices(
   endMs: number
 ): Promise<{ income: CategorySlice[]; expense: CategorySlice[] }> {
   const db = await openMainDatabase();
-  let scopeSql = '';
-  let scopeParams: string[] = [];
-  if (scope.mode === 'pocket') {
-    scopeSql = 'AND t.pocket_id = ?';
-    scopeParams = [scope.pocketId];
-  } else if (scope.mode === 'exclude_jar') {
-    scopeSql = 'AND t.pocket_id != ?';
-    scopeParams = [scope.jarId];
-  }
+  const scoped = scopeSql(scope);
   const rows = await db.getAllAsync<{
     category_id: string | null;
     category_name: string | null;
@@ -295,11 +298,11 @@ export async function getCategorySlices(
      FROM transactions t
      LEFT JOIN categories c ON c.id = t.category_id
      WHERE t.currency = ? AND t.occurred_at >= ? AND t.occurred_at <= ?
-       AND t.kind IN ('income', 'expense') ${scopeSql}
+       AND t.kind IN ('income', 'expense') ${scoped.sql}
      GROUP BY t.category_id, t.kind
      HAVING SUM(t.amount_minor) > 0
      ORDER BY total_minor DESC`,
-    [currency, startMs, endMs, ...scopeParams]
+    [currency, startMs, endMs, ...scoped.params]
   );
 
   const income: CategorySlice[] = [];

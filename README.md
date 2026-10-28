@@ -59,6 +59,21 @@ Implementation: [`src/security/backup.ts`](src/security/backup.ts), [`src/securi
 
 ---
 
+## Monthly report export (CSV)
+
+**Statistics → Export report…** (native only; disabled on web). A monthly income/expense summary as a CSV file for a spreadsheet.
+
+- **What is in the file:** for each calendar month (device time zone) and each chosen currency, `month,currency,income,expense,net`; every month in the range gets a row (zeros when empty). Only `income` and `expense` count, never transfers. Currencies are never added together (no exchange rates). Amounts are exact decimals (BigInt end to end, no rounding, no digit grouping); `expense` is the positive size of the spending and `net = income − expense`.
+- **Optional category breakdown** (“Break down by category”, off by default): long form `month,currency,kind,category,amount`, non-zero sums only. This is the only place free text (category names) enters the file; text cells starting with `=`, `+`, `-`, `@`, tab or CR get a leading `'` against spreadsheet formula injection.
+- **What is never in the file:** pocket names or IDs, transaction titles, exact dates, timestamps, device info.
+- **Choices:** time range (whole months, at most 240, default the last 12 including the current one), scope (all pockets / one pocket / outside the Jar, as in Statistics), which currencies to include, CSV preset (**International** by default: `,` between columns and a decimal point, so a spreadsheet never reads a decimal comma as a thousands separator; **Hungarian**: `;` and decimal comma; not remembered, resets on each open). UTF-8 with BOM, CRLF line ends, RFC 4180 quoting.
+- **The file is not encrypted.** The screen says so in a confirmation before the share sheet. It is written to the cache as `tarcak-report-YYYY-MM-DD.csv`, shared with [`expo-sharing`](https://docs.expo.dev/versions/latest/sdk/sharing/) (lock-on-background is suspended while the sheet is open, like the backup), and removed on the next export or the next time the screen opens (not right after sharing: on Android the receiving app may still be reading it). Whatever app you share it with keeps its own copy.
+- **No network, no analytics, no logging of the contents.** The preview and the file come from the same function ([`src/domain/monthlyReport.ts`](src/domain/monthlyReport.ts)).
+
+Implementation: [`src/domain/monthlyReport.ts`](src/domain/monthlyReport.ts) (pure, unit-tested in `tests/monthlyReport.test.ts`), [`src/db/repositories/report.ts`](src/db/repositories/report.ts), [`src/utils/reportFile.ts`](src/utils/reportFile.ts), [`src/screens/ReportExportScreen.tsx`](src/screens/ReportExportScreen.tsx). The `.tarcak` backup, the schema and `src/security/` are untouched.
+
+---
+
 ## Upgrading from an older build
 
 Safe to install over an existing vault: on unlock, [`runPendingMigrations`](src/db/migrations/runner.ts) applies any of **`0001`–`0008`** not yet recorded in `schema_migrations`. No new migration is required for recent UI-only releases if you are already at version **8**.
@@ -350,6 +365,7 @@ For each pocket `p` and currency `c`:
 - **Categories:** `listCategories`, `createCategory`, `updateCategory`, `deleteCategory` (relies on the `ON DELETE SET NULL` FK — no usage guard, no “keep at least one” rule).
 - **Jar:** `listJarDistributionRules`, `replaceJarDistributionRules`, `distributeJarCurrency`, `splitAmountByBps` (pure helper).
 - **Jar advanced:** `listJarAdvancedSummaries`, `getJarAdvancedAssetDetail`, `saveJarAdvancedAsset`, `deleteJarAdvancedAsset`, `getJarAdvancedDistributeConfig`, `resolveAdvancedEffectiveBps`, etc.
+- **Report:** `getReportRows({ months, scope, currencies? })` ([`src/db/repositories/report.ts`](src/db/repositories/report.ts)): income/expense sums per month, currency, kind and category, as BigInt.
 - **Statistics:** `getBalanceTimeline`, `downsampleTimeline`, `getPocketSlicesAt`, `getCategorySlices` (income/expense totals by category for a range), `getEarliestOccurredAt` (for charts and time-range defaults). `getBalanceTimeline` and `getPocketSlicesAt` both take an optional `CategoryFilter` (all / uncategorized / one category) that narrows their underlying SQL to that category's income/expense rows.
 
 ---
@@ -407,12 +423,14 @@ src/
       jar.ts
       jarAdvanced.ts
       statistics.ts
+      report.ts            # grouped sums for the CSV report export
   domain/
     types.ts
     jarAdvancedMath.ts       # milestone / ceiling BPS resolution
     jarAdvancedChartModel.ts # Balance Chart layout + effective % sampling
     jarAdvancedEditorTypes.ts
     jarAdvancedEditorSave.ts
+    monthlyReport.ts         # CSV report: month ranges, exact amount text, CSV cells (pure)
   stores/
     ledgerStore.ts       # zustand: pockets + home balances refresh
   components/
@@ -436,6 +454,7 @@ src/
     TransactionEditorScreen.tsx
     HistoryScreen.tsx
     StatisticsScreen.tsx
+    ReportExportScreen.tsx
     SettingsScreen.tsx
     AssetTypesScreen.tsx
     CategoriesScreen.tsx
@@ -448,6 +467,7 @@ src/
     formatMinor.ts         # display rounding per asset (display_decimals or automatic)
     formatOccurredAt.ts
     pocketChartColors.ts   # stable per-pocket chart colors (theme-aware)
+    reportFile.ts          # write/purge the report CSV in the cache
 AppBoot.tsx              # vault gate (themed via appearanceCache) + SafeAreaProvider + MainNavigator when unlocked
 scripts/
   jar-advanced-chart-selftest.mjs  # manual QA checklist (`npm run test:jar`)
