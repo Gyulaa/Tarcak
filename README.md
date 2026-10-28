@@ -4,7 +4,7 @@
 
 Local-first personal finance app: **pockets** (budget segments), **multi-currency balances**, and a **unified ledger** for income, expenses, and transfers between pockets. All data stays on the device and is stored **encrypted**; unlocking the data uses a **password** you choose (not biometrics as the primary secret).
 
-**App version (native):** `1.2.3` in [`app.json`](app.json) (`android.versionCode` `5`, auto-incremented by EAS on `preview` / `production` builds — see [`eas.json`](eas.json)).
+**App version (native):** `1.3.0` in [`app.json`](app.json) (`android.versionCode` `5`, auto-incremented by EAS on `preview` / `production` builds — see [`eas.json`](eas.json)).
 
 ## Current project setup
 
