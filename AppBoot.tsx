@@ -1,7 +1,3 @@
-// @ts-nocheck
-// Temporary: React 19 + React Native 0.81 JSX typings disagree under `tsc` (View/Text as JSX).
-// Metro / Expo bundling is unaffected. Security code is fully checked via `npm run typecheck:src`.
-
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -18,6 +14,7 @@ import {
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import * as settingsRepo from './src/db/repositories/settings';
 import { MainNavigator } from './src/navigation/MainNavigator';
 import { AppThemeProvider, useAppTheme } from './src/theme/ThemeContext';
 import {
@@ -28,12 +25,14 @@ import {
 import { DEFAULT_COLOR_THEME_ID } from './src/theme/colorThemes';
 import { font } from './src/theme/fonts';
 import type { AppColors } from './src/theme/palette';
+import { applyScreenCaptureBlock } from './src/utils/screenCapture';
 import { applyPendingBackupImportToSettings } from './src/security/backupImportMeta';
 import {
   createFirstVault,
   eraseAllLocalTarcakData,
   hasVault,
   isSessionUnlocked,
+  isVaultLockSuspended,
   lockVaultSession,
   openMainDatabase,
   registerLockOnBackground,
@@ -45,6 +44,19 @@ import { useLedgerStore } from './src/stores/ledgerStore';
 function VaultStatusBar() {
   const { isDark } = useAppTheme();
   return <StatusBar style={isDark ? 'light' : 'dark'} />;
+}
+
+/** The setting lives in the encrypted database, so it is applied once the vault is open. */
+function ScreenCaptureGuard() {
+  useEffect(() => {
+    void settingsRepo
+      .getBlockScreenCapture()
+      .then(applyScreenCaptureBlock)
+      .catch((e) => {
+        Alert.alert('Screenshot block', e instanceof Error ? e.message : String(e));
+      });
+  }, []);
+  return null;
 }
 
 type VaultPhaseKey = 'kdf' | 'db';
@@ -87,6 +99,8 @@ export default function AppBoot() {
   const [vaultPresent, setVaultPresent] = useState<boolean | null>(null);
   const [unlocked, setUnlocked] = useState(false);
   const [password, setPassword] = useState('');
+  /** Only on first launch: a typo in the vault password would lock the user out for good. */
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [busy, setBusy] = useState(false);
   /** Which long-running substep is active during create/unlock (`null` when idle or erase-only busy). */
   const [vaultPhaseKey, setVaultPhaseKey] = useState<VaultPhaseKey | null>(null);
@@ -111,11 +125,14 @@ export default function AppBoot() {
     setUnlocked(isSessionUnlocked());
   }, [vaultPresent, busy]);
 
-  // After `inactive`/`background` lock, sync UI when the app becomes active again.
+  // Leaving the app swaps to the lock screen right away (the session locks in parallel), so the
+  // app-switcher snapshot shows no balances; becoming active syncs with the real session state.
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
         setUnlocked(isSessionUnlocked());
+      } else if (!isVaultLockSuspended()) {
+        setUnlocked(false);
       }
     });
     return () => sub.remove();
@@ -123,12 +140,17 @@ export default function AppBoot() {
 
   const onCreateVault = async () => {
     setMessage(null);
+    if (password !== confirmPassword) {
+      setMessage('The passwords do not match.');
+      return;
+    }
     setBusy(true);
     try {
       setVaultPhaseKey('kdf');
       await createFirstVault(password);
       setVaultPhaseKey('db');
       setPassword('');
+      setConfirmPassword('');
       await refreshVaultFlag();
       await openMainDatabase();
       setUnlocked(true);
@@ -207,6 +229,7 @@ export default function AppBoot() {
       useLedgerStore.setState({ pockets: [], homeBalances: [], lastError: null });
       await refreshVaultFlag();
       setPassword('');
+      setConfirmPassword('');
       setMessage('Local data removed. Choose a new password and tap Create vault.');
     } catch (e) {
       setMessage(e instanceof Error ? e.message : String(e));
@@ -233,6 +256,7 @@ export default function AppBoot() {
           <AppThemeProvider>
             <MainNavigator onLockVault={handleLockFromApp} />
             <VaultStatusBar />
+            <ScreenCaptureGuard />
           </AppThemeProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>
@@ -272,6 +296,24 @@ export default function AppBoot() {
             />
           </Pressable>
         </View>
+
+        {!vaultPresent ? (
+          <View style={[vaultStyles.inputOuter, vaultStyles.confirmInputOuter]}>
+            <TextInput
+              style={vaultStyles.input}
+              placeholder="Repeat password"
+              placeholderTextColor={vaultColors.placeholder}
+              secureTextEntry={!passwordVisible}
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!busy}
+              selectionColor={vaultColors.primary}
+              accessibilityLabel="Repeat password"
+            />
+          </View>
+        ) : null}
 
         {!vaultPresent ? (
           <Pressable
@@ -399,6 +441,9 @@ function createVaultGateStyles(c: AppColors) {
       color: c.inputText,
       backgroundColor: 'transparent',
     },
+    confirmInputOuter: {
+      marginTop: 12,
+    },
     eyeBtn: {
       padding: 10,
       justifyContent: 'center',
@@ -417,7 +462,7 @@ function createVaultGateStyles(c: AppColors) {
       opacity: 0.55,
     },
     primaryBtnText: {
-      color: '#fff',
+      color: c.onPrimary,
       fontFamily: font.semibold,
       fontSize: 17,
     },
@@ -462,7 +507,7 @@ function createVaultGateStyles(c: AppColors) {
       borderColor: c.primary,
     },
     phaseCheck: {
-      color: '#fff',
+      color: c.onPrimary,
       fontSize: 14,
       fontFamily: font.bold,
     },

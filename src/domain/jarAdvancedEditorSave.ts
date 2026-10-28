@@ -1,17 +1,28 @@
 import type { JarAdvancedAssetPayload } from '../db/repositories/jarAdvanced';
-import {
-  splitsSumValid,
-  type EditorMilestone,
-  type SplitRow,
-} from './jarAdvancedEditorTypes';
+import { JAR_ADV_TOTAL_BPS, type EditorMilestone, type SplitRow } from './jarAdvancedEditorTypes';
 
+/** Rows left at 0% are dropped: they carry no share and the database only accepts positive ones. */
 export function splitRowsToPayload(
   rows: SplitRow[]
 ): { target_pocket_id: string; percent_bps: number }[] {
-  return rows.map((r) => ({
-    target_pocket_id: r.pocketId,
-    percent_bps: Math.round(r.percent * 100),
-  }));
+  return rows
+    .map((r) => ({
+      target_pocket_id: r.pocketId,
+      percent_bps: Math.round(r.percent * 100),
+    }))
+    .filter((r) => r.percent_bps > 0);
+}
+
+/** Distribution needs every split to cover exactly 100%, checked on the basis points that are saved. */
+function splitTotalError(
+  payload: { percent_bps: number }[],
+  label: string
+): string | null {
+  const sum = payload.reduce((a, r) => a + r.percent_bps, 0);
+  if (sum === JAR_ADV_TOTAL_BPS) {
+    return null;
+  }
+  return `${label} must total exactly 100% (now ${(sum / 100).toFixed(2)}%).`;
 }
 
 export function validateEditorForSave(params: {
@@ -26,8 +37,10 @@ export function validateEditorForSave(params: {
   if (!Number.isInteger(params.defaultCeilingMinor) || params.defaultCeilingMinor < 0) {
     return { ok: false, message: 'Default ceiling must be a non-negative amount.' };
   }
-  if (!splitsSumValid(params.defaultSplits)) {
-    return { ok: false, message: 'Default split must have at least one pocket above 0% and must not exceed 100%.' };
+  const defaultPayload = splitRowsToPayload(params.defaultSplits);
+  const defaultError = splitTotalError(defaultPayload, 'Default split');
+  if (defaultError) {
+    return { ok: false, message: defaultError };
   }
 
   const milestonePayload = [];
@@ -43,14 +56,13 @@ export function validateEditorForSave(params: {
         message: `Milestone ${i + 1}: threshold must be greater than the default ceiling.`,
       };
     }
-    if (!splitsSumValid(m.splits)) {
-      return { ok: false, message: `Milestone ${i + 1}: split must have at least one pocket above 0% and must not exceed 100%.` };
+    const splits = splitRowsToPayload(m.splits);
+    const splitError = splitTotalError(splits, `Milestone ${i + 1}: split`);
+    if (splitError) {
+      return { ok: false, message: splitError };
     }
     thresholds.push(m.thresholdMinor);
-    milestonePayload.push({
-      thresholdMinor: m.thresholdMinor,
-      splits: splitRowsToPayload(m.splits),
-    });
+    milestonePayload.push({ thresholdMinor: m.thresholdMinor, splits });
   }
 
   const sorted = [...thresholds].sort((a, b) => a - b);
@@ -68,7 +80,7 @@ export function validateEditorForSave(params: {
     payload: {
       currency: params.currency.trim().toUpperCase(),
       defaultCeilingMinor: params.defaultCeilingMinor,
-      defaultSplits: splitRowsToPayload(params.defaultSplits),
+      defaultSplits: defaultPayload,
       milestones: milestonePayload,
     },
   };

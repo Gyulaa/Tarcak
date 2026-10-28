@@ -29,6 +29,10 @@ export const GCM_NONCE_LENGTH_BYTES = 12;
  */
 export const PBKDF2_ITERATIONS = 100_000;
 
+/** Accepted range for a stored or imported iteration count (rejects corrupt or hostile values). */
+export const PBKDF2_ITERATIONS_MIN = 10_000;
+export const PBKDF2_ITERATIONS_MAX = 50_000_000;
+
 /** PBKDF2 output length: 32 bytes = AES-256 key size for KEK. */
 export const PBKDF2_KEY_LENGTH_BYTES = 32;
 

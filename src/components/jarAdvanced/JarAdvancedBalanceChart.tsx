@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useCallback, useMemo, useState } from 'react';
 import { LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -13,6 +12,8 @@ import {
   snapPreviewBalance,
   xToBalanceInPlot,
   Y_AXIS_TICK_PERCENTS,
+  type ChartKnot,
+  type ChartLayout,
   type ChartPlotArea,
   type PocketLineSeries,
 } from '../../domain/jarAdvancedChartModel';
@@ -332,7 +333,12 @@ function renderGrid(
   return els;
 }
 
-function renderKnotGuides(layout, plot, selectedKnotId, colors) {
+function renderKnotGuides(
+  layout: ChartLayout,
+  plot: ChartPlotArea,
+  selectedKnotId: EditorKnotId | null,
+  colors: AppColors
+) {
   return layout.knots
     .filter((k) => k.kind !== 'origin')
     .map((k) => {
@@ -355,7 +361,13 @@ function renderKnotGuides(layout, plot, selectedKnotId, colors) {
     });
 }
 
-function renderPocketLine(series, plot, palette, selectedKnot, colors) {
+function renderPocketLine(
+  series: PocketLineSeries,
+  plot: ChartPlotArea,
+  palette: string[],
+  selectedKnot: ChartKnot | null,
+  colors: AppColors
+) {
   const color = pocketChartColor(series.pocketId, palette);
   const inSelectedKnot =
     selectedKnot != null &&
@@ -387,7 +399,12 @@ function renderPocketLine(series, plot, palette, selectedKnot, colors) {
   );
 }
 
-function renderKnotOnAxis(knot, plot, selectedKnotId, colors) {
+function renderKnotOnAxis(
+  knot: ChartKnot,
+  plot: ChartPlotArea,
+  selectedKnotId: EditorKnotId | null,
+  colors: AppColors
+) {
   const x = balanceToXInPlot(knot.balanceMinor, plot);
   const y = plot.top + plot.height;
   const knotId = knot.kind === 'ceiling' ? 'default' : knot.id;

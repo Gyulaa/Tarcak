@@ -1,24 +1,30 @@
 # Állapot
 
-Frissítve: 2026-10-27. Egy oldal: a `/agentic-code:save-work` írja újra, a `/agentic-code:resume-work` olvassa először.
+Frissítve: 2026-10-28 (délután). Egy oldal: a `/agentic-code:save-work` írja újra, a `/agentic-code:resume-work` olvassa először.
 
 ## Mi ez
 Helyi, titkosított személyes pénzügyi app (Expo / React Native). Verzió: 1.2.3 (Android versionCode 5).
 
 ## Most
-- Claude-beállítás: a `chore/claude-setup` ágon kész (CLAUDE.md, jegyzetek, check szkript, hookok, guard, teljes típusellenőrzés a CI-ben, DESIGN.md), commitolva, pushra és PR-ra vár (külön engedéllyel). Közben kiderült: 26 `.tsx` fájl `@ts-nocheck` (B3).
+- 2026-10-27: teljes átvizsgálás (B4–B21 a `docs/bugs.md`-ben), a `@ts-nocheck` kivezetése (B3) és 13 hiba javítása, plusz a kiírt összegek kerekítése (auto + eszközönként, migráció 0008). Döntések: `docs/decisions.md` (2026-10-27).
+- 2026-10-28: B12 kész: `npm audit fix`, Expo SDK 55 (RN 0.83), `zod` override, `expo-system-ui`. A Security scan kapu lokálisan zöld (8 alacsony súlyú marad). Eszközteszt a telefonon (SDK 55 dev build) sikeres, Gyula szerint minden jól működik.
+- Egységtesztek: `npm test` (Node beépített futtató, 57 teszt), a `check.sh` futtatja.
 
-## Nyitott ágak és PR-ok
-- `chore/claude-setup` (még nincs pusholva)
+## Ágak
+- A #1–#4 PR le van zárva (merge), de a #2–#4 a saját alap-ágába olvadt, nem a `main`-be: a `main`-en csak a #1 (Claude-beállítás) van rajta. Minden más munka a `chore/dependency-updates`-en van (36 commit a `main` előtt).
+- `fix/remaining-bugs` (a `chore/dependency-updates`-ről, nincs pusholva): B15, B19, B2, B16, B21, B11, B10 javítva, eszközön még nem kipróbálva (a B15 szűrés, a jelszócsere, a palettaszínek, az új jogosultságok kellenek buildhez).
+
+## Dev build a telefonra (Linux)
+- JDK 17: `~/.jdks/temurin-17` (`JAVA_HOME`), Android SDK: `~/Android/Sdk`, adb: `~/Android/Sdk/platform-tools/adb`.
+- `npx expo prebuild --platform android --no-install`, majd `android/gradlew assembleDebug -PreactNativeArchitectures=arm64-v8a` (~22 perc hidegen). Az éles Tarcak más aláírású, ezért a debug build `android/app/build.gradle`-ban `applicationIdSuffix ".dev"`-et kap (az `android/` ignorált, kézzel kell). Utána `adb reverse tcp:8081 tcp:8081` és `npx expo start --localhost`.
 
 ## Blokkol / várunk
-- (nincs)
+- Semmi.
 
 ## Következő lépés
-1. B3: a `// @ts-nocheck` kivezetése fájlonként (364 rejtett típushiba, a kisebb fájlokkal kezdve); amíg ez nincs meg, a típusellenőrzés a felületi kódot nem védi.
-2. B2: kontraszt a gombfeliratokon (`DESIGN.md` Colors).
-3. Unit tesztek a tiszta logikára (`amountMinor`, `jarAdvancedMath`, `jarAdvancedChartModel`, `backupFormat`); ehhez kell egy tesztfuttató, ami új függőség, tehát előbb döntés.
-4. A README "Still to add" pontjai: szerkeszthető `occurred_at`, zseb átnevezés UX.
+1. A munka `main`-re juttatása: egy új PR a `fix/remaining-bugs`-ból (tartalmazza a #2–#4 munkáját is). Push és PR csak engedéllyel.
+2. Nincs nyitott hiba a javítandók között (B20 maradéka szándékos). Következő: README „Still to add”, eszközteszt az új buildön.
+3. README „Still to add”: szerkeszthető `occurred_at`, zseb átnevezés UX.
 
 ## Súrlódás
-- (még nincs; soronként: mi volt lassú vagy hibázott többször, milyen gyakran)
+- A pre-commit check a teljes munkafát típusellenőrzi, nem csak a stage-elt fájlokat: fájlonkénti `@ts-nocheck`-kivezetésnél a többi fájlba vissza kellett tenni a direktívát (egyszer, kb. 2 perc).

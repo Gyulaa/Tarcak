@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useMemo, useState } from 'react';
 import {
@@ -13,15 +12,21 @@ import {
 } from 'react-native';
 
 import { ContourOnPrimaryText } from '../components/ContourOnPrimaryText';
-import { PocketEditMenu, PocketEditPencilButton } from '../components/PocketEditMenu';
+import {
+  PocketEditMenu,
+  PocketEditPencilButton,
+  type PocketEditTarget,
+} from '../components/PocketEditMenu';
 import { ScreenWithFooter } from '../components/ScreenWithFooter';
 import * as settingsRepo from '../db/repositories/settings';
+import type { Pocket } from '../domain/types';
+import type { RootStackScreenProps } from '../navigation/types';
 import { useLedgerStore } from '../stores/ledgerStore';
 import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
 
-export default function PocketsScreen({ navigation }) {
+export default function PocketsScreen({ navigation }: RootStackScreenProps<'Pockets'>) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const allPockets = useLedgerStore((s) => s.pockets);
@@ -32,7 +37,7 @@ export default function PocketsScreen({ navigation }) {
   const addPocket = useLedgerStore((s) => s.addPocket);
   const lastError = useLedgerStore((s) => s.lastError);
 
-  const [editTarget, setEditTarget] = useState(null);
+  const [editTarget, setEditTarget] = useState<PocketEditTarget | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [newName, setNewName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -60,7 +65,7 @@ export default function PocketsScreen({ navigation }) {
     }
   };
 
-  const openEdit = (item) => {
+  const openEdit = (item: Pocket) => {
     setEditTarget({
       id: item.id,
       name: item.name,

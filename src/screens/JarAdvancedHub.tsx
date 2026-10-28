@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useMemo, useState } from 'react';
 import {
@@ -18,20 +17,22 @@ import { ScreenWithFooter } from '../components/ScreenWithFooter';
 import * as assetTypesRepo from '../db/repositories/assetTypes';
 import * as jarAdvancedRepo from '../db/repositories/jarAdvanced';
 import * as settingsRepo from '../db/repositories/settings';
+import type { AssetType } from '../domain/types';
+import type { RootStackScreenProps } from '../navigation/types';
 import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
 import { formatMinorForDisplay } from '../utils/formatMinor';
 
-export default function JarAdvancedHub({ navigation }) {
+export default function JarAdvancedHub({ navigation }: RootStackScreenProps<'JarAdvanced'>) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createHubStyles(colors), [colors]);
-  const [summaries, setSummaries] = useState([]);
+  const [summaries, setSummaries] = useState<jarAdvancedRepo.JarAdvancedAssetSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [jarOn, setJarOn] = useState(true);
   const [advancedOn, setAdvancedOn] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [assetTypes, setAssetTypes] = useState([]);
+  const [assetTypes, setAssetTypes] = useState<AssetType[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -46,6 +47,8 @@ export default function JarAdvancedHub({ navigation }) {
       setJarOn(jar);
       setAdvancedOn(adv);
       setAssetTypes(types);
+    } catch (e) {
+      Alert.alert('Could not load', e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
@@ -63,7 +66,7 @@ export default function JarAdvancedHub({ navigation }) {
     [assetTypes, codesInUse]
   );
 
-  const onDelete = (currency) => {
+  const onDelete = (currency: string) => {
     Alert.alert(
       'Remove advanced config?',
       `Delete Advanced Jar rules for ${currency}?`,

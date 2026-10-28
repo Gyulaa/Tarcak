@@ -1,6 +1,8 @@
 import * as Crypto from 'expo-crypto';
 
 import type { AssetType } from '../../domain/types';
+import { MAX_AMOUNT_DECIMALS } from '../../utils/amountMinor';
+import { setAssetDisplayDecimals } from '../../utils/formatMinor';
 import { openMainDatabase } from '../client';
 
 const CODE_PATTERN = /^[A-Z0-9]{1,12}$/;
@@ -9,16 +11,20 @@ type AssetTypeRow = {
   id: string;
   code: string;
   name: string;
+  display_decimals: number | null;
   sort_index: number;
   created_at: number;
   updated_at: number;
 };
+
+const SELECT_COLUMNS = `id, code, name, display_decimals, sort_index, created_at, updated_at`;
 
 function mapRow(r: AssetTypeRow): AssetType {
   return {
     id: r.id,
     code: r.code,
     name: r.name,
+    display_decimals: r.display_decimals,
     sort_index: r.sort_index,
     created_at: r.created_at,
     updated_at: r.updated_at,
@@ -56,10 +62,12 @@ export async function requireRegisteredAssetCurrency(code: string): Promise<void
 export async function listAssetTypes(): Promise<AssetType[]> {
   const db = await openMainDatabase();
   const rows = await db.getAllAsync<AssetTypeRow>(
-    `SELECT id, code, name, sort_index, created_at, updated_at FROM asset_types
+    `SELECT ${SELECT_COLUMNS} FROM asset_types
      ORDER BY sort_index ASC, code COLLATE NOCASE ASC`
   );
-  return rows.map(mapRow);
+  const types = rows.map(mapRow);
+  setAssetDisplayDecimals(types);
+  return types;
 }
 
 export async function createAssetType(params: { code: string; name: string }): Promise<AssetType> {
@@ -89,7 +97,7 @@ export async function createAssetType(params: { code: string; name: string }): P
     [id, code, name, sort_index, now, now]
   );
   const created = await db.getFirstAsync<AssetTypeRow>(
-    `SELECT id, code, name, sort_index, created_at, updated_at FROM asset_types WHERE id = ?`,
+    `SELECT ${SELECT_COLUMNS} FROM asset_types WHERE id = ?`,
     [id]
   );
   if (!created) {
@@ -108,6 +116,24 @@ export async function updateAssetTypeName(id: string, name: string): Promise<voi
   const res = await db.runAsync(
     `UPDATE asset_types SET name = ?, updated_at = ? WHERE id = ?`,
     [trimmed, now, id]
+  );
+  if (res.changes === 0) {
+    throw new Error('Asset type not found.');
+  }
+}
+
+/** `null` switches back to the automatic, size-based precision. */
+export async function updateAssetTypeDisplayDecimals(id: string, decimals: number | null): Promise<void> {
+  if (
+    decimals !== null &&
+    (!Number.isInteger(decimals) || decimals < 0 || decimals > MAX_AMOUNT_DECIMALS)
+  ) {
+    throw new Error('Decimals must be between 0 and 8.');
+  }
+  const db = await openMainDatabase();
+  const res = await db.runAsync(
+    `UPDATE asset_types SET display_decimals = ?, updated_at = ? WHERE id = ?`,
+    [decimals, Date.now(), id]
   );
   if (res.changes === 0) {
     throw new Error('Asset type not found.');

@@ -95,11 +95,17 @@ async function openMainDatabaseWork(): Promise<SQLite.SQLiteDatabase> {
     );
   }
 
-  // SQLite defaults foreign keys OFF; we rely on ON DELETE RESTRICT for pocket integrity.
-  await db.execAsync('PRAGMA foreign_keys = ON;');
+  try {
+    // SQLite defaults foreign keys OFF; we rely on ON DELETE RESTRICT for pocket integrity.
+    await db.execAsync('PRAGMA foreign_keys = ON;');
 
-  // Bring file to current schema (idempotent after first run).
-  await runPendingMigrations(db);
+    // Bring file to current schema (idempotent after first run).
+    await runPendingMigrations(db);
+  } catch (e) {
+    // Close the handle so the next attempt does not open the same file a second time.
+    await db.closeAsync().catch(() => {});
+    throw e;
+  }
 
   cachedDb = db;
   return db;

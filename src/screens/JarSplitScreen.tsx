@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useMemo, useState } from 'react';
 import {
@@ -18,13 +17,17 @@ import { ScreenWithFooter } from '../components/ScreenWithFooter';
 import * as jarRepo from '../db/repositories/jar';
 import * as pocketsRepo from '../db/repositories/pockets';
 import * as settingsRepo from '../db/repositories/settings';
+import type { Pocket } from '../domain/types';
+import type { RootStackScreenProps } from '../navigation/types';
 import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
 
 const TOTAL_BPS = 10_000;
 
-function parsePercentToBps(s) {
+type SplitRowDraft = { pocketId: string; name: string; percentStr: string };
+
+function parsePercentToBps(s: string): number | null {
   const t = String(s).trim().replace(',', '.');
   if (t === '') return null;
   const n = Number(t);
@@ -32,11 +35,11 @@ function parsePercentToBps(s) {
   return Math.round(n * 100);
 }
 
-function bpsToDisplay(bps) {
+function bpsToDisplay(bps: number): string {
   return (bps / 100).toFixed(2).replace(/\.?0+$/, '');
 }
 
-function equalBpsForRows(n) {
+function equalBpsForRows(n: number): number[] {
   if (n <= 0) return [];
   const base = Math.floor(TOTAL_BPS / n);
   const out = Array(n).fill(base);
@@ -47,11 +50,11 @@ function equalBpsForRows(n) {
   return out;
 }
 
-export default function JarSplitScreen({ navigation }) {
+export default function JarSplitScreen({ navigation }: RootStackScreenProps<'JarSplit'>) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createSplitStyles(colors), [colors]);
-  const [rows, setRows] = useState([]);
-  const [available, setAvailable] = useState([]);
+  const [rows, setRows] = useState<SplitRowDraft[]>([]);
+  const [available, setAvailable] = useState<Pocket[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [jarFeatureOn, setJarFeatureOn] = useState(true);
@@ -109,16 +112,16 @@ export default function JarSplitScreen({ navigation }) {
     return available.filter((p) => !ids.has(p.id));
   }, [available, rows]);
 
-  const addPocket = (p) => {
+  const addPocket = (p: Pocket) => {
     setRows((prev) => [...prev, { pocketId: p.id, name: p.name, percentStr: '' }]);
     setPickerOpen(false);
   };
 
-  const removeRow = (pocketId) => {
+  const removeRow = (pocketId: string) => {
     setRows((prev) => prev.filter((r) => r.pocketId !== pocketId));
   };
 
-  const updatePercent = (pocketId, text) => {
+  const updatePercent = (pocketId: string, text: string) => {
     setRows((prev) =>
       prev.map((r) => (r.pocketId === pocketId ? { ...r, percentStr: text } : r))
     );
@@ -167,7 +170,7 @@ export default function JarSplitScreen({ navigation }) {
 
   const fillPct = totalBps.sum / 100;
   const barPct = Math.min(100, Math.max(0, fillPct));
-  const barWidth = `${barPct}%`;
+  const barWidth = `${barPct}%` as const;
 
   if (!jarFeatureOn) {
     return (

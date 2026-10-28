@@ -1,6 +1,5 @@
-// @ts-nocheck
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Pressable,
@@ -19,34 +18,48 @@ import * as categoriesRepo from '../db/repositories/categories';
 import * as pocketsRepo from '../db/repositories/pockets';
 import * as settingsRepo from '../db/repositories/settings';
 import * as txRepo from '../db/repositories/transactions';
+import type {
+  AssetType,
+  Category,
+  LedgerTransaction,
+  Pocket,
+  TransactionKind,
+} from '../domain/types';
+import type { RootStackScreenProps } from '../navigation/types';
 import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
 import { formatMinorToAmountString, parseAmountStringToMinor } from '../utils/amountMinor';
 import { formatOccurredAt } from '../utils/formatOccurredAt';
 
-const KINDS = ['income', 'expense', 'transfer'];
+const KINDS: TransactionKind[] = ['income', 'expense', 'transfer'];
 const NONE_CATEGORY = '__none__';
 
-export default function TransactionEditorScreen({ navigation, route }) {
+export default function TransactionEditorScreen({
+  navigation,
+  route,
+}: RootStackScreenProps<'TransactionEditor'>) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createTxStyles(colors), [colors]);
   const { transactionId, presetKind, pocketId, fromPocketId, toPocketId } = route.params || {};
 
   const [loading, setLoading] = useState(!!transactionId);
-  const [kind, setKind] = useState(presetKind || 'income');
+  const [kind, setKind] = useState<TransactionKind>(presetKind || 'income');
   const [title, setTitle] = useState('');
   const [amountStr, setAmountStr] = useState('');
   const [currency, setCurrency] = useState('HUF');
   const [targetPocketId, setTargetPocketId] = useState(pocketId || '');
   const [fromId, setFromId] = useState(fromPocketId || '');
   const [toId, setToId] = useState(toPocketId || '');
-  const [pockets, setPockets] = useState([]);
-  const [assetTypes, setAssetTypes] = useState([]);
-  const [categories, setCategories] = useState([]);
+  const [pockets, setPockets] = useState<Pocket[]>([]);
+  const [assetTypes, setAssetTypes] = useState<AssetType[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [categoryId, setCategoryId] = useState('');
   /** Preserved when editing; ignored on create (we use time of save). */
   const [occurredAt, setOccurredAt] = useState<number | null>(null);
+  /** The ref blocks a second tap before React re-renders; the state disables the button. */
+  const savingRef = useRef(false);
+  const [saving, setSaving] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -94,7 +107,14 @@ export default function TransactionEditorScreen({ navigation, route }) {
     }
     void (async () => {
       setLoading(true);
-      const row = await txRepo.getTransaction(transactionId);
+      let row: LedgerTransaction | null;
+      try {
+        row = await txRepo.getTransaction(transactionId);
+      } catch (e) {
+        Alert.alert('Could not load', e instanceof Error ? e.message : String(e));
+        navigation.goBack();
+        return;
+      }
       if (!row) {
         Alert.alert('Missing', 'Transaction not found.');
         navigation.goBack();
@@ -123,6 +143,7 @@ export default function TransactionEditorScreen({ navigation, route }) {
         id: '__legacy__',
         code: currency,
         name: 'Not in catalog — add in Asset types or pick another',
+        display_decimals: null,
         sort_index: -1,
         created_at: 0,
         updated_at: 0,
@@ -140,6 +161,9 @@ export default function TransactionEditorScreen({ navigation, route }) {
   };
 
   const save = async () => {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
     try {
       if (!assetTypes.some((a) => a.code === currency)) {
         throw new Error(
@@ -201,6 +225,9 @@ export default function TransactionEditorScreen({ navigation, route }) {
       navigation.goBack();
     } catch (e) {
       Alert.alert('Cannot save', e instanceof Error ? e.message : String(e));
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
   };
 
@@ -404,7 +431,7 @@ export default function TransactionEditorScreen({ navigation, route }) {
         </>
       ) : null}
 
-      <Pressable style={styles.saveBtn} onPress={() => void save()}>
+      <Pressable style={styles.saveBtn} onPress={() => void save()} disabled={saving}>
         <ContourOnPrimaryText style={styles.saveBtnText}>
           {transactionId ? 'Save changes' : 'Save'}
         </ContourOnPrimaryText>

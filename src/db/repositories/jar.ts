@@ -1,7 +1,8 @@
 import * as Crypto from 'expo-crypto';
 
-import type { JarDistributionRule } from '../../domain/types';
+import type { JarDistributionRule, Pocket } from '../../domain/types';
 import { JAR_ADV_TOTAL_BPS } from '../../domain/jarAdvancedMath';
+import { chunkSafeAmount, splitBigAmountByBps } from '../../domain/splitAmount';
 import { openMainDatabase } from '../client';
 import * as jarAdvancedRepo from './jarAdvanced';
 import * as pocketsRepo from './pockets';
@@ -26,34 +27,6 @@ function mapRuleRow(r: RuleRow): JarDistributionRule {
     percent_bps: r.percent_bps,
     sort_index: r.sort_index,
   };
-}
-
-/**
- * Split `totalMinor` across `bpsList`.
- * Sum may be ≤ TOTAL_BPS; any undistributed portion stays in the Jar (caller's responsibility).
- * Last entry absorbs rounding remainder within the distributed portion.
- */
-export function splitAmountByBps(totalMinor: number, bpsList: number[]): number[] {
-  if (bpsList.length === 0) {
-    return [];
-  }
-  const sum = bpsList.reduce((a, b) => a + b, 0);
-  if (sum > TOTAL_BPS) {
-    throw new Error('Split must not exceed 100%.');
-  }
-  const totalToDistribute = Math.floor((totalMinor * sum) / TOTAL_BPS);
-  const out: number[] = [];
-  let allocated = 0;
-  for (let i = 0; i < bpsList.length; i++) {
-    if (i === bpsList.length - 1) {
-      out.push(totalToDistribute - allocated);
-    } else {
-      const share = Math.floor((totalMinor * bpsList[i]) / TOTAL_BPS);
-      out.push(share);
-      allocated += share;
-    }
-  }
-  return out;
 }
 
 export async function listJarDistributionRules(): Promise<JarDistributionRule[]> {
@@ -118,6 +91,8 @@ export async function replaceJarDistributionRules(
 
 /**
  * Transfers the full Jar balance for `currency` to target pockets using saved rules (one transfer per non-zero share).
+ * Runs in one transaction: either every transfer is written or none, so a failure (or the vault locking
+ * mid-way) never leaves a partial distribution whose retry would split the remainder again.
  */
 export async function distributeJarCurrency(params: {
   currency: string;
@@ -131,10 +106,23 @@ export async function distributeJarCurrency(params: {
     throw new Error('Jar is archived. Turn on Pool & distribute in Settings to use it.');
   }
   const currency = params.currency.trim().toUpperCase();
+  const db = await openMainDatabase();
+  let count = 0;
+  await db.withTransactionAsync(async () => {
+    count = await distributeJarCurrencyInTransaction(jar, currency, params.title);
+  });
+  return count;
+}
+
+async function distributeJarCurrencyInTransaction(
+  jar: Pocket,
+  currency: string,
+  titleParam: string | undefined
+): Promise<number> {
   const balances = await txRepo.sumBalancesForPocket(jar.id);
   const row = balances.find((b) => b.currency === currency);
-  const totalMinor = row?.balance_minor ?? 0;
-  if (totalMinor <= 0) {
+  const totalMinor = row?.balance_minor ?? 0n;
+  if (totalMinor <= 0n) {
     throw new Error('No balance to distribute for this asset in the Jar.');
   }
 
@@ -150,7 +138,7 @@ export async function distributeJarCurrency(params: {
         `No Advanced Jar rules for ${currency}. Open Advanced Jar from the Jar screen and add this asset, or turn off Advanced Jar in Settings to use the basic split.`
       );
     }
-    const bpsMap = jarAdvancedRepo.resolveAdvancedEffectiveBps(totalMinor, advCfg);
+    const bpsMap = jarAdvancedRepo.resolveAdvancedEffectiveBps(Number(totalMinor), advCfg);
     let sum = 0;
     for (const v of bpsMap.values()) {
       sum += v;
@@ -172,25 +160,33 @@ export async function distributeJarCurrency(params: {
     }));
   }
 
+  for (const target of ordered) {
+    const pocket = await pocketsRepo.getPocket(target.target_pocket_id);
+    if (!pocket || pocket.archived) {
+      throw new Error(
+        `A pocket in the split is archived or missing${pocket ? ` (${pocket.name})` : ''}. Update the split first.`
+      );
+    }
+  }
+
   const bpsList = ordered.map((x) => x.percent_bps);
-  const parts = splitAmountByBps(totalMinor, bpsList);
-  const title = (params.title ?? 'Jar distribution').trim() || 'Jar distribution';
+  const parts = splitBigAmountByBps(totalMinor, bpsList);
+  const title = (titleParam ?? 'Jar distribution').trim() || 'Jar distribution';
   const occurred_at = Date.now();
   let count = 0;
   for (let i = 0; i < ordered.length; i++) {
-    const amt = parts[i];
-    if (amt <= 0) {
-      continue;
+    // A share beyond 2^53 minor is booked as several transfers, as one row holds a JS number.
+    for (const amt of chunkSafeAmount(parts[i])) {
+      await txRepo.insertTransfer({
+        title,
+        amount_minor: amt,
+        currency,
+        occurred_at,
+        from_pocket_id: jar.id,
+        to_pocket_id: ordered[i].target_pocket_id,
+      });
+      count += 1;
     }
-    await txRepo.insertTransfer({
-      title,
-      amount_minor: amt,
-      currency,
-      occurred_at,
-      from_pocket_id: jar.id,
-      to_pocket_id: ordered[i].target_pocket_id,
-    });
-    count += 1;
   }
   if (count === 0) {
     throw new Error('Nothing to transfer (amounts rounded to zero). Try adjusting the split.');

@@ -201,11 +201,12 @@ async function balanceMinorForPocketAt(
   currency: string,
   atMs: number,
   categoryFilter: CategoryFilter = ALL_CATEGORY_FILTER
-): Promise<number> {
+): Promise<bigint> {
   const db = await openMainDatabase();
   const cat = categoryFilterSql(categoryFilter);
-  const r = await db.getFirstAsync<{ b: number }>(
-    `SELECT COALESCE(SUM(
+  // Read as text: the driver's JS numbers are exact only up to 2^53.
+  const r = await db.getFirstAsync<{ b: string }>(
+    `SELECT CAST(COALESCE(SUM(
       CASE
         WHEN kind = 'income' AND pocket_id = ? THEN amount_minor
         WHEN kind = 'expense' AND pocket_id = ? THEN -amount_minor
@@ -213,17 +214,17 @@ async function balanceMinorForPocketAt(
         WHEN kind = 'transfer' AND to_pocket_id = ? THEN amount_minor
         ELSE 0
       END
-    ), 0) AS b
+    ), 0) AS TEXT) AS b
     FROM transactions WHERE currency = ? AND occurred_at <= ? ${cat.sql}`,
     [pocketId, pocketId, pocketId, pocketId, currency, atMs, ...cat.params]
   );
-  return r?.b ?? 0;
+  return BigInt(r?.b ?? 0);
 }
 
 export type PocketSlice = {
   pocketId: string;
   name: string;
-  balance_minor: number;
+  balance_minor: bigint;
 };
 
 /**
@@ -247,7 +248,7 @@ export async function getPocketSlicesAt(
     if (p.archived === 1) continue;
     if (options.excludeJar && options.jarId && p.id === options.jarId) continue;
     const bal = await balanceMinorForPocketAt(p.id, currency, atMs, categoryFilter);
-    if (bal === 0) continue;
+    if (bal === 0n) continue;
     slices.push({ pocketId: p.id, name: p.name, balance_minor: bal });
   }
   return slices;

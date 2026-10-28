@@ -1,8 +1,8 @@
-// @ts-nocheck
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   LayoutAnimation,
   Pressable,
   ScrollView,
@@ -15,7 +15,12 @@ import { LineChart, PieChart } from 'react-native-gifted-charts';
 
 import { ModalSelectField } from '../components/ModalSelectField';
 import { ScreenWithFooter } from '../components/ScreenWithFooter';
-import { formatTimeRangeLabel, resolveTimeRange, TimeRangePickerField } from '../components/TimeRangePickerField';
+import {
+  formatTimeRangeLabel,
+  resolveTimeRange,
+  TimeRangePickerField,
+  type TimeRangeValue,
+} from '../components/TimeRangePickerField';
 import * as assetTypesRepo from '../db/repositories/assetTypes';
 import * as categoriesRepo from '../db/repositories/categories';
 import * as pocketsRepo from '../db/repositories/pockets';
@@ -26,12 +31,19 @@ import {
   getCategorySlices,
   getEarliestOccurredAt,
   getPocketSlicesAt,
+  type BalanceTimelinePoint,
+  type CategoryFilter,
+  type CategorySlice,
+  type PocketSlice,
+  type StatisticsScope,
 } from '../db/repositories/statistics';
+import type { AssetType, Category, Pocket } from '../domain/types';
+import type { RootStackScreenProps } from '../navigation/types';
 import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
-import { AMOUNT_MINOR_SCALE, formatMinorToAmountString } from '../utils/amountMinor';
-import { formatMinorForDisplay } from '../utils/formatMinor';
+import { AMOUNT_MINOR_SCALE } from '../utils/amountMinor';
+import { formatMinorAmountForDisplay, formatMinorForDisplay } from '../utils/formatMinor';
 import { formatOccurredAt } from '../utils/formatOccurredAt';
 import { pocketChartColor } from '../utils/pocketChartColors';
 
@@ -109,6 +121,8 @@ function formatYAxisMajorLabel(giftedLabel: string): string {
   return major.toFixed(3);
 }
 
+type ActivePoint = { ts: number; v: number };
+
 function axisDateLabel(ts: number): string {
   try {
     return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -117,7 +131,7 @@ function axisDateLabel(ts: number): string {
   }
 }
 
-export default function StatisticsScreen({ route, navigation }) {
+export default function StatisticsScreen({ route, navigation }: RootStackScreenProps<'Statistics'>) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { width: winW } = useWindowDimensions();
@@ -127,24 +141,24 @@ export default function StatisticsScreen({ route, navigation }) {
     [colors.primary]
   );
 
-  const [assetTypes, setAssetTypes] = useState([]);
+  const [assetTypes, setAssetTypes] = useState<AssetType[]>([]);
   const [currency, setCurrency] = useState('HUF');
-  const [jarPocket, setJarPocket] = useState(null);
-  const [pockets, setPockets] = useState([]);
-  const [categories, setCategories] = useState([]);
+  const [jarPocket, setJarPocket] = useState<Pocket | null>(null);
+  const [pockets, setPockets] = useState<Pocket[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [scopeKey, setScopeKey] = useState('all');
   const [categoryFilterKey, setCategoryFilterKey] = useState('all');
-  const [rangeValue, setRangeValue] = useState({ kind: 'preset', id: '30d' });
-  const [earliest, setEarliest] = useState(null);
+  const [rangeValue, setRangeValue] = useState<TimeRangeValue>({ kind: 'preset', id: '30d' });
+  const [earliest, setEarliest] = useState<number | null>(null);
   /** Collapsed by default — Asset/Scope/Category/Range all have sensible defaults, so nothing
    *  requires the user to open this before the charts render. */
   const [settingsExpanded, setSettingsExpanded] = useState(false);
 
   const [lineLoading, setLineLoading] = useState(true);
-  const [linePoints, setLinePoints] = useState([]);
-  const [pieSlices, setPieSlices] = useState([]);
-  const [categoryExpenseSlices, setCategoryExpenseSlices] = useState([]);
-  const [categoryIncomeSlices, setCategoryIncomeSlices] = useState([]);
+  const [linePoints, setLinePoints] = useState<BalanceTimelinePoint[]>([]);
+  const [pieSlices, setPieSlices] = useState<PocketSlice[]>([]);
+  const [categoryExpenseSlices, setCategoryExpenseSlices] = useState<CategorySlice[]>([]);
+  const [categoryIncomeSlices, setCategoryIncomeSlices] = useState<CategorySlice[]>([]);
   const [rangeMeta, setRangeMeta] = useState({ startMs: 0, endMs: 0 });
   /** Measured width of the chart row (full card content width). */
   const [chartRowWidth, setChartRowWidth] = useState(0);
@@ -155,8 +169,8 @@ export default function StatisticsScreen({ route, navigation }) {
    * matter what z-index/elevation/collapsable combination was tried — a fixed row in normal
    * layout flow can't be clipped that way since nothing needs to escape its own bounds.
    */
-  const [activePoint, setActivePoint] = useState(null);
-  const activePointRef = useRef(null);
+  const [activePoint, setActivePoint] = useState<ActivePoint | null>(null);
+  const activePointRef = useRef<ActivePoint | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -191,7 +205,7 @@ export default function StatisticsScreen({ route, navigation }) {
     }, [navigation, route.params?.initialCurrency])
   );
 
-  const statisticsScope = useMemo(() => {
+  const statisticsScope = useMemo((): StatisticsScope => {
     if (scopeKey === 'all') return { mode: 'all' };
     if (scopeKey === 'exclude_jar' && jarPocket) return { mode: 'exclude_jar', jarId: jarPocket.id };
     if (scopeKey.startsWith('pocket:')) {
@@ -231,7 +245,7 @@ export default function StatisticsScreen({ route, navigation }) {
 
   /** Categories never apply to transfers, so a category filter narrows the same charts down to
    *  "this category's income/expense only" — transfers simply drop out of every total. */
-  const categoryFilter = useMemo(() => {
+  const categoryFilter = useMemo((): CategoryFilter => {
     if (categoryFilterKey === 'uncategorized') return { mode: 'uncategorized' };
     if (categoryFilterKey.startsWith('cat:')) {
       return { mode: 'one', categoryId: categoryFilterKey.slice('cat:'.length) };
@@ -324,6 +338,8 @@ export default function StatisticsScreen({ route, navigation }) {
         setCategoryExpenseSlices([]);
         setCategoryIncomeSlices([]);
       }
+    } catch (e) {
+      Alert.alert('Could not load', e instanceof Error ? e.message : String(e));
     } finally {
       setLineLoading(false);
     }
@@ -388,11 +404,11 @@ export default function StatisticsScreen({ route, navigation }) {
   const lineScale = useMemo(() => computeLineChartScale(linePoints), [linePoints]);
 
   const positiveSlices = useMemo(
-    () => pieSlices.filter((s) => s.balance_minor > 0),
+    () => pieSlices.filter((s) => s.balance_minor > 0n),
     [pieSlices]
   );
   const negativeSlices = useMemo(
-    () => pieSlices.filter((s) => s.balance_minor < 0),
+    () => pieSlices.filter((s) => s.balance_minor < 0n),
     [pieSlices]
   );
 
@@ -404,24 +420,25 @@ export default function StatisticsScreen({ route, navigation }) {
   const pieData = useMemo(() => {
     if (pieDisplaySlices.length === 0) return [];
     return pieDisplaySlices.map((s, i) => ({
-      value: Math.abs(s.balance_minor),
+      // The donut only needs the proportions, so a float is fine here.
+      value: Math.abs(Number(s.balance_minor)),
       color: pieSliceColors[i % pieSliceColors.length],
       text: s.name,
     }));
   }, [pieDisplaySlices, pieSliceColors]);
 
   const pieTotal = useMemo(
-    () => pieDisplaySlices.reduce((a, s) => a + s.balance_minor, 0),
+    () => pieDisplaySlices.reduce((a, s) => a + s.balance_minor, 0n),
     [pieDisplaySlices]
   );
 
   const showPieSection =
     (statisticsScope.mode === 'all' || statisticsScope.mode === 'exclude_jar') &&
     pieDisplaySlices.length > 0 &&
-    pieTotal !== 0;
+    pieTotal !== 0n;
 
   const categoryColorFor = useCallback(
-    (s) => s.color ?? (s.categoryId ? pocketChartColor(s.categoryId, pieSliceColors) : colors.textMuted),
+    (s: CategorySlice) => s.color ?? (s.categoryId ? pocketChartColor(s.categoryId, pieSliceColors) : colors.textMuted),
     [pieSliceColors, colors.textMuted]
   );
 
@@ -631,7 +648,11 @@ export default function StatisticsScreen({ route, navigation }) {
                 // reports the touched point's data into React state. It fires during the chart
                 // library's own render pass, so the update is deferred a tick (requestAnimationFrame)
                 // rather than calling setState synchronously while a different component renders.
-                pointerLabelComponent: (items, _secondary, pointerIndex) => {
+                pointerLabelComponent: (
+                  items: { value: number; timestamp?: number }[] | undefined,
+                  _secondary: unknown,
+                  pointerIndex: unknown
+                ) => {
                   const it = items?.[0];
                   if (!it) return null;
                   const v = Math.round(Number(it.value));
@@ -677,7 +698,7 @@ export default function StatisticsScreen({ route, navigation }) {
               centerLabelComponent={() => (
                 <View style={styles.pieCenter}>
                   <Text style={styles.pieCenterLabel} numberOfLines={2}>
-                    {formatMinorToAmountString(pieTotal)}
+                    {formatMinorAmountForDisplay(pieTotal, currency)}
                   </Text>
                   <Text style={styles.pieCenterSub}>{currency}</Text>
                 </View>
@@ -738,7 +759,7 @@ export default function StatisticsScreen({ route, navigation }) {
                   centerLabelComponent={() => (
                     <View style={styles.pieCenter}>
                       <Text style={styles.pieCenterLabel} numberOfLines={2}>
-                        {formatMinorToAmountString(expensePieTotal)}
+                        {formatMinorAmountForDisplay(expensePieTotal, currency)}
                       </Text>
                       <Text style={styles.pieCenterSub}>{currency}</Text>
                     </View>
@@ -786,7 +807,7 @@ export default function StatisticsScreen({ route, navigation }) {
                   centerLabelComponent={() => (
                     <View style={styles.pieCenter}>
                       <Text style={styles.pieCenterLabel} numberOfLines={2}>
-                        {formatMinorToAmountString(incomePieTotal)}
+                        {formatMinorAmountForDisplay(incomePieTotal, currency)}
                       </Text>
                       <Text style={styles.pieCenterSub}>{currency}</Text>
                     </View>

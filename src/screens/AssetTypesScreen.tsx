@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useMemo, useState } from 'react';
 import {
@@ -15,21 +14,35 @@ import {
 import { ContourOnPrimaryText } from '../components/ContourOnPrimaryText';
 import { ScreenWithFooter } from '../components/ScreenWithFooter';
 import * as assetTypesRepo from '../db/repositories/assetTypes';
+import type { AssetType } from '../domain/types';
 import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
+import { MAX_AMOUNT_DECIMALS } from '../utils/amountMinor';
+
+/** `null` = automatic (whole units from 100, cents from 1, three significant digits below 1). */
+const DECIMAL_CHOICES: (number | null)[] = [
+  null,
+  ...Array.from({ length: MAX_AMOUNT_DECIMALS + 1 }, (_, i) => i),
+];
+
+function decimalsLabel(d: number | null): string {
+  if (d === null) return 'Auto';
+  return `${d} decimal${d === 1 ? '' : 's'}`;
+}
 
 export default function AssetTypesScreen() {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState<AssetType[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
   const [newCode, setNewCode] = useState('');
   const [newName, setNewName] = useState('');
   const [renameOpen, setRenameOpen] = useState(false);
-  const [renameId, setRenameId] = useState(null);
+  const [renameId, setRenameId] = useState<string | null>(null);
   const [renameCode, setRenameCode] = useState('');
   const [renameValue, setRenameValue] = useState('');
+  const [renameDecimals, setRenameDecimals] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
 
   const reload = useCallback(async () => {
@@ -58,10 +71,11 @@ export default function AssetTypesScreen() {
     }
   };
 
-  const openRename = (row) => {
+  const openRename = (row: AssetType) => {
     setRenameId(row.id);
     setRenameCode(row.code);
     setRenameValue(row.name);
+    setRenameDecimals(row.display_decimals);
     setRenameOpen(true);
   };
 
@@ -70,6 +84,7 @@ export default function AssetTypesScreen() {
     setBusy(true);
     try {
       await assetTypesRepo.updateAssetTypeName(renameId, renameValue);
+      await assetTypesRepo.updateAssetTypeDisplayDecimals(renameId, renameDecimals);
       setRenameOpen(false);
       setRenameId(null);
       await reload();
@@ -80,7 +95,7 @@ export default function AssetTypesScreen() {
     }
   };
 
-  const tryDelete = (id, code) => {
+  const tryDelete = (id: string, code: string) => {
     Alert.alert('Delete asset type', `Remove "${code}"? Only allowed if no transactions use it.`, [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -118,10 +133,11 @@ export default function AssetTypesScreen() {
             <View style={styles.cardMain}>
               <Text style={styles.cardCode}>{item.code}</Text>
               <Text style={styles.cardName}>{item.name}</Text>
+              <Text style={styles.cardMeta}>Shown with: {decimalsLabel(item.display_decimals)}</Text>
             </View>
             <View style={styles.cardActions}>
               <Pressable onPress={() => openRename(item)} hitSlop={10}>
-                <Text style={styles.link}>Rename</Text>
+                <Text style={styles.link}>Edit</Text>
               </Pressable>
               <Pressable onPress={() => tryDelete(item.id, item.code)} hitSlop={10}>
                 <Text style={styles.delete}>Delete</Text>
@@ -173,7 +189,7 @@ export default function AssetTypesScreen() {
       <Modal visible={renameOpen} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>Rename label</Text>
+            <Text style={styles.modalTitle}>Edit asset type</Text>
             <Text style={styles.fieldLabel}>Code (fixed)</Text>
             <Text style={styles.codeReadonly}>{renameCode}</Text>
             <Text style={styles.fieldLabel}>Display name</Text>
@@ -184,6 +200,34 @@ export default function AssetTypesScreen() {
               autoFocus
               placeholderTextColor={colors.placeholder}
             />
+            <Text style={styles.fieldLabel}>Decimals shown</Text>
+            <View style={styles.chipRow}>
+              {DECIMAL_CHOICES.map((d) => {
+                const on = renameDecimals === d;
+                return (
+                  <Pressable
+                    key={d ?? 'auto'}
+                    style={[styles.chip, on && styles.chipOn]}
+                    onPress={() => setRenameDecimals(d)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: on }}
+                    accessibilityLabel={decimalsLabel(d)}
+                  >
+                    {on ? (
+                      <ContourOnPrimaryText style={styles.chipTextOn}>
+                        {d === null ? 'Auto' : String(d)}
+                      </ContourOnPrimaryText>
+                    ) : (
+                      <Text style={styles.chipText}>{d === null ? 'Auto' : String(d)}</Text>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Text style={styles.hint}>
+              Rounds amounts in lists and totals only; editing a transaction shows the exact value.
+              Auto: whole units from 100, two decimals from 1, three significant digits below 1.
+            </Text>
             <View style={styles.modalActions}>
               <Pressable
                 onPress={() => {
@@ -236,6 +280,21 @@ function createStyles(c: AppColors) {
     cardMain: { marginBottom: 8 },
     cardCode: { fontSize: 16, fontFamily: font.bold, color: c.text },
     cardName: { fontSize: 14, color: c.textMuted, marginTop: 4 },
+    cardMeta: { fontSize: 13, color: c.textMuted, marginTop: 2 },
+    chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
+    chip: {
+      minWidth: 44,
+      minHeight: 36,
+      paddingHorizontal: 12,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: c.pillBg,
+    },
+    chipOn: { backgroundColor: c.primary },
+    chipText: { color: c.pillText },
+    chipTextOn: { fontFamily: font.semibold },
+    hint: { fontSize: 13, color: c.textMuted, marginTop: 8, lineHeight: 18 },
     cardActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 16 },
     link: { color: c.primary, fontFamily: font.semibold, fontSize: 14 },
     delete: { color: c.danger, fontSize: 14 },

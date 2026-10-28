@@ -10,10 +10,10 @@ Local-first personal finance app: **pockets** (budget segments), **multi-currenc
 
 | Item | Notes |
 |------|--------|
-| **Runtime** | Expo SDK `~54`, React Native `0.81`, React `19`, TypeScript `strict` |
+| **Runtime** | Expo SDK `~55`, React Native `0.83`, React `19`, TypeScript `strict` |
 | **Entry** | `index.ts` → `App.tsx` (fonts) → `AppBoot.tsx` (vault gate + main UI) |
 | **Architecture** | New Architecture enabled (`newArchEnabled: true` in `app.json`) |
-| **Implemented** | **Vault** (PBKDF2 + AES-GCM wrapped DEK, SQLCipher, lock on background). **Schema** migrations **`0001`–`0007`** (auto-applied on unlock). **Repositories:** `pockets`, `transactions`, `settings`, `assetTypes`, `categories`, `jar`, `jarAdvanced`, `statistics`. **UI:** Home (balances by currency, Jar shortcut), Pockets + pocket detail, **History** (collapsible multi-filter panel — Type / Asset / Pocket / **Category**, tap-to-toggle, summary chips when collapsed), **Statistics** (collapsible **settings panel** — Asset / Scope / **Category filter** / Time range — plus balance-over-time, pocket mix with a **negative-balance fallback**, **per-category income/expense breakdown**, and a fixed-position chart value readout), **Settings** (appearance, Jar toggles, archived pockets, **categories**, **encrypted backup**), asset-type catalog, **category catalog** (optional per-transaction tag), transaction editor. **Jar:** Record income, Distribute (basic or Advanced rules), Jar split screen, recent Jar transactions. **Advanced Jar:** hub + per-asset **visual editor** (Balance Chart, split preview bar, milestone knots). **`ModalSelectField`** everywhere including **multi-select** filter sheets (tap toggles a checkmark and keeps the sheet open; tapping "All" clears and closes). **Themes:** six accent palettes + dark mode; **unlock screen** uses cached appearance. **Support:** BTC donation address on Home. **Encrypted `.tarcak` backup** export/import. |
+| **Implemented** | **Vault** (PBKDF2 + AES-GCM wrapped DEK, SQLCipher, lock on background). **Schema** migrations **`0001`–`0008`** (auto-applied on unlock). **Repositories:** `pockets`, `transactions`, `settings`, `assetTypes`, `categories`, `jar`, `jarAdvanced`, `statistics`. **UI:** Home (balances by currency, Jar shortcut), Pockets + pocket detail, **History** (collapsible multi-filter panel — Type / Asset / Pocket / **Category**, tap-to-toggle, summary chips when collapsed), **Statistics** (collapsible **settings panel** — Asset / Scope / **Category filter** / Time range — plus balance-over-time, pocket mix with a **negative-balance fallback**, **per-category income/expense breakdown**, and a fixed-position chart value readout), **Settings** (appearance, Jar toggles, archived pockets, **screenshot block**, **categories**, **encrypted backup**), asset-type catalog, **category catalog** (optional per-transaction tag), transaction editor. **Jar:** Record income, Distribute (basic or Advanced rules), Jar split screen, recent Jar transactions. **Advanced Jar:** hub + per-asset **visual editor** (Balance Chart, split preview bar, milestone knots). **`ModalSelectField`** everywhere including **multi-select** filter sheets (tap toggles a checkmark and keeps the sheet open; tapping "All" clears and closes). **Themes:** six accent palettes + dark mode; **unlock screen** uses cached appearance. **Support:** BTC donation address on Home. **Encrypted `.tarcak` backup** export/import. |
 | **Still to add** | Polish (**editable** `occurred_at` in the transaction editor; pocket rename UX), automated tests beyond CI typecheck + `test:jar` checklist, optional FX / converted home total |
 
 ## Support / donations
@@ -49,9 +49,9 @@ Semantic colors (not raw hex in screens) come from **`useAppTheme()`** in [`src/
 | **Vault password** | Unlocks the app after restore (unchanged). |
 | **Backup password** | Encrypts the `.tarcak` file at rest (cloud, USB, email). |
 
-**Export:** flushes WAL (`PRAGMA wal_checkpoint(FULL)`), then reads the **on-disk SQLCipher-encrypted file directly** (raw encrypted bytes — not `serializeAsync`, which returns decrypted in-memory pages and was the root cause of the historic import bug), bundles vault metadata (salt, wrapped DEK, PBKDF2 iteration count), appearance, and a **contents manifest** (pockets, transactions, asset types, categories, Jar basic + Advanced rules, settings) → JSON → AES-GCM with the backup password → file `tarcak-backup-YYYY-MM-DD.tarcak` in cache, then **share** sheet ([`expo-sharing`](https://docs.expo.dev/versions/latest/sdk/sharing/)). While the share sheet is open, automatic **lock-on-background is suspended** (depth counter in `session.ts`) so the session stays alive. The whole SQLCipher file is copied as-is, so new tables (e.g. `categories`) are always included automatically — the contents manifest in [`backupFormat.ts`](src/security/backupFormat.ts) is just the human-readable description shown in Settings, not a per-table registration list.
+**Export:** flushes WAL (`PRAGMA wal_checkpoint(FULL)`), then reads the **on-disk SQLCipher-encrypted file directly** (raw encrypted bytes — not `serializeAsync`, which returns decrypted in-memory pages and was the root cause of the historic import bug), bundles vault metadata (salt, wrapped DEK, PBKDF2 iteration count), appearance, and a **contents manifest** (pockets, transactions, asset types, categories, Jar basic + Advanced rules, settings) → JSON → AES-GCM with the backup password (file format 2: the PBKDF2 iteration count sits in the GCM-authenticated header, so the default can rise without breaking old files; format 1 files still open) → file `tarcak-backup-YYYY-MM-DD.tarcak` in cache, then **share** sheet ([`expo-sharing`](https://docs.expo.dev/versions/latest/sdk/sharing/)). While the share sheet is open, automatic **lock-on-background is suspended** (depth counter in `session.ts`) so the session stays alive. The whole SQLCipher file is copied as-is, so new tables (e.g. `categories`) are always included automatically — the contents manifest in [`backupFormat.ts`](src/security/backupFormat.ts) is just the human-readable description shown in Settings, not a per-table registration list.
 
-**Import:** document picker ([`expo-document-picker`](https://docs.expo.dev/versions/latest/sdk/document-picker/)) with the same **lock suspension** (so choosing a file does not kick you to the password screen) → `content://` URIs are copied to cache first (Android) → decrypt while unlocked → replace DB file + SecureStore vault → record restore metadata ([`backupImportMeta.ts`](src/security/backupImportMeta.ts)) → lock session (user unlocks with **vault** password). **Destructive** on device: overwrites local data. After unlock, **Home** and **Settings** show a **”Restored from backup”** banner (backup created / imported timestamps) until dismissed. **Legacy recovery:** if the imported DB file is plain SQLite (created by an older build that used `serializeAsync`), `db/client.ts` automatically encrypts it in place with `PRAGMA rekey` on the first unlock — no user action needed.
+**Import:** document picker ([`expo-document-picker`](https://docs.expo.dev/versions/latest/sdk/document-picker/)) with the same **lock suspension** while the picker is open (so choosing a file does not kick you to the password screen; it ends before the password prompt) → `content://` URIs are copied to cache first (Android, deleted after reading) → decrypt and validate while unlocked → stage the new DB file next to the old one → move the old files aside, swap in the new DB + SecureStore vault (on failure the old files and vault keys are put back) → record restore metadata ([`backupImportMeta.ts`](src/security/backupImportMeta.ts)) → lock session (user unlocks with **vault** password). **Destructive** on device: overwrites local data. After unlock, **Home** and **Settings** show a **”Restored from backup”** banner (backup created / imported timestamps) until dismissed. **Legacy recovery:** if the imported DB file is plain SQLite (created by an older build that used `serializeAsync`), `db/client.ts` automatically encrypts it in place with `PRAGMA rekey` on the first unlock — no user action needed.
 
 Implementation: [`src/security/backup.ts`](src/security/backup.ts), [`src/security/backupCrypto.ts`](src/security/backupCrypto.ts), [`src/security/backupFormat.ts`](src/security/backupFormat.ts), [`src/security/backupImportMeta.ts`](src/security/backupImportMeta.ts), [`src/components/BackupPasswordModal.tsx`](src/components/BackupPasswordModal.tsx), [`src/components/BackupRestoredBanner.tsx`](src/components/BackupRestoredBanner.tsx). Imported directly from Settings (not the `security/index` barrel) so backup code does not load at cold start.
 
@@ -61,7 +61,7 @@ Implementation: [`src/security/backup.ts`](src/security/backup.ts), [`src/securi
 
 ## Upgrading from an older build
 
-Safe to install over an existing vault: on unlock, [`runPendingMigrations`](src/db/migrations/runner.ts) applies any of **`0001`–`0007`** not yet recorded in `schema_migrations`. No new migration is required for recent UI-only releases if you are already at version **7**.
+Safe to install over an existing vault: on unlock, [`runPendingMigrations`](src/db/migrations/runner.ts) applies any of **`0001`–`0008`** not yet recorded in `schema_migrations`. No new migration is required for recent UI-only releases if you are already at version **8**.
 
 | Migration | What changes |
 |-----------|----------------|
@@ -72,6 +72,7 @@ Safe to install over an existing vault: on unlock, [`runPendingMigrations`](src/
 | `0005` | `pockets.archived` |
 | `0006` | Advanced Jar tables |
 | `0007` | `categories` catalog + nullable `transactions.category_id` (FK, `ON DELETE SET NULL`) |
+| `0008` | nullable `asset_types.display_decimals` (0–8; null = automatic) |
 
 First unlock after a big jump may take a few seconds. Wrong vault password still fails before migrations run. See **Forgot password** if you need a clean slate.
 
@@ -257,6 +258,7 @@ Partial unique index: at most one row with `is_jar = 1`.
 | `id` | TEXT PK | UUID |
 | `code` | TEXT NOT NULL UNIQUE | Uppercase code stored on `transactions.currency` |
 | `name` | TEXT NOT NULL | Display label |
+| `display_decimals` | INTEGER, nullable, 0–8 | Decimals shown in lists and totals (migration `0008`); null = automatic: none from 100 units, two from 1, three significant digits below 1. Display only; edit fields show the exact amount |
 | `sort_index` | INTEGER NOT NULL | UI ordering |
 | `created_at` / `updated_at` | INTEGER NOT NULL | Unix ms |
 
@@ -394,6 +396,7 @@ src/
       0005_pockets_archived.ts
       0006_jar_advanced.ts
       0007_categories.ts
+      0008_asset_display_decimals.ts
       index.ts           # re-exports
     repositories/
       pockets.ts
@@ -441,8 +444,8 @@ src/
     JarAdvancedHub.tsx
     JarAdvancedAssetEditor.tsx
   utils/
-    amountMinor.ts         # parse/format; spaced thousands on integer part
-    formatMinor.ts
+    amountMinor.ts         # parse (comma or point decimals) / exact and rounded format
+    formatMinor.ts         # display rounding per asset (display_decimals or automatic)
     formatOccurredAt.ts
     pocketChartColors.ts   # stable per-pocket chart colors (theme-aware)
 AppBoot.tsx              # vault gate (themed via appearanceCache) + SafeAreaProvider + MainNavigator when unlocked

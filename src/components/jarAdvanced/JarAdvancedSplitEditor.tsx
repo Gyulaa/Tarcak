@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -7,7 +6,7 @@ import { font } from '../../theme/fonts';
 import type { AppColors } from '../../theme/palette';
 import {
   equalSplitPercents,
-  splitsSumValid,
+  splitsSumExact100,
   type SplitRow,
 } from '../../domain/jarAdvancedEditorTypes';
 
@@ -37,7 +36,7 @@ export function JarAdvancedSplitEditor({
 
   const sum = rows.reduce((a, r) => a + r.percent, 0);
   const sumOver = sum > 100.05;
-  const sumOk = splitsSumValid(rows); // 0 < sum <= 100
+  const sumOk = splitsSumExact100(rows);
 
   const updatePercent = (pocketId: string, text: string) => {
     const t = text.replace(',', '.');
@@ -143,6 +142,8 @@ export function JarAdvancedSplitEditor({
       </View>
       {sumOver ? (
         <Text style={styles.warn}>Total exceeds 100% — reduce before saving.</Text>
+      ) : !sumOk && !readOnly ? (
+        <Text style={styles.warn}>Total must be exactly 100% to save.</Text>
       ) : null}
     </View>
   );

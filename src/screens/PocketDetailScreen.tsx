@@ -1,7 +1,6 @@
-// @ts-nocheck
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useLayoutEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ContourOnPrimaryText } from '../components/ContourOnPrimaryText';
 import { PocketEditMenu, PocketEditPencilButton } from '../components/PocketEditMenu';
@@ -9,6 +8,8 @@ import { ScreenWithFooter } from '../components/ScreenWithFooter';
 import * as pocketsRepo from '../db/repositories/pockets';
 import * as settingsRepo from '../db/repositories/settings';
 import * as txRepo from '../db/repositories/transactions';
+import type { BalanceRow, LedgerTransaction } from '../domain/types';
+import type { RootStackScreenProps } from '../navigation/types';
 import { useLedgerStore } from '../stores/ledgerStore';
 import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
@@ -16,7 +17,7 @@ import type { AppColors } from '../theme/palette';
 import { formatMinorForDisplay } from '../utils/formatMinor';
 import { formatOccurredAt } from '../utils/formatOccurredAt';
 
-export default function PocketDetailScreen({ navigation, route }) {
+export default function PocketDetailScreen({ navigation, route }: RootStackScreenProps<'PocketDetail'>) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { pocketId } = route.params;
@@ -24,8 +25,8 @@ export default function PocketDetailScreen({ navigation, route }) {
   const [pocketName, setPocketName] = useState('');
   const [isJar, setIsJar] = useState(false);
   const [pocketArchived, setPocketArchived] = useState(false);
-  const [balances, setBalances] = useState([]);
-  const [txs, setTxs] = useState([]);
+  const [balances, setBalances] = useState<BalanceRow[]>([]);
+  const [txs, setTxs] = useState<LedgerTransaction[]>([]);
   const [txnCount, setTxnCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [jarFeaturesOn, setJarFeaturesOn] = useState(true);
@@ -48,6 +49,8 @@ export default function PocketDetailScreen({ navigation, route }) {
       setTxnCount(n);
       setBalances(b);
       setTxs(t);
+    } catch (e) {
+      Alert.alert('Could not load', e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }

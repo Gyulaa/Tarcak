@@ -7,7 +7,6 @@
 
 import { File, Paths } from 'expo-file-system';
 import * as FileSystem from 'expo-file-system/legacy';
-import * as SQLite from 'expo-sqlite';
 import { defaultDatabaseDirectory } from 'expo-sqlite';
 
 import { openMainDatabase } from '../db/client';
@@ -25,14 +24,23 @@ import {
   decryptBackupPayloadUtf8,
   encryptBackupPayloadUtf8,
 } from './backupCrypto';
-import { MAIN_DATABASE_NAME } from './constants';
-import { uint8ArrayToBase64 } from './encoding';
+import {
+  DATA_KEY_LENGTH_BYTES,
+  GCM_NONCE_LENGTH_BYTES,
+  MAIN_DATABASE_NAME,
+  PASSWORD_SALT_LENGTH_BYTES,
+  PBKDF2_ITERATIONS_MAX,
+  PBKDF2_ITERATIONS_MIN,
+  WRAPPED_DEK_FORMAT_V1,
+} from './constants';
+import { base64ToUint8Array, uint8ArrayToBase64 } from './encoding';
 import { VaultCryptoError } from './errors';
 import { lockVaultSession } from './lockdown';
 import {
   readVaultSnapshotForBackup,
   restoreVaultFromSnapshot,
 } from './keystore';
+import type { BackupVaultSnapshot } from './backupFormat';
 import { assertPasswordAcceptable } from './passwordPolicy';
 
 const BACKUP_EXTENSION = '.tarcak';
@@ -99,9 +107,44 @@ async function resolveReadableBackupUri(fileUri: string): Promise<string> {
 
 async function readBackupFileBytes(fileUri: string): Promise<Uint8Array> {
   const readableUri = await resolveReadableBackupUri(fileUri);
-  const infile = new File(readableUri);
-  const b64 = await infile.base64();
-  return backupBase64ToBytes(b64);
+  try {
+    const infile = new File(readableUri);
+    const b64 = await infile.base64();
+    return backupBase64ToBytes(b64);
+  } finally {
+    if (readableUri !== fileUri) {
+      await FileSystem.deleteAsync(readableUri, { idempotent: true }).catch(() => {});
+    }
+  }
+}
+
+/** Checks the vault metadata before anything on the device is replaced, so a bad file fails early. */
+function assertValidVaultSnapshot(vault: BackupVaultSnapshot): void {
+  const iterations = Number(vault.pbkdf2Iterations);
+  if (
+    !Number.isInteger(iterations) ||
+    iterations < PBKDF2_ITERATIONS_MIN ||
+    iterations > PBKDF2_ITERATIONS_MAX
+  ) {
+    throw new VaultCryptoError('Backup has an invalid key-derivation setting.');
+  }
+  let salt: Uint8Array;
+  let wrapped: Uint8Array;
+  try {
+    salt = base64ToUint8Array(vault.passwordSaltB64);
+    wrapped = base64ToUint8Array(vault.wrappedDekB64);
+  } catch {
+    throw new VaultCryptoError('Backup vault metadata is not valid Base64.');
+  }
+  if (salt.length !== PASSWORD_SALT_LENGTH_BYTES) {
+    throw new VaultCryptoError('Backup vault salt has the wrong length.');
+  }
+  if (
+    wrapped.length !== 1 + GCM_NONCE_LENGTH_BYTES + DATA_KEY_LENGTH_BYTES + 16 ||
+    wrapped[0] !== WRAPPED_DEK_FORMAT_V1
+  ) {
+    throw new VaultCryptoError('Backup vault key has an unknown format.');
+  }
 }
 
 function parsePayloadV1(json: string): BackupPayloadV1 {
@@ -124,7 +167,26 @@ function parsePayloadV1(json: string): BackupPayloadV1 {
   if (!p.databaseB64 || typeof p.databaseB64 !== 'string') {
     throw new VaultCryptoError('Backup is missing database data.');
   }
+  assertValidVaultSnapshot(p.vault);
   return p;
+}
+
+/**
+ * Earlier exports and the files copied in by the import picker are encrypted but have no reason to
+ * stay in the cache. Best effort: a failed cleanup must not block the export.
+ */
+async function purgeBackupCacheCopies(): Promise<void> {
+  const cache = FileSystem.cacheDirectory;
+  if (!cache) {
+    return;
+  }
+  const names = await FileSystem.readDirectoryAsync(cache);
+  await Promise.all([
+    ...names
+      .filter((n) => n.startsWith('tarcak-backup-') || n.startsWith('tarcak-import-'))
+      .map((n) => FileSystem.deleteAsync(`${cache}${n}`, { idempotent: true })),
+    FileSystem.deleteAsync(`${cache}DocumentPicker/`, { idempotent: true }),
+  ]);
 }
 
 /**
@@ -135,8 +197,14 @@ export async function exportEncryptedBackup(backupPassword: string): Promise<str
 
   const db = await openMainDatabase();
 
-  // Flush any WAL data into the main file before reading it (no-op for DELETE journal mode).
-  await db.execAsync('PRAGMA wal_checkpoint(FULL)');
+  // Flush any WAL data into the main file before reading it (no-op for DELETE journal mode, which
+  // reports log = checkpointed = -1). A busy or partial checkpoint would leave recent writes out.
+  const checkpoint = await db.getFirstAsync<{ busy: number; log: number; checkpointed: number }>(
+    'PRAGMA wal_checkpoint(FULL)'
+  );
+  if (checkpoint && (checkpoint.busy !== 0 || checkpoint.log !== checkpoint.checkpointed)) {
+    throw new VaultCryptoError('Could not flush recent changes to the database file. Try the export again.');
+  }
 
   const [dbBytes, vault, appearance] = await Promise.all([
     readMainDatabaseBytes(),
@@ -162,13 +230,13 @@ export async function exportEncryptedBackup(backupPassword: string): Promise<str
   const payloadUtf8 = new TextEncoder().encode(JSON.stringify(payload));
   const encrypted = await encryptBackupPayloadUtf8(backupPassword, payloadUtf8);
 
+  await purgeBackupCacheCopies().catch(() => {});
   const outfile = new File(Paths.cache, buildExportFilename());
   outfile.write(backupBytesToBase64(encrypted), { encoding: 'base64' });
   return outfile.uri;
 }
 
-async function writeDatabaseBytesToDisk(dbBytes: Uint8Array): Promise<void> {
-  const uri = buildMainDatabaseFileUri();
+async function writeDatabaseBytesToDisk(uri: string, dbBytes: Uint8Array): Promise<void> {
   const parent = parentDirectoryUri(uri);
   try {
     await FileSystem.makeDirectoryAsync(parent, { intermediates: true });
@@ -180,10 +248,35 @@ async function writeDatabaseBytesToDisk(dbBytes: Uint8Array): Promise<void> {
   });
 }
 
+/** The database file plus the SQLite side files that must never be paired with a different main file. */
+const DATABASE_FILE_SUFFIXES = ['', '-wal', '-shm', '-journal'] as const;
+const STAGED_IMPORT_SUFFIX = '.import';
+const PRE_IMPORT_SUFFIX = '.pre-import';
+
+/** Moves the current database files aside, recording each move in `moved` (even if a later one fails). */
+async function moveDatabaseFilesAside(
+  dbUri: string,
+  moved: { from: string; to: string }[]
+): Promise<void> {
+  for (const suffix of DATABASE_FILE_SUFFIXES) {
+    const from = `${dbUri}${suffix}`;
+    const info = await FileSystem.getInfoAsync(from);
+    if (!info.exists) {
+      continue;
+    }
+    const to = `${dbUri}${PRE_IMPORT_SUFFIX}${suffix}`;
+    await FileSystem.deleteAsync(to, { idempotent: true });
+    await FileSystem.moveAsync({ from, to });
+    moved.push({ from, to });
+  }
+}
+
 /**
  * Replace local vault + database from an encrypted backup file.
- * Decrypts while the session is still open; locks afterward so the user re-unlocks with the
- * vault password from the backup (unchanged).
+ * Decrypts and validates while the session is still open, stages the new database next to the old
+ * one, then swaps them. If the swap fails, the previous database and vault metadata are put back, so
+ * a failed import never leaves the device without data. Locks the session; the user re-unlocks with
+ * the vault password from the backup (unchanged).
  */
 export async function importEncryptedBackup(fileUri: string, backupPassword: string): Promise<void> {
   assertPasswordAcceptable(backupPassword);
@@ -198,16 +291,41 @@ export async function importEncryptedBackup(fileUri: string, backupPassword: str
     throw new VaultCryptoError('Database section in backup is empty or corrupt.');
   }
 
-  await lockVaultSession();
-
+  const dbUri = buildMainDatabaseFileUri();
+  const stagedUri = `${dbUri}${STAGED_IMPORT_SUFFIX}`;
   try {
-    await SQLite.deleteDatabaseAsync(MAIN_DATABASE_NAME);
-  } catch {
-    /* missing file */
+    await writeDatabaseBytesToDisk(stagedUri, dbBytes);
+  } catch (e) {
+    await FileSystem.deleteAsync(stagedUri, { idempotent: true }).catch(() => {});
+    throw e;
   }
 
-  await restoreVaultFromSnapshot(payload.vault);
-  await writeDatabaseBytesToDisk(dbBytes);
+  const previousVault = await readVaultSnapshotForBackup().catch(() => null);
+
+  await lockVaultSession();
+
+  const movedAside: { from: string; to: string }[] = [];
+  try {
+    await moveDatabaseFilesAside(dbUri, movedAside);
+    await FileSystem.moveAsync({ from: stagedUri, to: dbUri });
+    await restoreVaultFromSnapshot(payload.vault);
+  } catch (e) {
+    await FileSystem.deleteAsync(stagedUri, { idempotent: true }).catch(() => {});
+    for (const suffix of DATABASE_FILE_SUFFIXES) {
+      await FileSystem.deleteAsync(`${dbUri}${suffix}`, { idempotent: true }).catch(() => {});
+    }
+    for (const m of movedAside) {
+      await FileSystem.moveAsync({ from: m.to, to: m.from }).catch(() => {});
+    }
+    if (previousVault) {
+      await restoreVaultFromSnapshot(previousVault).catch(() => {});
+    }
+    throw e;
+  }
+
+  for (const m of movedAside) {
+    await FileSystem.deleteAsync(m.to, { idempotent: true }).catch(() => {});
+  }
 
   if (payload.appearance) {
     await writeAppearanceCache({

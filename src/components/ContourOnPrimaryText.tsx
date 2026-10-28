@@ -1,4 +1,3 @@
-// @ts-nocheck
 import type { ReactNode } from 'react';
 import { Platform, Text, type StyleProp, type TextStyle } from 'react-native';
 

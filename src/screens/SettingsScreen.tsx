@@ -1,19 +1,22 @@
-// @ts-nocheck
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
 
 import { BackupPasswordModal } from '../components/BackupPasswordModal';
 import { BackupRestoredBanner } from '../components/BackupRestoredBanner';
+import { ChangePasswordModal } from '../components/ChangePasswordModal';
 import { ModalSelectField } from '../components/ModalSelectField';
 import { ScreenWithFooter } from '../components/ScreenWithFooter';
 import * as assetTypesRepo from '../db/repositories/assetTypes';
 import * as settingsRepo from '../db/repositories/settings';
+import type { AssetType } from '../domain/types';
 import { useLockVault } from '../navigation/LockVaultContext';
+import type { RootStackScreenProps } from '../navigation/types';
 import {
+  changeVaultPassword,
   resumeVaultLockOnBackground,
   suspendVaultLockOnBackground,
   VaultCryptoError,
@@ -29,20 +32,25 @@ import { COLOR_THEME_META, COLOR_THEME_ORDER, normalizeColorThemeId } from '../t
 import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
+import { applyScreenCaptureBlock } from '../utils/screenCapture';
 
-export default function SettingsScreen() {
-  const navigation = useNavigation();
+type BackupModalState = { mode: 'export' } | { mode: 'import'; fileUri: string };
+
+export default function SettingsScreen({ navigation }: RootStackScreenProps<'Settings'>) {
   const { colors, isDark, colorThemeId, setDarkMode, setColorTheme } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const lockVault = useLockVault();
-  const [assetTypes, setAssetTypes] = useState([]);
+  const [assetTypes, setAssetTypes] = useState<AssetType[]>([]);
   const [defaultCode, setDefaultCode] = useState('HUF');
   const [loaded, setLoaded] = useState(false);
   const [jarEnabled, setJarEnabled] = useState(true);
   const [advancedJarEnabled, setAdvancedJarEnabled] = useState(false);
   const [showArchivedPockets, setShowArchivedPockets] = useState(false);
-  const [backupModal, setBackupModal] = useState(null);
+  const [blockScreenCapture, setBlockScreenCapture] = useState(false);
+  const [backupModal, setBackupModal] = useState<BackupModalState | null>(null);
   const [backupBusy, setBackupBusy] = useState(false);
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [passwordBusy, setPasswordBusy] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -54,12 +62,13 @@ export default function SettingsScreen() {
         setJarEnabled(await settingsRepo.getJarEnabled());
         setAdvancedJarEnabled(await settingsRepo.getAdvancedJarEnabled());
         setShowArchivedPockets(await settingsRepo.getShowArchivedPockets());
+        setBlockScreenCapture(await settingsRepo.getBlockScreenCapture());
         setLoaded(true);
       })();
     }, [])
   );
 
-  const onJarToggle = async (value) => {
+  const onJarToggle = async (value: boolean) => {
     try {
       await settingsRepo.setJarEnabled(value);
       setJarEnabled(value);
@@ -68,7 +77,7 @@ export default function SettingsScreen() {
     }
   };
 
-  const onAdvancedJarToggle = async (value) => {
+  const onAdvancedJarToggle = async (value: boolean) => {
     try {
       await settingsRepo.setAdvancedJarEnabled(value);
       setAdvancedJarEnabled(value);
@@ -77,7 +86,7 @@ export default function SettingsScreen() {
     }
   };
 
-  const onShowArchivedToggle = async (value) => {
+  const onShowArchivedToggle = async (value: boolean) => {
     try {
       await settingsRepo.setShowArchivedPockets(value);
       setShowArchivedPockets(value);
@@ -86,7 +95,17 @@ export default function SettingsScreen() {
     }
   };
 
-  const onDarkToggle = async (value) => {
+  const onBlockScreenCaptureToggle = async (value: boolean) => {
+    try {
+      await settingsRepo.setBlockScreenCapture(value);
+      await applyScreenCaptureBlock(value);
+      setBlockScreenCapture(value);
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const onDarkToggle = async (value: boolean) => {
     try {
       await setDarkMode(value);
     } catch (e) {
@@ -124,7 +143,7 @@ export default function SettingsScreen() {
     [assetTypes]
   );
 
-  const onPickDefaultAsset = async (code) => {
+  const onPickDefaultAsset = async (code: string) => {
     try {
       await settingsRepo.setDefaultCurrency(code);
       setDefaultCode(code);
@@ -135,10 +154,10 @@ export default function SettingsScreen() {
 
   const closeBackupModal = () => {
     setBackupModal(null);
-    resumeVaultLockOnBackground();
   };
 
-  const runExportBackup = async (backupPassword) => {
+  /** Lock-on-background stays suspended until the share sheet returns, then resumes in `finally`. */
+  const runExportBackup = async (backupPassword: string) => {
     setBackupBusy(true);
     suspendVaultLockOnBackground();
     try {
@@ -175,6 +194,8 @@ export default function SettingsScreen() {
       Alert.alert('Not on web', 'Import and export backups from the Android or iOS app.');
       return;
     }
+    // Suspended only while the system picker is open; the password modal that follows must not
+    // keep the vault unlocked if the user leaves the app.
     suspendVaultLockOnBackground();
     try {
       const picked = await DocumentPicker.getDocumentAsync({
@@ -182,7 +203,6 @@ export default function SettingsScreen() {
         copyToCacheDirectory: true,
       });
       if (picked.canceled || !picked.assets?.[0]?.uri) {
-        resumeVaultLockOnBackground();
         return;
       }
       const name = picked.assets[0].name ?? '';
@@ -194,13 +214,15 @@ export default function SettingsScreen() {
       }
       setBackupModal({ mode: 'import', fileUri: picked.assets[0].uri });
     } catch (e) {
-      resumeVaultLockOnBackground();
       Alert.alert('Could not open file', e instanceof Error ? e.message : String(e));
+    } finally {
+      resumeVaultLockOnBackground();
     }
   };
 
-  const runImportBackup = (backupPassword) => {
+  const runImportBackup = (backupPassword: string) => {
     if (!backupModal || backupModal.mode !== 'import') return;
+    const { fileUri } = backupModal;
     Alert.alert(
       'Replace all data on this device?',
       'Importing replaces your vault and database with the backup. This cannot be undone unless you have another copy.',
@@ -209,13 +231,13 @@ export default function SettingsScreen() {
         {
           text: 'Import',
           style: 'destructive',
-          onPress: () => void doImportBackup(backupPassword, backupModal.fileUri),
+          onPress: () => void doImportBackup(backupPassword, fileUri),
         },
       ]
     );
   };
 
-  const doImportBackup = async (backupPassword, fileUri) => {
+  const doImportBackup = async (backupPassword: string, fileUri: string) => {
     setBackupBusy(true);
     suspendVaultLockOnBackground();
     try {
@@ -239,6 +261,29 @@ export default function SettingsScreen() {
     } finally {
       resumeVaultLockOnBackground();
       setBackupBusy(false);
+    }
+  };
+
+  const runChangePassword = async (currentPassword: string, newPassword: string) => {
+    setPasswordBusy(true);
+    try {
+      await changeVaultPassword(currentPassword, newPassword);
+      setPasswordModalOpen(false);
+      Alert.alert(
+        'Password changed',
+        'Use the new password from the next unlock. Backup files you exported earlier still open the vault with the password you had when you exported them.'
+      );
+    } catch (e) {
+      Alert.alert(
+        'Could not change password',
+        e instanceof WrongVaultPasswordError
+          ? 'The current password is incorrect.'
+          : e instanceof Error
+            ? e.message
+            : String(e)
+      );
+    } finally {
+      setPasswordBusy(false);
     }
   };
 
@@ -380,6 +425,26 @@ export default function SettingsScreen() {
 
       <View style={styles.divider} />
 
+      <Text style={styles.label}>Privacy</Text>
+      <View style={[styles.switchRow, Platform.OS === 'web' && styles.switchRowDim]}>
+        <View style={styles.switchTextCol}>
+          <Text style={styles.switchTitle}>Block screenshots</Text>
+          <Text style={styles.switchHint}>
+            Blocks screenshots and screen recording, and hides balances in the recent-apps preview.
+            Off by default.
+          </Text>
+        </View>
+        <Switch
+          value={blockScreenCapture}
+          onValueChange={(v) => void onBlockScreenCaptureToggle(v)}
+          disabled={!loaded || Platform.OS === 'web'}
+          trackColor={{ false: colors.switchTrackOff, true: colors.switchTrackOn }}
+          thumbColor={blockScreenCapture ? colors.switchThumbOn : colors.switchThumbOff}
+        />
+      </View>
+
+      <View style={styles.divider} />
+
       <Text style={styles.label}>Backup & restore</Text>
       <Text style={styles.backupHint}>
         Export creates an encrypted {BACKUP_EXTENSION} file with your full vault:{' '}
@@ -409,10 +474,25 @@ export default function SettingsScreen() {
 
       <View style={styles.divider} />
 
+      <Pressable
+        style={styles.secondaryBtn}
+        onPress={() => setPasswordModalOpen(true)}
+        disabled={!loaded}
+      >
+        <Text style={styles.secondaryBtnText}>Change vault password…</Text>
+      </Pressable>
+
       <Pressable style={styles.lockRow} onPress={() => void lockVault()}>
         <Text style={styles.lockText}>Lock vault</Text>
         <Text style={styles.lockHint}>Closes the database and clears keys from memory.</Text>
       </Pressable>
+
+      <ChangePasswordModal
+        visible={passwordModalOpen}
+        busy={passwordBusy}
+        onCancel={() => !passwordBusy && setPasswordModalOpen(false)}
+        onSubmit={runChangePassword}
+      />
 
       <BackupPasswordModal
         visible={backupModal != null}
@@ -473,7 +553,7 @@ function createStyles(c: AppColors) {
     switchHint: { fontSize: 13, color: c.textMuted, lineHeight: 19 },
     switchRowDim: { opacity: 0.55 },
     secondaryBtnDim: { opacity: 0.45 },
-    lockRow: { paddingVertical: 8 },
+    lockRow: { paddingVertical: 8, marginTop: 16 },
     lockText: { fontSize: 17, fontFamily: font.semibold, color: c.danger },
     lockHint: { color: c.textMuted, marginTop: 6, fontSize: 13 },
     backupHint: { fontSize: 13, color: c.textMuted, lineHeight: 19, marginBottom: 12 },

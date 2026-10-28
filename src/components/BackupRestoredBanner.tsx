@@ -1,9 +1,9 @@
-// @ts-nocheck
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 
 import {
+  type BackupRestoreInfo,
   clearBackupRestoreInfo,
   getBackupRestoreInfo,
 } from '../security/backupImportMeta';
@@ -29,7 +29,7 @@ type Props = {
 export function BackupRestoredBanner({ compact = false }: Props) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, compact), [colors, compact]);
-  const [info, setInfo] = useState(null);
+  const [info, setInfo] = useState<BackupRestoreInfo | null>(null);
 
   const reload = useCallback(() => {
     void getBackupRestoreInfo().then(setInfo);

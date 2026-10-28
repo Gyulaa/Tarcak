@@ -33,12 +33,12 @@ const terracottaLight: AppColors = {
   textSecondary: '#333333',
   textMuted: '#666666',
   /** Truer orange (less brick/red) while still readable with white labels. */
-  primary: '#d45a12',
+  primary: '#c35311',
   onPrimary: '#ffffff',
   danger: '#b00020',
   success: '#2e7d32',
   chipBg: '#fff3e8',
-  chipText: '#d45a12',
+  chipText: '#a34a0f',
   jarSoftBg: '#fff8f2',
   jarSoftBorder: '#f5d4bc',
   jarHint: '#a34a0f',
@@ -52,21 +52,21 @@ const terracottaLight: AppColors = {
   inputBorder: '#dddddd',
   inputText: '#111111',
   modalOverlay: 'rgba(0,0,0,0.4)',
-  placeholder: '#aaaaaa',
-  shadowJar: '#d45a12',
+  placeholder: '#6e6e6e',
+  shadowJar: '#c35311',
   barTrack: '#eeeeee',
   switchTrackOff: '#dddddd',
   switchTrackOn: '#f0b896',
   switchThumbOff: '#f4f4f4',
-  switchThumbOn: '#d45a12',
+  switchThumbOn: '#c35311',
   pillBg: '#e8e8e8',
   pillText: '#333333',
   pocketPickBg: '#f4f4f4',
   pocketPickBgSelected: '#fff3e8',
   pocketPickBorder: '#e0e0e0',
-  pocketPickBorderSelected: '#d45a12',
+  pocketPickBorderSelected: '#c35311',
   pocketPickText: '#111111',
-  pocketPickTextSelected: '#d45a12',
+  pocketPickTextSelected: '#a34a0f',
 };
 
 const terracottaDark: AppColors = {
@@ -79,7 +79,7 @@ const terracottaDark: AppColors = {
   textSecondary: '#d0d0d0',
   textMuted: '#909090',
   primary: '#e8702e',
-  onPrimary: '#ffffff',
+  onPrimary: '#0a0a0a',
   danger: '#ff8a80',
   success: '#81c784',
   chipBg: '#2c1e12',
@@ -97,7 +97,7 @@ const terracottaDark: AppColors = {
   inputBorder: '#3a3a3a',
   inputText: '#f0f0f0',
   modalOverlay: 'rgba(0,0,0,0.65)',
-  placeholder: '#777777',
+  placeholder: '#8f8f8f',
   shadowJar: '#e8702e',
   barTrack: '#2a2a2a',
   switchTrackOff: '#444444',
@@ -134,7 +134,7 @@ const oceanLight = pickLight(terracottaLight, {
   switchTrackOn: '#8cccd0',
   switchThumbOn: '#0f5f60',
   pocketPickBorderSelected: '#0f5f60',
-  pocketPickTextSelected: '#4a9fa0',
+  pocketPickTextSelected: '#0f5f60',
 });
 
 const oceanDark = pickDark(terracottaDark, {
@@ -153,18 +153,18 @@ const oceanDark = pickDark(terracottaDark, {
 });
 
 const forestLight = pickLight(terracottaLight, {
-  primary: '#2f8f4a',
+  primary: '#2c8646',
   chipBg: '#ecf8ef',
-  chipText: '#2f8f4a',
+  chipText: '#1e6b34',
   jarSoftBg: '#f0faf3',
   jarSoftBorder: '#b8e6c8',
   jarHint: '#1e6b34',
   jarBannerTitle: '#268040',
-  shadowJar: '#2f8f4a',
+  shadowJar: '#2c8646',
   switchTrackOn: '#a8e0b8',
-  switchThumbOn: '#2f8f4a',
-  pocketPickBorderSelected: '#2f8f4a',
-  pocketPickTextSelected: '#5ccc7a',
+  switchThumbOn: '#2c8646',
+  pocketPickBorderSelected: '#2c8646',
+  pocketPickTextSelected: '#1e6b34',
 });
 
 const forestDark = pickDark(terracottaDark, {
@@ -194,7 +194,7 @@ const slateLight = pickLight(terracottaLight, {
   switchTrackOn: '#a8b3cc',
   switchThumbOn: '#3d4a63',
   pocketPickBorderSelected: '#3d4a63',
-  pocketPickTextSelected: '#6b7c9e',
+  pocketPickTextSelected: '#3d4a63',
 });
 
 const slateDark = pickDark(terracottaDark, {
@@ -225,7 +225,7 @@ const redLight = pickLight(terracottaLight, {
   switchTrackOn: '#f0a8a8',
   switchThumbOn: '#b71d1d',
   pocketPickBorderSelected: '#b71d1d',
-  pocketPickTextSelected: '#e87070',
+  pocketPickTextSelected: '#b71d1d',
 });
 
 const redDark = pickDark(terracottaDark, {
@@ -247,18 +247,18 @@ const redDark = pickDark(terracottaDark, {
  * “Yellow” palette: deep gold/amber fills so white button text stays readable (pure yellow fails WCAG).
  */
 const yellowLight = pickLight(terracottaLight, {
-  primary: '#b8890a',
+  primary: '#956f08',
   chipBg: '#fffbeb',
-  chipText: '#b8890a',
+  chipText: '#8a6808',
   jarSoftBg: '#fffbf0',
   jarSoftBorder: '#f0e0a8',
   jarHint: '#8a6808',
-  jarBannerTitle: '#9a7409',
-  shadowJar: '#b8890a',
+  jarBannerTitle: '#8a6808',
+  shadowJar: '#956f08',
   switchTrackOn: '#e8d078',
-  switchThumbOn: '#b8890a',
-  pocketPickBorderSelected: '#b8890a',
-  pocketPickTextSelected: '#d4b040',
+  switchThumbOn: '#956f08',
+  pocketPickBorderSelected: '#956f08',
+  pocketPickTextSelected: '#8a6808',
 });
 
 const yellowDark = pickDark(terracottaDark, {

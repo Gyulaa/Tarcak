@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useMemo, useState } from 'react';
 import {
@@ -19,6 +18,8 @@ import * as jarRepo from '../db/repositories/jar';
 import * as pocketsRepo from '../db/repositories/pockets';
 import * as settingsRepo from '../db/repositories/settings';
 import * as txRepo from '../db/repositories/transactions';
+import type { BalanceRow, LedgerTransaction } from '../domain/types';
+import type { RootStackScreenProps } from '../navigation/types';
 import { useLedgerStore } from '../stores/ledgerStore';
 import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
@@ -29,13 +30,13 @@ import { formatOccurredAt } from '../utils/formatOccurredAt';
 const JAR_TX_PREVIEW_COUNT = 5;
 const JAR_TX_FETCH_LIMIT = 200;
 
-export default function JarScreen({ navigation }) {
+export default function JarScreen({ navigation }: RootStackScreenProps<'Jar'>) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createJarStyles(colors), [colors]);
   const refreshLedger = useLedgerStore((s) => s.refresh);
   const [jarName, setJarName] = useState('Jar');
-  const [jarId, setJarId] = useState(null);
-  const [balances, setBalances] = useState([]);
+  const [jarId, setJarId] = useState<string | null>(null);
+  const [balances, setBalances] = useState<BalanceRow[]>([]);
   const [ruleCount, setRuleCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -43,8 +44,8 @@ export default function JarScreen({ navigation }) {
   const [jarFeatureOn, setJarFeatureOn] = useState(true);
   const [advancedJarOn, setAdvancedJarOn] = useState(false);
   const [advancedAssetCount, setAdvancedAssetCount] = useState(0);
-  const [advancedCurrencySet, setAdvancedCurrencySet] = useState(() => new Set());
-  const [jarTransactions, setJarTransactions] = useState([]);
+  const [advancedCurrencySet, setAdvancedCurrencySet] = useState(() => new Set<string>());
+  const [jarTransactions, setJarTransactions] = useState<LedgerTransaction[]>([]);
   const [jarTxShowAll, setJarTxShowAll] = useState(false);
 
   const load = useCallback(async () => {
@@ -75,9 +76,11 @@ export default function JarScreen({ navigation }) {
         jarRepo.listJarDistributionRules(),
         txRepo.listTransactions({ pocketId: jar.id, limit: JAR_TX_FETCH_LIMIT }),
       ]);
-      setBalances(b.filter((x) => x.balance_minor > 0));
+      setBalances(b.filter((x) => x.balance_minor > 0n));
       setRuleCount(rules.length);
       setJarTransactions(txs);
+    } catch (e) {
+      Alert.alert('Could not load', e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
@@ -90,7 +93,7 @@ export default function JarScreen({ navigation }) {
     }, [load, refreshLedger])
   );
 
-  const runDistribute = async (currency) => {
+  const runDistribute = async (currency: string) => {
     setBusy(true);
     try {
       const n = await jarRepo.distributeJarCurrency({ currency });

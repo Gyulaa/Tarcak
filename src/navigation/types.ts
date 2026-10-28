@@ -1,3 +1,5 @@
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+
 export type RootStackParamList = {
   Home: undefined;
   Pockets: undefined;
@@ -19,3 +21,8 @@ export type RootStackParamList = {
   JarAdvanced: undefined;
   JarAdvancedAssetEditor: { currency: string };
 };
+
+export type RootStackScreenProps<T extends keyof RootStackParamList> = NativeStackScreenProps<
+  RootStackParamList,
+  T
+>;

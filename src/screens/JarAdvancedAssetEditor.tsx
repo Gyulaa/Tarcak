@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useMemo, useState } from 'react';
 import {
@@ -22,14 +21,18 @@ import { JarAdvancedBalanceChart } from '../components/jarAdvanced/JarAdvancedBa
 import { ScreenWithFooter } from '../components/ScreenWithFooter';
 import { effectiveSplitRowsAtBalance, suggestMilestoneBalance } from '../domain/jarAdvancedChartModel';
 import {
-  splitsSumExact100,
   splitsSumValid,
+  type EditorKnotId,
+  type EditorMilestone,
+  type EditorSelection,
   type SplitRow,
 } from '../domain/jarAdvancedEditorTypes';
 import { validateEditorForSave } from '../domain/jarAdvancedEditorSave';
 import * as jarAdvancedRepo from '../db/repositories/jarAdvanced';
 import * as jarRepo from '../db/repositories/jar';
 import * as pocketsRepo from '../db/repositories/pockets';
+import type { Pocket } from '../domain/types';
+import type { RootStackScreenProps } from '../navigation/types';
 import { useAppTheme } from '../theme/ThemeContext';
 import { font } from '../theme/fonts';
 import type { AppColors } from '../theme/palette';
@@ -39,27 +42,30 @@ import {
 } from '../utils/amountMinor';
 import { formatMinorForDisplay } from '../utils/formatMinor';
 
-function parseCeilingMinorString(raw) {
-  const t = String(raw).trim().replace(/\s/g, '').replace(/,/g, '');
-  if (t === '' || /^0+(\.0*)?$/.test(t)) {
+function parseCeilingMinorString(raw: string): number {
+  const t = raw.replace(/\s/g, '');
+  if (t === '' || /^0+([.,]0*)?$/.test(t)) {
     return 0;
   }
   return parseAmountStringToMinor(t);
 }
 
-export default function JarAdvancedAssetEditor({ navigation, route }) {
+export default function JarAdvancedAssetEditor({
+  navigation,
+  route,
+}: RootStackScreenProps<'JarAdvancedAssetEditor'>) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createEditorStyles(colors), [colors]);
   const currency = route.params?.currency?.trim().toUpperCase() ?? '';
 
   const [ceilingStr, setCeilingStr] = useState('0');
-  const [defaultSplits, setDefaultSplits] = useState([]);
-  const [milestones, setMilestones] = useState([]);
-  const [available, setAvailable] = useState([]);
-  const [pocketById, setPocketById] = useState(() => new Map());
-  const [selection, setSelection] = useState({ kind: 'edit', knotId: 'default' });
+  const [defaultSplits, setDefaultSplits] = useState<SplitRow[]>([]);
+  const [milestones, setMilestones] = useState<EditorMilestone[]>([]);
+  const [available, setAvailable] = useState<Pocket[]>([]);
+  const [pocketById, setPocketById] = useState(() => new Map<string, string>());
+  const [selection, setSelection] = useState<EditorSelection>({ kind: 'edit', knotId: 'default' });
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [pickerTarget, setPickerTarget] = useState(null);
+  const [pickerTarget, setPickerTarget] = useState<EditorKnotId | null>(null);
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
@@ -177,7 +183,7 @@ export default function JarAdvancedAssetEditor({ navigation, route }) {
   };
 
   const idsInCurrentEdit = useMemo(() => {
-    if (selection.kind !== 'edit') return new Set();
+    if (selection.kind !== 'edit') return new Set<string>();
     if (selection.knotId === 'default') {
       return new Set(defaultSplits.map((r) => r.pocketId));
     }
@@ -190,7 +196,7 @@ export default function JarAdvancedAssetEditor({ navigation, route }) {
     [available, idsInCurrentEdit]
   );
 
-  const addPocketToCurrent = (p) => {
+  const addPocketToCurrent = (p: Pocket) => {
     if (selection.kind !== 'edit') return;
     const row = { pocketId: p.id, name: p.name, percent: 0 };
     if (selection.knotId === 'default') {
@@ -207,7 +213,7 @@ export default function JarAdvancedAssetEditor({ navigation, route }) {
     setPickerOpen(false);
   };
 
-  const updateCurrentSplits = (rows) => {
+  const updateCurrentSplits = (rows: SplitRow[]) => {
     if (selection.kind !== 'edit') return;
     if (selection.knotId === 'default') {
       setDefaultSplits(rows);
@@ -265,7 +271,7 @@ export default function JarAdvancedAssetEditor({ navigation, route }) {
     ]);
   };
 
-  const doSave = async (validated) => {
+  const doSave = async (validated: { payload: jarAdvancedRepo.JarAdvancedAssetPayload }) => {
     setBusy(true);
     try {
       await jarAdvancedRepo.saveJarAdvancedAsset(validated.payload);
@@ -303,20 +309,6 @@ export default function JarAdvancedAssetEditor({ navigation, route }) {
     });
     if (!validated.ok) {
       Alert.alert('Cannot save', validated.message);
-      return;
-    }
-    const anyPartial =
-      !splitsSumExact100(defaultSplits) ||
-      milestonesForSave.some((m) => !splitsSumExact100(m.splits));
-    if (anyPartial) {
-      Alert.alert(
-        'Partial split',
-        'One or more splits total less than 100%. The undistributed portion will stay in the Jar when you distribute.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Save anyway', onPress: () => void doSave(validated) },
-        ]
-      );
       return;
     }
     void doSave(validated);

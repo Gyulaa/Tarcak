@@ -35,6 +35,12 @@ const FORBIDDEN = [
   { re: /\bdocument\.write\s*\(/, name: 'document.write()' },
 ];
 
+/** Directives that switch off the typecheck; they live in comments, so these are matched on every line. */
+const FORBIDDEN_IN_COMMENTS = [
+  { re: /@ts-nocheck\b/, name: '@ts-nocheck' },
+  { re: /@ts-ignore\b/, name: '@ts-ignore' },
+];
+
 function* walkDir(dir, base = dir) {
   let names;
   try {
@@ -93,10 +99,8 @@ function scanStatic() {
     const lines = content.split(/\r?\n/);
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      if (line.trim().startsWith('//') || line.trim().startsWith('*')) {
-        continue;
-      }
-      for (const { re, name } of FORBIDDEN) {
+      const isComment = line.trim().startsWith('//') || line.trim().startsWith('*');
+      for (const { re, name } of isComment ? FORBIDDEN_IN_COMMENTS : [...FORBIDDEN, ...FORBIDDEN_IN_COMMENTS]) {
         if (re.test(line)) {
           hits.push({
             file: file.replace(/\\/g, '/').replace(ROOT.replace(/\\/g, '/'), '').replace(/^\//, ''),
