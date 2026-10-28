@@ -91,6 +91,11 @@ describe('formatMinorExact', () => {
     assert.equal(formatMinorExact(major(12) + 10_000_000n, '.'), '12.1');
   });
 
+  test('a value below one unit keeps its leading zero and every digit', () => {
+    assert.equal(formatMinorExact(14_163_066n, '.'), '0.14163066');
+    assert.equal(formatMinorExact(14_163_066n, ','), '0,14163066');
+  });
+
   test('negative amounts carry the sign, nothing rounds', () => {
     assert.equal(formatMinorExact(-1n, '.'), '-0.00000001');
     assert.equal(formatMinorExact(-250_000_000n, ','), '-2,5');

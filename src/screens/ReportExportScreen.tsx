@@ -41,8 +41,8 @@ import type { AppColors } from '../theme/palette';
 import { deleteReportFile, purgeReportFiles, writeReportFile } from '../utils/reportFile';
 
 const FORMAT_OPTIONS: { value: CsvFormat; title: string; subtitle: string }[] = [
-  { value: 'hungarian', title: 'Hungarian', subtitle: 'Semicolon between columns, decimal comma' },
   { value: 'international', title: 'International', subtitle: 'Comma between columns, decimal point' },
+  { value: 'hungarian', title: 'Hungarian', subtitle: 'Semicolon between columns, decimal comma' },
 ];
 
 /** The last 12 calendar months including the current one. */
@@ -68,7 +68,7 @@ export default function ReportExportScreen() {
   const [scopeKey, setScopeKey] = useState('all');
   const [rangeValue, setRangeValue] = useState<TimeRangeValue>(defaultRange);
   const [breakdown, setBreakdown] = useState(false);
-  const [format, setFormat] = useState<CsvFormat>('hungarian');
+  const [format, setFormat] = useState<CsvFormat>('international');
   /** Currencies the user switched off; a currency that shows up later starts switched on. */
   const [skipped, setSkipped] = useState<string[]>([]);
 

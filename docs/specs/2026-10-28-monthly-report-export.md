@@ -25,7 +25,7 @@ Gyula egy gombnyomással kapjon egy anonimizált, havi bontású bevétel/kiadá
 - [ ] Nincs más oszlop: nincs zsebnév/-azonosító, tranzakciócím, azonosító, időbélyeg, eszközinfó.
 
 **CSV formátum**
-- [ ] Két előbeállítás, alapból a magyar: **Hungarian** (elválasztó `;`, tizedesjel `,`) és **International** (`,` és `.`). A választás nem tárolódik (nincs új `user_settings` kulcs), minden megnyitáskor az alap.
+- [ ] Két előbeállítás, alapból az International (módosítva 2026-10-28, Gyula kérésére: az angol nyelvű táblázatkezelő a `0,14163066`-ot ezres tagolásnak olvasta, `14,163,066` lett): **International** (elválasztó `,`, tizedesjel `.`) és **Hungarian** (`;` és `,`). A választás nem tárolódik (nincs új `user_settings` kulcs), minden megnyitáskor az alap.
 - [ ] UTF-8 BOM-mal (hogy a magyar ékezetek Excelben jók legyenek), CRLF sorvég, RFC 4180 szerinti idézés (elválasztót, idézőjelet, sortörést tartalmazó cella idézőjelben, a belső `"` duplázva).
 - [ ] **CSV-injekció ellen**: ha egy szöveges cella (kategórianév) `=`, `+`, `-`, `@`, tab vagy CR karakterrel kezdődik, elé `'` kerül. Az összegcellákra ez nem vonatkozik (a negatív szám `-`-lel kezdődik).
 - [ ] Fájlnév: `tarcak-report-YYYY-MM-DD.csv` (csak az export napja).
